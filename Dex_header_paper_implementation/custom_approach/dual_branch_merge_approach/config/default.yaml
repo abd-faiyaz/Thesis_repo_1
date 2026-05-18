@@ -1,0 +1,69 @@
+# Dual-Branch Merge (Pattern B) — default configuration
+# Paths are relative to dual_branch_merge_approach/ unless absolute.
+
+paths:
+  apk_root: data/apks                    # remote: point to 50k APK directory (benign/ + malware/)
+  dataset_index: artifacts/dataset_index.csv
+  processed_dir: artifacts/processed
+  checkpoint_dir: artifacts/checkpoints
+  latest_checkpoint: artifacts/checkpoints/latest.pt
+  best_checkpoint: artifacts/checkpoints/best.pt
+  failed_apks_log: artifacts/failed_apks.log
+  normalization_stats: artifacts/normalization_header.json
+  vocab: artifacts/vocab.json
+  splits_dir: artifacts/splits
+  class_balance: artifacts/class_balance.json
+  pipeline_log: artifacts/pipeline.log
+  artifacts_bundle: artifacts/pattern_b_bundle.tar.gz
+
+preprocessing:
+  label_mode: parent_folder              # scan_dataset walks apk_root; do not trust external CSV
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  multidex:
+    mode: sum
+    dex_pattern: "^classes(\\d*)\\.dex$"
+    max_dex: 3
+  lexicon_size: 4380
+  min_token_freq: 2
+  bow_encoding: multihot
+  manifest_parser: pyaxmlparser
+  cache_format: shard_npz
+  train_ratio: 0.9
+  seed: 42
+
+data:
+  batch_size: 16
+  num_workers: 4
+  pin_memory: true
+
+model:
+  header_dim: 104
+  hidden_dim: 128
+  ascnn_embed_dim: 128
+  bow_padded_len: 4381                   # N+1
+
+training:
+  batch_size: 16
+  learning_rate: 0.005
+  momentum: 0.9
+  lr_decay_factor: 0.5
+  lr_step_size: 10
+  lr_scheduler: StepLR
+  epochs: 80
+  num_workers: 4
+  pin_memory: true
+  device: cuda
+  loss: BCEWithLogitsLoss
+  optimizer: SGD
+  checkpoint_every_epoch: true
+  benign_to_malware_ratio: null
+  pos_weight: null
+  auto_pos_weight: true              # use artifacts/class_balance.json when set by Phase 6
+
+evaluation:
+  threshold: 0.5
+  metrics:
+    - accuracy
+    - f1
+    - roc_auc

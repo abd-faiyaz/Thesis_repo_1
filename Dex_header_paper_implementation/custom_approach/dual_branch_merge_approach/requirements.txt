@@ -1,0 +1,9 @@
+# Dual-Branch Merge (Pattern B) — Dex header MLP + manifest ASCNN fusion
+# Python 3.10+ recommended. zipfile is stdlib (no pip package).
+
+torch>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+PyYAML>=6.0
+pyaxmlparser>=0.3.31

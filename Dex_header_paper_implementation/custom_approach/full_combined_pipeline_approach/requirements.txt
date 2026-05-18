@@ -1,0 +1,11 @@
+# Full Combined Pipeline (Pattern A) — ASCNN(C) single tower
+# Use thesis venv: /run/media/abd-faiyaz/Files/thesis_vigidroid/thesis_venv
+# Python 3.10+. zipfile is stdlib.
+
+# Versions match thesis_venv as of Phase 1 setup (2026-05-17)
+torch==2.11.0
+numpy==2.4.3
+scikit-learn==1.8.0
+tqdm==4.67.3
+PyYAML==6.0.3
+pyaxmlparser>=0.3.31
