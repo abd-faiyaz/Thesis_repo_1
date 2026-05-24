@@ -85,3 +85,10 @@ def ensure_artifact_dirs(cfg: PipelineConfig) -> None:
     cfg.paths.processed_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.failed_apks_log.parent.mkdir(parents=True, exist_ok=True)
+
+
+def multidex_settings_from_config(cfg: PipelineConfig) -> dict[str, Any]:
+    """Return resolved multidex options from pipeline config."""
+    from src.features.multidex import multidex_settings
+
+    return multidex_settings(cfg.preprocessing)

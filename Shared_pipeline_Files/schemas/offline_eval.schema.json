@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "offline_eval.schema.json",
+  "title": "Offline model evaluation result",
+  "type": "object",
+  "required": ["run_id", "model_id", "split", "n_samples", "metrics", "threshold"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "model_id": { "type": "string" },
+    "domain": { "type": "string" },
+    "split": { "type": "string", "enum": ["train", "val", "test"] },
+    "n_samples": { "type": "integer", "minimum": 0 },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "accuracy": { "type": "number" },
+        "f1": { "type": "number" },
+        "roc_auc": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "confusion_matrix": {
+      "type": "array",
+      "items": { "type": "array", "items": { "type": "integer" } }
+    },
+    "threshold": { "type": "number" },
+    "checkpoint_path": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "hardware": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

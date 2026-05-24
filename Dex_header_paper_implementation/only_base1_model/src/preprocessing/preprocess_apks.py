@@ -3,27 +3,27 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
 from src.config import ensure_artifact_dirs, load_config
-from src.features.dex_header import (
-    FEATURE_DIM,
-    DexHeaderError,
-    extract_header_features,
-    parse_dex_header_fields,
-)
+from src.features.dex_header import FEATURE_DIM, DexHeaderError
+from src.features.multidex import multidex_settings
 from src.features.normalization import (
+    build_normalization_metadata,
     fit_minmax,
     save_normalization_stats,
     transform_minmax,
 )
-from src.preprocessing.apk_extract import ApkExtractError, read_classes_dex
+from src.preprocessing.apk_extract import ApkExtractError, extract_apk_header_extraction
 from src.preprocessing.labels import LabelError, load_labels_csv, resolve_label
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -41,6 +41,29 @@ def _log_failure(log_path: Path, apk_path: Path, reason: str) -> None:
         f.write(f"{apk_path}\t{reason}\n")
 
 
+def _resolve_multidex_config(pre: dict[str, Any]) -> dict[str, Any]:
+    """Resolve multidex settings; map legacy dex_entry_name to primary_only."""
+    if pre.get("dex_entry_name") and not pre.get("multidex"):
+        warnings.warn(
+            "preprocessing.dex_entry_name is deprecated; using multidex.mode=primary_only",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        md = multidex_settings(pre)
+        return {
+            "mode": "primary_only",
+            "dex_pattern": md["dex_pattern"],
+            "max_dex": md["max_dex"],
+        }
+    return multidex_settings(pre)
+
+
+def _feature_dim_for_mode(mode: str, max_dex: int) -> int:
+    if mode == "concat":
+        return FEATURE_DIM * max_dex
+    return FEATURE_DIM
+
+
 def _save_aggregate(
     out_path: Path,
     features: np.ndarray,
@@ -49,18 +72,24 @@ def _save_aggregate(
     mins: np.ndarray,
     maxs: np.ndarray,
     output_format: str,
+    *,
+    bundle_metadata: dict[str, Any],
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     meta = {
         "feature_dim": int(features.shape[1]),
         "num_samples": int(features.shape[0]),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        **bundle_metadata,
     }
 
     if output_format == "npy":
         np.save(out_path.with_suffix(".features.npy"), features)
         np.save(out_path.with_suffix(".labels.npy"), labels)
         np.save(out_path.with_suffix(".paths.npy"), np.array(paths, dtype=object))
+        meta_path = out_path.with_suffix(".meta.json")
+        with meta_path.open("w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
         return
 
     bundle = {
@@ -72,6 +101,11 @@ def _save_aggregate(
         "normalization_mins": torch.from_numpy(mins).float(),
         "normalization_maxs": torch.from_numpy(maxs).float(),
         "created_at": meta["created_at"],
+        "multidex_mode": meta["multidex_mode"],
+        "dex_pattern": meta["dex_pattern"],
+        "cache_version": meta["cache_version"],
+        "max_dex": meta["max_dex"],
+        "dex_file_counts": meta.get("dex_file_counts"),
     }
     torch.save(bundle, out_path)
 
@@ -82,7 +116,8 @@ def preprocess(
     processed_dir: Path,
     failed_log: Path,
     normalization_stats_path: Path,
-    dex_entry_name: str,
+    multidex: dict[str, Any],
+    cache_version: int,
     output_format: str,
     aggregate_filename: str,
     label_mode: str,
@@ -90,7 +125,7 @@ def preprocess(
     benign_names: set[str],
     malicious_names: set[str],
     limit: int | None = None,
-) -> dict[str, int]:
+) -> dict[str, int | str]:
     """Extract features from all APKs under apk_root; return summary counts."""
     apks = _discover_apks(apk_root)
     if limit is not None:
@@ -100,10 +135,15 @@ def preprocess(
         raise FileNotFoundError(f"No .apk files under {apk_root}")
 
     csv_cache = load_labels_csv(labels_csv) if label_mode == "csv" and labels_csv else None
+    expected_feature_dim = _feature_dim_for_mode(
+        str(multidex["mode"]),
+        int(multidex["max_dex"]),
+    )
 
     raw_features: list[np.ndarray] = []
     labels: list[int] = []
     paths: list[str] = []
+    dex_count_hist: dict[int, int] = {}
     failed = 0
 
     for apk_path in tqdm(apks, desc="Extracting Dex headers", unit="apk"):
@@ -116,9 +156,20 @@ def preprocess(
                 malicious_names=malicious_names,
                 csv_cache=csv_cache,
             )
-            dex_bytes = read_classes_dex(apk_path, entry_name=dex_entry_name)
-            parse_dex_header_fields(dex_bytes)
-            vector = extract_header_features(dex_bytes)
+            extraction = extract_apk_header_extraction(
+                apk_path,
+                mode=str(multidex["mode"]),
+                pattern=str(multidex["dex_pattern"]),
+                max_dex=int(multidex["max_dex"]),
+            )
+            vector = extraction.vector
+            if vector.shape != (expected_feature_dim,):
+                raise ApkExtractError(
+                    f"Feature shape {vector.shape} != expected ({expected_feature_dim},)"
+                )
+            dex_count_hist[extraction.num_dex_files] = (
+                dex_count_hist.get(extraction.num_dex_files, 0) + 1
+            )
         except (ApkExtractError, DexHeaderError, LabelError) as exc:
             failed += 1
             _log_failure(failed_log, apk_path, str(exc))
@@ -138,15 +189,34 @@ def preprocess(
     feature_matrix = np.stack(raw_features, axis=0)
     label_array = np.array(labels, dtype=np.float64)
 
-    mins, maxs = fit_minmax(feature_matrix)
+    dex_file_counts = {str(k): v for k, v in sorted(dex_count_hist.items())}
+    norm_meta = build_normalization_metadata(
+        multidex_mode=str(multidex["mode"]),
+        dex_pattern=str(multidex["dex_pattern"]),
+        cache_version=cache_version,
+        num_samples=len(paths),
+        apk_root=str(apk_root),
+        max_dex=int(multidex["max_dex"]),
+        dex_file_counts=dex_file_counts,
+    )
+
+    mins, maxs = fit_minmax(feature_matrix, feature_dim=expected_feature_dim)
     save_normalization_stats(
         normalization_stats_path,
         mins,
         maxs,
-        extra={"num_samples": len(paths), "apk_root": str(apk_root)},
+        feature_dim=expected_feature_dim,
+        extra=norm_meta,
     )
     normalized = transform_minmax(feature_matrix, mins, maxs)
 
+    bundle_metadata = {
+        "multidex_mode": norm_meta["multidex_mode"],
+        "dex_pattern": norm_meta["dex_pattern"],
+        "cache_version": norm_meta["cache_version"],
+        "max_dex": norm_meta["max_dex"],
+        "dex_file_counts": dex_file_counts,
+    }
     out_path = processed_dir / aggregate_filename
     _save_aggregate(
         out_path,
@@ -156,20 +226,24 @@ def preprocess(
         mins,
         maxs,
         output_format,
+        bundle_metadata=bundle_metadata,
     )
 
     return {
         "total_apks": len(apks),
         "successful": len(paths),
         "failed": failed,
-        "feature_dim": FEATURE_DIM,
+        "feature_dim": expected_feature_dim,
+        "multidex_mode": str(multidex["mode"]),
+        "cache_version": cache_version,
+        "dex_file_counts": dex_file_counts,
         "output": str(out_path),
     }
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Preprocess APKs: extract classes.dex header features."
+        description="Preprocess APKs: extract and aggregate classes*.dex header features."
     )
     parser.add_argument(
         "--config",
@@ -209,6 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     malicious_names = {
         _normalize_set_name(n) for n in pre.get("malicious_names", ["malware", "malicious", "virus", "1"])
     }
+    multidex = _resolve_multidex_config(pre)
+    cache_version = int(pre.get("cache_version", 2))
 
     if str(_PACKAGE_ROOT) not in sys.path:
         sys.path.insert(0, str(_PACKAGE_ROOT))
@@ -216,13 +292,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"APK root: {apk_root}")
     print(f"Output dir: {cfg.paths.processed_dir}")
     print(f"Label mode: {label_mode}")
+    print(f"Multidex mode: {multidex['mode']}")
+    print(f"Dex pattern: {multidex['dex_pattern']}")
+    print(f"Cache version: {cache_version}")
 
     summary = preprocess(
         apk_root=apk_root,
         processed_dir=cfg.paths.processed_dir,
         failed_log=cfg.paths.failed_apks_log,
         normalization_stats_path=cfg.paths.normalization_stats,
-        dex_entry_name=pre.get("dex_entry_name", "classes.dex"),
+        multidex=multidex,
+        cache_version=cache_version,
         output_format=pre.get("output_format", "pt"),
         aggregate_filename=pre.get("aggregate_filename", "dex_header_features.pt"),
         label_mode=label_mode,

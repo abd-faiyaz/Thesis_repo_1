@@ -7,6 +7,11 @@ import sys
 from pathlib import Path
 
 from src.config import ensure_artifact_dirs, load_config
+from src.pipeline_integration import (
+    get_pipeline_settings,
+    load_shared_train_val_paths,
+    partition_rows_from_shared_paths,
+)
 from src.preprocessing.common import (
     scan_apk_rows,
     stratified_split,
@@ -31,15 +36,28 @@ def main(argv: list[str] | None = None) -> int:
     ensure_artifact_dirs(cfg)
     pre = cfg.preprocessing
 
-    apk_root = args.apk_root or cfg.paths.apk_root
+    apk_root = Path(args.apk_root or cfg.paths.apk_root)
     rows = scan_apk_rows(cfg, apk_root)
     if args.limit is not None:
         rows = rows[: args.limit]
-    train_rows, val_rows = stratified_split(
-        rows,
-        train_ratio=float(pre.get("train_ratio", 0.9)),
-        seed=int(pre.get("seed", 42)),
-    )
+
+    settings = get_pipeline_settings(cfg)
+    shared_paths = load_shared_train_val_paths(settings)
+    if shared_paths is not None:
+        train_paths, val_paths = shared_paths
+        train_rows, val_rows, rows = partition_rows_from_shared_paths(
+            rows, train_paths, val_paths, apk_root
+        )
+        print(
+            f"Using shared splits from {settings.shared_splits_dir} "
+            f"(train={len(train_rows)}, val={len(val_rows)})"
+        )
+    else:
+        train_rows, val_rows = stratified_split(
+            rows,
+            train_ratio=float(pre.get("train_ratio", 0.9)),
+            seed=int(pre.get("seed", 42)),
+        )
 
     write_dataset_index(cfg.paths.dataset_index, rows)
     write_split_file(cfg.paths.splits_dir / "train.txt", train_rows)

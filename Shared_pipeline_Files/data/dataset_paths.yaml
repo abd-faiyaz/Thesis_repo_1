@@ -1,0 +1,14 @@
+# Shared dataset pointers — APK binaries stay outside the repo.
+# Edit apk_root to match your machine (examples below).
+
+apk_root: /run/media/abd-faiyaz/Files/thesis_full_dataset
+# alt (CachyOS mount): /mnt/Files/thesis_full_dataset
+
+project_root: /run/media/abd-faiyaz/Files/thesis_vigidroid
+
+manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv
+splits_dir: Shared_pipeline_Files/data/splits
+
+train_split: Shared_pipeline_Files/data/splits/train.txt
+val_split: Shared_pipeline_Files/data/splits/val.txt
+test_split: Shared_pipeline_Files/data/splits/test.txt

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "device_scan.schema.json",
+  "title": "On-device APK scan metrics",
+  "type": "object",
+  "required": ["scan_id", "device", "apk", "trigger", "stages", "totals"],
+  "properties": {
+    "scan_id": { "type": "string" },
+    "timestamp_ms": { "type": "integer" },
+    "device": {
+      "type": "object",
+      "required": ["model", "api"],
+      "properties": {
+        "model": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "api": { "type": "integer" }
+      }
+    },
+    "apk": {
+      "type": "object",
+      "required": ["name", "size_bytes"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256_short": { "type": "string" }
+      }
+    },
+    "trigger": { "type": "string", "enum": ["manual", "download", "scheduled", "install"] },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["domain", "inference_ms", "score"],
+        "properties": {
+          "domain": { "type": "string" },
+          "parse_ms": { "type": "number" },
+          "vectorize_ms": { "type": "number" },
+          "inference_ms": { "type": "number" },
+          "score": { "type": "number" },
+          "mem_delta_bytes": { "type": "integer" }
+        }
+      }
+    },
+    "ensemble": {
+      "type": "object",
+      "properties": {
+        "score": { "type": "number" },
+        "decision": { "type": "string", "enum": ["benign", "malware", "uncertain"] },
+        "policy": { "type": "string" }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "properties": {
+        "wall_ms": { "type": "number" },
+        "cpu_ms": { "type": "number" },
+        "mem_delta_bytes": { "type": "integer" },
+        "battery_pct_delta": { "type": ["number", "null"] }
+      }
+    }
+  },
+  "additionalProperties": true
+}

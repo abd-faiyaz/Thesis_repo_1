@@ -184,20 +184,44 @@ def run_evaluation(
         show_progress=True,
     )
 
+    y_true, y_pred, y_score = collect_predictions(
+        model, loader, device, threshold=threshold
+    )
+    from src.pipeline_integration import (
+        build_confusion_matrix,
+        export_offline_evaluation,
+        write_local_metrics_json,
+    )
+
+    confusion = build_confusion_matrix(y_true, y_pred)
+    n_samples = int(len(y_true))
+
     result: dict[str, Any] = {
         "split": split,
         "loss": val_loss,
         **metrics,
         "checkpoint": str(ckpt_path),
         "threshold": threshold,
+        "n_samples": n_samples,
+        "confusion_matrix": confusion,
     }
     print(f"Evaluation ({split}) — loss={val_loss:.4f} {format_metrics(metrics)}")
 
     out = metrics_out or (cfg.paths.checkpoint_dir / f"metrics_{split}.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
+    write_local_metrics_json(out, result)
     print(f"  metrics written → {out}")
+
+    settings = get_pipeline_settings(cfg)
+    export_offline_evaluation(
+        cfg,
+        split=split,
+        metrics=metrics,
+        n_samples=n_samples,
+        threshold=threshold,
+        checkpoint_path=ckpt_path,
+        confusion_matrix=confusion,
+        val_loss=val_loss,
+    )
 
     return result
 

@@ -2,7 +2,9 @@
 # Paths relative to full_combined_pipeline_approach/ unless absolute.
 
 paths:
+  # Full corpus: set to your APK tree (see Shared_pipeline_Files/data/dataset_paths.yaml)
   apk_root: data/apks
+  # apk_root: /mnt/Files/thesis_full_dataset
   dataset_index: artifacts/dataset_index.csv
   processed_dir: artifacts/processed
   checkpoint_dir: artifacts/checkpoints
@@ -56,7 +58,7 @@ training:
   epochs: 80
   num_workers: 4
   pin_memory: true
-  device: cpu
+  device: cuda
   loss: BCEWithLogitsLoss
   optimizer: SGD
   checkpoint_every_epoch: true
@@ -70,3 +72,13 @@ evaluation:
     - accuracy
     - f1
     - roc_auc
+
+# VigiDroid thesis pipeline (Phase 3+) — see patternA_specifics.md § Pipeline integration
+pipeline:
+  enabled: true
+  model_id: pattern_a_combined
+  domain: dex_header_manifest
+  export_offline_json: true
+  use_shared_splits: false
+  shared_splits_dir: Shared_pipeline_Files/data/splits
+  shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv

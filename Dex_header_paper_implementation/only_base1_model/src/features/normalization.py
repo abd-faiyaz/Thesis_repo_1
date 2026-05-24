@@ -11,10 +11,11 @@ import numpy as np
 from src.features.dex_header import FEATURE_DIM
 
 
-def fit_minmax(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def fit_minmax(features: np.ndarray, *, feature_dim: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Compute per-dimension min and max from shape (N, D)."""
-    if features.ndim != 2 or features.shape[1] != FEATURE_DIM:
-        raise ValueError(f"Expected (N, {FEATURE_DIM}), got {features.shape}")
+    dim = feature_dim if feature_dim is not None else FEATURE_DIM
+    if features.ndim != 2 or features.shape[1] != dim:
+        raise ValueError(f"Expected (N, {dim}), got {features.shape}")
     mins = features.min(axis=0)
     maxs = features.max(axis=0)
     return mins, maxs
@@ -29,6 +30,30 @@ def transform_minmax(
     denom = maxs - mins
     denom = np.where(denom == 0, 1.0, denom)
     return (features - mins) / denom
+
+
+def build_normalization_metadata(
+    *,
+    multidex_mode: str,
+    dex_pattern: str,
+    cache_version: int,
+    num_samples: int,
+    apk_root: str,
+    max_dex: int,
+    dex_file_counts: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """Standard metadata persisted alongside min-max stats."""
+    meta: dict[str, Any] = {
+        "multidex_mode": multidex_mode,
+        "dex_pattern": dex_pattern,
+        "cache_version": cache_version,
+        "num_samples": num_samples,
+        "apk_root": apk_root,
+        "max_dex": max_dex,
+    }
+    if dex_file_counts is not None:
+        meta["dex_file_counts"] = dex_file_counts
+    return meta
 
 
 def save_normalization_stats(

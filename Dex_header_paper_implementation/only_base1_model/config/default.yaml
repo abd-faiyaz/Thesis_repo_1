@@ -10,7 +10,12 @@ paths:
   normalization_stats: artifacts/normalization.json
 
 preprocessing:
-  dex_entry_name: classes.dex      # primary Dex only (no classes2.dex merge)
+  multidex:
+    mode: sum                      # sum | mean | primary_only | concat
+    dex_pattern: "^classes(\\d*)\\.dex$"
+    max_dex: 3                     # used only when mode: concat
+  # dex_entry_name: classes.dex    # deprecated; use multidex.mode: primary_only for ablation
+  cache_version: 2                 # v1=primary-only artifacts; v2=multidex aggregation
   output_format: pt                # pt | npy
   aggregate_filename: dex_header_features.pt
   # Labels: parent folder name (benign/ vs malware/) or explicit CSV manifest

@@ -72,6 +72,7 @@ public class ScanService extends JobIntentService {
         sendLog("ScanService started", "Running");
 
         boolean manual = intent.getBooleanExtra("manual_trigger", false);
+        String trigger = manual ? "manual" : "download";
         if (manual) sendLog("Triggered by button", null);
         else sendLog("Triggered by BroadcastReceiver", null);
 
@@ -149,6 +150,15 @@ public class ScanService extends JobIntentService {
                     apkName, parsingMs, vectorMs, inferenceMs, score, cnnParsingMs, cnnInferenceMs, cnnScore, totalMs, cpuMs, memDelta);
 
             sendLog(result, "Idle");
+
+            writeScanMetrics(
+                    trigger,
+                    apk,
+                    parsingMs, vectorMs, inferenceMs, score,
+                    cnnParsingMs, cnnInferenceMs, cnnScore,
+                    totalMs, cpuMs / 1_000_000.0, memDelta,
+                    memEnd - memStart
+            );
         }
 
         sendLog("Scan completed.", "Idle");
@@ -381,6 +391,60 @@ public class ScanService extends JobIntentService {
             sendLog("CNN Inference error: " + e.getMessage(), "Error");
             return -1f;
         }
+    }
+
+    private void writeScanMetrics(
+            String trigger,
+            File apk,
+            double xgbParseMs, double xgbVecMs, double xgbInferMs, float xgbScore,
+            double cnnParseMs, double cnnInferMs, float cnnScore,
+            double wallMs, double cpuMs, long memDeltaBytes,
+            long scanMemDelta
+    ) {
+        try {
+            MetricsWriter.ScanMetrics scan = new MetricsWriter.ScanMetrics();
+            scan.trigger = trigger;
+            scan.apkName = apk.getName();
+            scan.apkPath = apk.getAbsolutePath();
+            scan.apkSizeBytes = apk.length();
+            scan.wallMs = wallMs;
+            scan.cpuMs = cpuMs;
+            scan.memDeltaBytes = memDeltaBytes;
+
+            scan.stages.add(new MetricsWriter.StageMetrics(
+                    "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, scanMemDelta / 2));
+            scan.stages.add(new MetricsWriter.StageMetrics(
+                    "bytecnn", cnnParseMs, 0.0, cnnInferMs, cnnScore, scanMemDelta / 2));
+
+            float ensemble = computeEnsembleScore(xgbScore, cnnScore);
+            if (ensemble >= 0f) {
+                scan.ensembleScore = ensemble;
+                scan.ensembleDecision = ensemble >= 0.5f ? "malware" : "benign";
+                if (xgbScore >= 0f && cnnScore >= 0f && Math.abs(xgbScore - cnnScore) > 0.4f) {
+                    scan.ensembleDecision = "uncertain";
+                }
+            }
+
+            File out = MetricsWriter.writeScan(this, scan);
+            sendLog("Metrics JSON: " + out.getName(), null);
+        } catch (Exception e) {
+            Log.e(TAG, "Metrics write failed", e);
+            sendLog("Metrics JSON error: " + e.getMessage(), null);
+        }
+    }
+
+    private float computeEnsembleScore(float xgbScore, float cnnScore) {
+        int n = 0;
+        float sum = 0f;
+        if (xgbScore >= 0f) {
+            sum += xgbScore;
+            n++;
+        }
+        if (cnnScore >= 0f) {
+            sum += cnnScore;
+            n++;
+        }
+        return n > 0 ? sum / n : -1f;
     }
 
     // ------------------------------

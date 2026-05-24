@@ -128,6 +128,15 @@ def extract_header_features(dex_bytes: bytes) -> np.ndarray:
     return extract_raw_byte_features(dex_bytes)
 
 
+def extract_headers_from_dex_list(dex_bytes_list: list[bytes]) -> list[np.ndarray]:
+    """Parse each Dex buffer to a 104-d header vector; fail on first invalid Dex."""
+    vectors: list[np.ndarray] = []
+    for dex_bytes in dex_bytes_list:
+        parse_dex_header_fields(dex_bytes)
+        vectors.append(extract_header_features(dex_bytes))
+    return vectors
+
+
 def fields_to_hex_strings(fields: DexHeaderFields) -> dict[str, str]:
     """Debug helper: uint32 fields as hex strings (signature as hex blob)."""
     out: dict[str, str] = {"signature": fields.signature.hex()}

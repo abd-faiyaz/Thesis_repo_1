@@ -1,0 +1,45 @@
+{
+  "scan_id": "00000000-0000-4000-8000-000000000001",
+  "timestamp_ms": 1716500000000,
+  "device": {
+    "model": "Pixel 6a",
+    "manufacturer": "Google",
+    "api": 34
+  },
+  "apk": {
+    "name": "sample.apk",
+    "path": "/storage/emulated/0/Download/sample.apk",
+    "size_bytes": 12345678,
+    "sha256_short": "a1b2c3d4"
+  },
+  "trigger": "manual",
+  "stages": [
+    {
+      "domain": "manifest_xgb",
+      "parse_ms": 120.5,
+      "vectorize_ms": 2.1,
+      "inference_ms": 8.3,
+      "score": 0.12,
+      "mem_delta_bytes": 4096
+    },
+    {
+      "domain": "bytecnn",
+      "parse_ms": 1.2,
+      "vectorize_ms": 0.0,
+      "inference_ms": 15.0,
+      "score": 0.88,
+      "mem_delta_bytes": 2048
+    }
+  ],
+  "ensemble": {
+    "score": 0.5,
+    "decision": "uncertain",
+    "policy": "sequential_mean"
+  },
+  "totals": {
+    "wall_ms": 200.0,
+    "cpu_ms": 180.0,
+    "mem_delta_bytes": 6144,
+    "battery_pct_delta": null
+  }
+}

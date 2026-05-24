@@ -34,14 +34,15 @@ ROOT="$SCRIPT_DIR"
 # All following commands run from ROOT so relative paths in config work
 cd "$ROOT"
 
+# Shared thesis_venv at repo root (see scripts/setup_thesis_venv.sh)
+# shellcheck source=/dev/null
+source "$ROOT/scripts/activate_thesis_env.sh"
+
 # --- Configurable settings (override via environment variables) --------------
 
 # APK_ROOT: directory tree containing .apk files (benign/ and malware/ subdirs)
 # Default matches config/default.yaml → paths.apk_root
 APK_ROOT="${APK_ROOT:-$ROOT/data/apks}"
-
-# PYTHON: which Python interpreter to use (venv recommended)
-PYTHON="${PYTHON:-python3}"
 
 # CONFIG: YAML config file path (optional --config passed to Python modules)
 CONFIG="${CONFIG:-$ROOT/config/default.yaml}"
@@ -87,6 +88,7 @@ section "Base Model 1 (MLP(H)) — configuration"
 echo "ROOT:            $ROOT"
 echo "APK_ROOT:        $APK_ROOT"
 echo "PYTHON:          $PYTHON"
+echo "THESIS_VENV:     ${THESIS_VENV:-<not set>}"
 echo "CONFIG:          $CONFIG"
 echo "SKIP_PREPROCESS: $SKIP_PREPROCESS"
 echo "SKIP_TRAIN:      $SKIP_TRAIN"
@@ -98,8 +100,9 @@ echo "VERIFY_SETUP:    $VERIFY_SETUP"
 # --- Step 1 (optional): Install dependencies -----------------------------------
 if [[ "$INSTALL_DEPS" == "1" ]]; then
   section "Step 1: Installing dependencies"
-  # Install torch, sklearn, tqdm, PyYAML, etc. from requirements.txt
-  "$PYTHON" -m pip install -r "$ROOT/requirements.txt"
+  _REQS="$(thesis_all_requirements_path)"
+  echo "Using requirements: $_REQS"
+  "$PYTHON" -m pip install -r "$_REQS"
 else
   echo ""
   echo "(Skipping pip install; set INSTALL_DEPS=1 to install requirements.txt)"
@@ -133,7 +136,7 @@ if [[ "$SKIP_PREPROCESS" != "1" ]]; then
     PREPROCESS_ARGS+=(--limit "$PREPROCESS_LIMIT")
   fi
 
-  # Unzip APKs in memory, parse classes.dex header, save dex_header_features.pt
+  # Unzip APKs in memory, aggregate all classes*.dex headers, save dex_header_features.pt
   "$PYTHON" -m src.preprocessing.preprocess_apks "${PREPROCESS_ARGS[@]}"
 else
   echo ""

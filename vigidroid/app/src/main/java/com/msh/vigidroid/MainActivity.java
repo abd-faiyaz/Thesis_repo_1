@@ -16,6 +16,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+
 public class MainActivity extends AppCompatActivity {
 
     private TextView txtStatus, txtLog;
@@ -61,6 +63,8 @@ public class MainActivity extends AppCompatActivity {
             ScanService.enqueueWork(MainActivity.this, i);
         });
 
+        showMetricsPullHint();
+
         LocalBroadcastManager.getInstance(this)
                 .registerReceiver(logReceiver, new IntentFilter("SCAN_LOG"));
     }
@@ -69,6 +73,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(logReceiver);
         super.onDestroy();
+    }
+
+    private void showMetricsPullHint() {
+        File metricsDir = MetricsWriter.getMetricsDir(this);
+        txtLog.append("Metrics dir: " + metricsDir.getAbsolutePath() + "\n");
+        txtLog.append("Pull to PC: adb pull \"" + metricsDir.getAbsolutePath()
+                + "/\" Shared_pipeline_Files/results/device/\n");
     }
 
     private void requestAllFileAccess() {

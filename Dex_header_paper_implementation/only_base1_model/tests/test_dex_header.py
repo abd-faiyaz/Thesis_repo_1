@@ -17,6 +17,7 @@ from src.features.dex_header import (
     FEATURE_DIM,
     DexHeaderError,
     extract_header_features,
+    extract_headers_from_dex_list,
     parse_dex_header_fields,
     validate_magic,
 )
@@ -71,6 +72,15 @@ class TestDexHeader(unittest.TestCase):
         normed = transform_minmax(matrix, mins, maxs)
         self.assertEqual(normed.shape, (2, FEATURE_DIM))
         self.assertTrue(np.all(normed >= 0) and np.all(normed <= 1))
+
+    def test_extract_headers_from_dex_list(self) -> None:
+        other = _build_synthetic_dex()
+        other_arr = bytearray(other)
+        struct.pack_into("<I", other_arr, 8, 0xCAFEBABE)
+        vectors = extract_headers_from_dex_list([self.dex, bytes(other_arr)])
+        self.assertEqual(len(vectors), 2)
+        self.assertEqual(vectors[0].shape, (FEATURE_DIM,))
+        self.assertNotEqual(vectors[0][0], vectors[1][0])
 
 
 if __name__ == "__main__":

@@ -141,7 +141,7 @@ if ($SKIP_PREPROCESS -ne "1") {
         $preprocessArgs += @("--limit", $PREPROCESS_LIMIT)
     }
 
-    # Extract classes.dex headers → artifacts/processed/dex_header_features.pt
+    # Aggregate all classes*.dex headers → artifacts/processed/dex_header_features.pt
     & $PYTHON @preprocessArgs
 } else {
     Write-Host ""

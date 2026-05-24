@@ -19,9 +19,13 @@ REQUIRED = [
     ("pyaxmlparser", "pyaxmlparser"),
 ]
 
-VENV_HINT = (
-    "/run/media/abd-faiyaz/Files/thesis_vigidroid/thesis_venv/bin/python"
-)
+def _thesis_venv_python() -> str | None:
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "thesis_venv" / "bin" / "python"
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def check_imports() -> list[str]:
@@ -57,10 +61,13 @@ def main() -> int:
     print("Full Combined Pipeline (Pattern A) — Phase 1 environment check\n")
     print(f"Project root: {ROOT}")
     print(f"Python:       {sys.executable}")
-    if VENV_HINT not in sys.executable:
-        print(f"Hint:         use thesis venv: {VENV_HINT}\n")
+    venv_py = _thesis_venv_python()
+    if venv_py and venv_py not in sys.executable:
+        print(f"Hint:         use shared thesis venv: {venv_py}\n")
+    elif venv_py:
+        print("Using shared thesis_venv.\n")
     else:
-        print()
+        print("Hint:         create repo-root thesis_venv (see scripts/setup_thesis_venv.sh)\n")
 
     import_errors = check_imports()
     if import_errors:

@@ -145,5 +145,21 @@ Dex_header_paper_implementation/**/data/
 
 # --- Logs ---
 *.log
-thesis_vigidroid.zip
+# --- Shared pipeline (generated results; keep schemas & examples) ---
+Shared_pipeline_Files/results/offline/*
+Shared_pipeline_Files/results/device/*
+Shared_pipeline_Files/results/figures/*
+!Shared_pipeline_Files/results/**/.gitkeep
+Shared_pipeline_Files/data/manifests/apk_index.csv
+Shared_pipeline_Files/benchmarks/*.json
+
+pipeline_coding_phases.md 
+PIPELINE_IMPLEMENTATION_PLAN.md
+pipeline_specifics.md
 plan_next.txt
+why_pipeline.md
+Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/howToRun_dualBranchThenMerge.md
+Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/patternB_specifics.md
+Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/patternA_specifics.md
+Dex_header_paper_implementation/only_base1_model/BM1_multidex_specifics.md
+

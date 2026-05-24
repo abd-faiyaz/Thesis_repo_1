@@ -24,8 +24,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR"
 cd "$ROOT"
 
+# shellcheck source=/dev/null
+source "$ROOT/scripts/activate_thesis_env.sh"
+
 APK_ROOT="${APK_ROOT:-$ROOT/data/apks}"
-PYTHON="${PYTHON:-python3}"
 CONFIG="${CONFIG:-$ROOT/config/default.yaml}"
 EPOCHS="${EPOCHS:-}"
 INSTALL_DEPS="${INSTALL_DEPS:-0}"
@@ -54,6 +56,8 @@ exec > >(tee -a "$PIPELINE_LOG") 2>&1
 section "Pattern B (Dual-Branch Merge) — configuration"
 echo "ROOT:             $ROOT"
 echo "APK_ROOT:         $APK_ROOT"
+echo "PYTHON:           $PYTHON"
+echo "THESIS_VENV:      ${THESIS_VENV:-<not set>}"
 echo "CONFIG:           $CONFIG"
 echo "SKIP_PREPROCESS:  $SKIP_PREPROCESS"
 echo "SKIP_TRAIN:       $SKIP_TRAIN"
@@ -64,7 +68,9 @@ echo "PIPELINE_LOG:     $PIPELINE_LOG"
 
 if [[ "$INSTALL_DEPS" == "1" ]]; then
   section "Install dependencies"
-  "$PYTHON" -m pip install -r "$ROOT/requirements.txt"
+  _REQS="$(thesis_all_requirements_path)"
+  echo "Using requirements: $_REQS"
+  "$PYTHON" -m pip install -r "$_REQS"
 fi
 
 if [[ "$VERIFY_SETUP" == "1" ]]; then

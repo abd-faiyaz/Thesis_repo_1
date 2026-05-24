@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 1: verify dependencies and modular package imports."""
+"""Verify dependencies, config, and multi-Dex module wiring."""
 
 from __future__ import annotations
 
@@ -33,17 +33,30 @@ def check_imports() -> list[str]:
 def check_package() -> list[str]:
     errors: list[str] = []
     try:
-        from src.config import ensure_artifact_dirs, load_config
+        from src.config import ensure_artifact_dirs, load_config, multidex_settings_from_config
+        from src.features.multidex import aggregate_header_vectors, multidex_settings
+        from src.preprocessing.apk_extract import extract_apk_raw_header
 
         cfg = load_config()
         ensure_artifact_dirs(cfg)
+        md = multidex_settings_from_config(cfg)
+        if md["mode"] != "sum":
+            errors.append(f"  - expected multidex.mode=sum, got {md['mode']!r}")
+
+        cache_version = int(cfg.preprocessing.get("cache_version", 0))
+        if cache_version < 2:
+            errors.append(f"  - expected preprocessing.cache_version>=2, got {cache_version}")
+
+        _ = aggregate_header_vectors
+        _ = extract_apk_raw_header
+        _ = multidex_settings
     except Exception as exc:
         errors.append(f"  - src package / config: {exc}")
     return errors
 
 
 def main() -> int:
-    print("Base Model 1 (MLP(H)) — Phase 1 environment check\n")
+    print("Base Model 1 (MLP(H)) — environment check\n")
     print(f"Project root: {ROOT}\n")
 
     import_errors = check_imports()
@@ -61,11 +74,15 @@ def main() -> int:
         print()
     else:
         print("Package layout and config loader OK.")
-        from src.config import load_config
+        from src.config import load_config, multidex_settings_from_config
 
         cfg = load_config()
-        print(f"  processed_dir: {cfg.paths.processed_dir}")
-        print(f"  checkpoint_dir: {cfg.paths.checkpoint_dir}")
+        md = multidex_settings_from_config(cfg)
+        print(f"  processed_dir:   {cfg.paths.processed_dir}")
+        print(f"  checkpoint_dir:  {cfg.paths.checkpoint_dir}")
+        print(f"  multidex.mode:   {md['mode']}")
+        print(f"  dex_pattern:     {md['dex_pattern']}")
+        print(f"  cache_version:   {cfg.preprocessing.get('cache_version', 'unset')}")
         print()
 
     try:
@@ -77,7 +94,10 @@ def main() -> int:
 
     if import_errors or pkg_errors:
         return 1
-    print("Phase 1 setup verified. Ready for Phase 2.")
+    print(
+        "Setup verified. Run multi-Dex tests:\n"
+        "  PYTHONPATH=. python -m unittest tests.test_multidex tests.test_multidex_preprocess tests.test_dex_header -v"
+    )
     return 0
 
 

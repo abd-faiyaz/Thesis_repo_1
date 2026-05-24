@@ -447,3 +447,68 @@ python scripts/compute_dex_stats.py --split train
 PYTHONPATH=. thesis_venv/bin/python -m unittest tests.test_multidex tests.test_multidex_phase7 -v
 PYTHONPATH=. thesis_venv/bin/python scripts/verify_setup.py
 ```
+
+---
+
+## VigiDroid thesis pipeline integration (Phase 3+)
+
+**Status:** Complete (code hooks)  
+**Date:** 2026-05-24  
+**Refs:** [`why_pipeline.md`](../../../../why_pipeline.md), [`pipeline_coding_phases.md`](../../../../pipeline_coding_phases.md), [`pipeline_specifics.md`](../../../../pipeline_specifics.md)
+
+### Goal
+
+Align Pattern A (D4) with the monorepo **Shared_pipeline_Files** layout: shared dataset pointers, automatic offline eval JSON for thesis plots, optional shared train/val splits, and ONNX export entry point for Phase 4.
+
+### Config (`config/default.yaml`)
+
+New `pipeline:` block:
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `model_id` | `pattern_a_combined` | Offline JSON filename + future ONNX bundle id |
+| `domain` | `dex_header_manifest` | Feature domain label in metrics |
+| `export_offline_json` | `true` | Write ACC/F1/AUC to `Shared_pipeline_Files/results/offline/` on every `evaluate` |
+| `use_shared_splits` | `false` | If `true`, use `Shared_pipeline_Files/data/splits/{train,val}.txt` (apk **paths**) instead of local 90/10 stratified split |
+| `shared_splits_dir` | `Shared_pipeline_Files/data/splits` | Relative to thesis repo root |
+| `shared_manifest_csv` | `Shared_pipeline_Files/data/manifests/apk_index.csv` | Documented pointer; build via `Shared_pipeline_Files/tools/build_apk_manifest.py` |
+
+Set `paths.apk_root` to your full corpus before Phase 3 training (not `data/apks` on the training PC).
+
+### New / modified files
+
+| File | Change |
+|------|--------|
+| `src/pipeline_integration.py` | **New** — repo discovery, shared splits, confusion matrix, offline JSON export |
+| `src/training/evaluate.py` | Auto local `metrics_{split}.json` + shared offline JSON |
+| `src/preprocessing/scan_dataset.py` | Optional import of shared `train.txt` / `val.txt` |
+| `scripts/export_onnx.py` | **New** — Phase 4 skeleton (`artifacts/export/pattern_a_combined/`) |
+
+### Evaluate outputs (after `run_evaluate` / end of `run_pattern_a.sh`)
+
+1. **Local:** `artifacts/checkpoints/metrics_val.json` (includes `confusion_matrix`, `n_samples`)
+2. **Shared:** `Shared_pipeline_Files/results/offline/pattern_a_combined_val_<timestamp>.json`
+
+### Shared splits workflow (optional)
+
+```bash
+# From thesis repo root — once per corpus
+python Shared_pipeline_Files/tools/build_apk_manifest.py
+python Shared_pipeline_Files/tools/split_dataset.py
+
+# In config/default.yaml set:
+#   pipeline.use_shared_splits: true
+#   paths.apk_root: /mnt/Files/thesis_full_dataset
+
+python -m src.preprocessing.scan_dataset --apk-root "$APK_ROOT"
+```
+
+Local `artifacts/splits/*.txt` still store **apk_id** lines for preprocessing; shared files use **apk_path** lines and are mapped at scan time.
+
+### Phase 3 checklist (D4)
+
+1. Edit `paths.apk_root` (+ optional `pipeline.use_shared_splits`)
+2. Run [`patternA_running_guide.md`](patternA_running_guide.md) (or `./run_pattern_a.sh`)
+3. Confirm checkpoints under `artifacts/checkpoints/`
+4. Confirm offline JSON under `Shared_pipeline_Files/results/offline/`
+5. Phase 4: flesh out `scripts/export_onnx.py` → register in `Shared_pipeline_Files/tools/export_all_onnx.sh`

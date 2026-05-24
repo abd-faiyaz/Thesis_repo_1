@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Run Dex header preprocessing from the only_base1_model package root.
+# Run multi-Dex header preprocessing (sum-pool all classes*.dex) from package root.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=/dev/null
+source "$ROOT/scripts/activate_thesis_env.sh"
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
-python -m src.preprocessing.preprocess_apks "$@"
+"$PYTHON" -m src.preprocessing.preprocess_apks "$@"
