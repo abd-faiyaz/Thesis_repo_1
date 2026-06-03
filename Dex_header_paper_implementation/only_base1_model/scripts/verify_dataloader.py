@@ -12,7 +12,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.config import load_config
-from src.data.dataloaders import build_dataloaders_from_bundle, resolve_processed_path
+from src.data.dataloaders import (
+    build_dataloaders_from_bundle,
+    build_dataloaders_from_config,
+    resolve_processed_path,
+    resolve_split_settings,
+)
 from src.data.store import load_processed_bundle
 from src.features.dex_header import FEATURE_DIM
 
@@ -40,14 +45,21 @@ def main() -> int:
         print(f"Processed file not found ({processed_path}); using synthetic bundle.")
         bundle = _synthetic_bundle()
 
-    train_loader, val_loader, feature_dim = build_dataloaders_from_bundle(
-        bundle,
-        val_fraction=float(cfg.data.get("val_fraction", 0.2)),
-        seed=int(cfg.data.get("random_seed", 42)),
-        batch_size=int(cfg.data.get("batch_size", 16)),
-        num_workers=0,
-        pin_memory=False,
-    )
+    if processed_path.is_file():
+        train_loader, val_loader, feature_dim = build_dataloaders_from_config(cfg)
+    else:
+        split = resolve_split_settings(cfg)
+        train_loader, val_loader, feature_dim = build_dataloaders_from_bundle(
+            bundle,
+            split_mode=split["split_mode"],
+            train_years=split["train_years"],
+            val_years=split["val_years"],
+            val_fraction=split["val_fraction"],
+            seed=split["seed"],
+            batch_size=int(cfg.data.get("batch_size", 16)),
+            num_workers=0,
+            pin_memory=False,
+        )
 
     tx, ty = next(iter(train_loader))
     vx, vy = next(iter(val_loader))

@@ -151,9 +151,9 @@ def run_evaluation(
     from src.config import ensure_artifact_dirs
     from src.data.dataloaders import build_dataloaders_from_config
     from src.models.combined_net import build_combined_net_from_config
-    from src.training.checkpoint import load_checkpoint, restore_from_checkpoint
+    from src.training.checkpoint import load_checkpoint, load_model_from_checkpoint
     from src.training.losses import build_criterion
-    from src.training.setup import build_training_objects
+    from src.training.setup import build_training_objects, resolve_device
 
     ensure_artifact_dirs(cfg)
     train_loader, val_loader, _, _ = build_dataloaders_from_config(cfg)
@@ -168,11 +168,10 @@ def run_evaluation(
         raise FileNotFoundError(f"No checkpoint found at {ckpt_path}")
 
     model = build_combined_net_from_config(cfg)
-    optimizer, scheduler, device = build_training_objects(cfg, model)
+    load_model_from_checkpoint(checkpoint, model)
+    device = resolve_device(str(cfg.training.get("device", "cpu")))
+    model.to(device)
     criterion = build_criterion(cfg, device)
-    checkpoint = load_checkpoint(ckpt_path, map_location=device)
-    assert checkpoint is not None
-    restore_from_checkpoint(checkpoint, model, optimizer, scheduler)
 
     threshold = float(cfg.evaluation.get("threshold", 0.5))
     val_loss, metrics = validation_epoch(
@@ -190,6 +189,7 @@ def run_evaluation(
     from src.pipeline_integration import (
         build_confusion_matrix,
         export_offline_evaluation,
+        get_pipeline_settings,
         write_local_metrics_json,
     )
 

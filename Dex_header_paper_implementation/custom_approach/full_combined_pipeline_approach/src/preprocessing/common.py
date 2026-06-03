@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,6 +95,57 @@ def read_dataset_index(path: Path) -> list[DatasetRow]:
                 )
             )
     return rows
+
+
+def year_from_apk_path(apk_path: Path) -> str | None:
+    """Extract a 4-digit year folder (e.g. 2020) from an APK path."""
+    match = re.search(r"/(20\d{2})/", str(apk_path).replace("\\", "/"))
+    return match.group(1) if match else None
+
+
+def temporal_year_split(
+    rows: list[DatasetRow],
+    *,
+    train_years: list[int | str],
+    val_years: list[int | str],
+) -> tuple[list[DatasetRow], list[DatasetRow]]:
+    """
+    Hold out APKs by top-level year folder under apk_root.
+
+    train_years → train split (e.g. 2020, 2021)
+    val_years   → val/test split (e.g. 2022, 2023)
+    """
+    train_set = {str(y) for y in train_years}
+    val_set = {str(y) for y in val_years}
+    overlap = train_set & val_set
+    if overlap:
+        raise ValueError(f"train_years and val_years overlap: {sorted(overlap)}")
+
+    train_rows: list[DatasetRow] = []
+    val_rows: list[DatasetRow] = []
+    unassigned: list[DatasetRow] = []
+
+    for row in rows:
+        year = year_from_apk_path(row.apk_path)
+        if year in train_set:
+            train_rows.append(row)
+        elif year in val_set:
+            val_rows.append(row)
+        else:
+            unassigned.append(row)
+
+    if not train_rows:
+        raise ValueError(f"No APKs matched train_years={sorted(train_set)}")
+    if not val_rows:
+        raise ValueError(f"No APKs matched val_years={sorted(val_set)}")
+    if unassigned:
+        sample = unassigned[0].apk_path
+        raise ValueError(
+            f"{len(unassigned)} APK(s) not in train_years or val_years "
+            f"(example: {sample})"
+        )
+
+    return train_rows, val_rows
 
 
 def stratified_split(

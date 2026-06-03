@@ -154,6 +154,7 @@ def run_evaluation(
     *,
     checkpoint_path: Path | None = None,
     split: str = "val",
+    metrics_out: Path | None = None,
 ) -> dict[str, Any]:
     """
     Load trained checkpoint and compute metrics on val (or train) split.
@@ -193,9 +194,46 @@ def run_evaluation(
         threshold=threshold,
         show_progress=True,
     )
+    y_true, y_pred, y_score = collect_predictions(
+        model, loader, device, threshold=threshold
+    )
+    from src.training.run_logging import (
+        build_confusion_matrix,
+        build_metrics_payload,
+        finalize_run_manifest,
+        log_checkpoint_summary,
+        write_metrics_json,
+    )
 
-    result = {"split": split, "loss": val_loss, **metrics, "checkpoint": str(ckpt_path)}
+    confusion = build_confusion_matrix(y_true, y_pred)
+    payload = build_metrics_payload(
+        cfg,
+        split=split,
+        n_samples=int(y_true.shape[0]),
+        loss=val_loss,
+        metrics=metrics,
+        threshold=threshold,
+        checkpoint_path=ckpt_path,
+        confusion_matrix=confusion,
+        y_true=y_true,
+        y_pred=y_pred,
+        y_score=y_score,
+    )
+    out_path = write_metrics_json(cfg, payload, split=split, metrics_out=metrics_out)
+    log_checkpoint_summary(cfg, ckpt_path)
+    manifest = finalize_run_manifest(cfg)
+    if manifest is not None:
+        print(f"  run manifest → {manifest}")
+
+    result: dict[str, Any] = {
+        **payload,
+        "metrics_path": str(out_path),
+        "loss": val_loss,
+        **metrics,
+        "checkpoint": str(ckpt_path),
+    }
     print(f"Evaluation ({split}) — loss={val_loss:.4f} {format_metrics(metrics)}")
+    print(f"  metrics written → {out_path}")
     return result
 
 
@@ -204,6 +242,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--split", choices=("val", "train"), default="val")
+    parser.add_argument(
+        "--metrics-out",
+        type=Path,
+        default=None,
+        help="JSON path for metrics (default: artifacts/metrics/metrics_{split}.json)",
+    )
     return parser
 
 
@@ -215,7 +259,12 @@ def main(argv: list[str] | None = None) -> int:
 
     args = build_arg_parser().parse_args(argv)
     cfg = load_config(args.config)
-    run_evaluation(cfg, checkpoint_path=args.checkpoint, split=args.split)
+    run_evaluation(
+        cfg,
+        checkpoint_path=args.checkpoint,
+        split=args.split,
+        metrics_out=args.metrics_out,
+    )
     return 0
 
 

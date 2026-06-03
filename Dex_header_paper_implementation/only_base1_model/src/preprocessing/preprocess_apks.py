@@ -317,6 +317,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {key}: {value}")
     if summary["failed"]:
         print(f"  failures logged to: {cfg.paths.failed_apks_log}")
+
+    from src.training.run_logging import log_preprocess_summary, mirror_to_archive
+
+    log_preprocess_summary(cfg, summary, apk_root=apk_root)
+    norm_path = cfg.paths.normalization_stats
+    if norm_path.is_file():
+        mirror_to_archive(cfg, norm_path, "metrics/normalization.json")
+    failed_log = cfg.paths.failed_apks_log
+    if failed_log.is_file() and failed_log.stat().st_size > 0:
+        mirror_to_archive(cfg, failed_log, "logs/failed_apks.log")
+
     return 0
 
 

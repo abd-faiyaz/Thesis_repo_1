@@ -1,0 +1,72 @@
+
+While running the full pattern A using your given commands, i saw these every epoch:
+
+
+=============================================================================
+  Train CombinedNet
+=============================================================================
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+Device: cuda
+Feature dims: header=104 bow=4381 combined=4485
+Samples: train=12154 val=1335
+Epochs: 1 → 80
+Train 1/80:   0%|          | 0/760 [00:00<?, ?batch/s]<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+Val   1/80:   0%|          | 0/84 [00:00<?, ?batch/s]<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+Epoch 1/80 — train_loss=1.0299 val_loss=1.0300 best_val=1.0300 lr=0.005000
+Train 2/80:   0%|          | 0/760 [00:00<?, ?batch/s]<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+Val   2/80:   0%|          | 0/84 [00:00<?, ?batch/s]<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+
+Also after the training the output was like this:
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+<frozen runpy>:130: RuntimeWarning: 'src.training.train' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.train'; this may result in unpredictable behaviour
+Epoch 80/80 — train_loss=1.0293 val_loss=1.0296 best_val=1.0296 lr=0.000020
+Training complete.
+  latest: /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/checkpoints/latest.pt
+  best:   /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/checkpoints/best.pt
+
+=============================================================================
+  Evaluate (ACC, F1, AUC)
+=============================================================================
+<frozen runpy>:130: RuntimeWarning: 'src.training.evaluate' found in sys.modules after import of package 'src.training', but prior to execution of 'src.training.evaluate'; this may result in unpredictable behaviour
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/src/training/evaluate.py", line 264, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/src/training/evaluate.py", line 254, in main
+    run_evaluation(
+    ~~~~~~~~~~~~~~^
+        cfg,
+        ^^^^
+    ...<2 lines>...
+        metrics_out=args.metrics_out,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/src/training/evaluate.py", line 175, in run_evaluation
+    restore_from_checkpoint(checkpoint, model, optimizer, scheduler)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/src/training/checkpoint.py", line 96, in restore_from_checkpoint
+    restore_rng_state(checkpoint.get("rng_state"))
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/src/training/checkpoint.py", line 36, in restore_rng_state
+    torch.set_rng_state(state["torch"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/mnt/Files/thesis_vigidroid/thesis_venv/lib/python3.14/site-packages/torch/random.py", line 36, in set_rng_state
+    default_generator.set_state(new_state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+TypeError: RNG state must be a torch.ByteTensor
+
+
+

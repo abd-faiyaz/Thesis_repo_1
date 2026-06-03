@@ -56,15 +56,14 @@ def run_training(
     existing = None if fresh_start else load_checkpoint(latest_path, map_location="cpu")
 
     if existing is not None:
-        existing = load_checkpoint(latest_path, map_location=device)
-        if existing is not None:
-            start_epoch, global_step, best_val_loss = restore_from_checkpoint(
-                existing, model, optimizer, scheduler
-            )
-            print(
-                f"Resumed from {latest_path} — epoch {start_epoch + 1} "
-                f"(last train_loss={existing.get('train_loss', 'n/a')})"
-            )
+        start_epoch, global_step, best_val_loss = restore_from_checkpoint(
+            existing, model, optimizer, scheduler
+        )
+        model.to(device)
+        print(
+            f"Resumed from {latest_path} — epoch {start_epoch + 1} "
+            f"(last train_loss={existing.get('train_loss', 'n/a')})"
+        )
 
     total_epochs = int(epochs_override or cfg.training.get("epochs", 80))
     save_each_epoch = bool(cfg.training.get("checkpoint_every_epoch", True))

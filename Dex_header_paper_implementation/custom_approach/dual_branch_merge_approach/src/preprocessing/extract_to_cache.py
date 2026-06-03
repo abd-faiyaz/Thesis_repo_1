@@ -95,7 +95,8 @@ def extract_split(cfg: PipelineConfig, split: str, *, limit: int | None = None) 
             log_failure(cfg.paths.failed_apks_log, row.apk_path, f"unexpected: {exc}")
             continue
 
-        tmp_path = shard_path.with_suffix(".npz.tmp")
+        # np.savez_compressed always appends ".npz" — use ".tmp.npz" not ".npz.tmp".
+        tmp_path = shard_path.with_suffix(".tmp.npz")
         np.savez_compressed(
             tmp_path,
             header=header.astype(np.float32),

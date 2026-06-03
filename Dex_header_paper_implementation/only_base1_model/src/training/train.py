@@ -17,6 +17,13 @@ from src.training.checkpoint import (
 )
 from src.training.evaluate import format_metrics, validation_epoch
 from src.training.loops import train_one_epoch
+from src.training.run_logging import (
+    finalize_run_manifest,
+    log_checkpoint_summary,
+    log_epoch,
+    log_training_run_info,
+    reset_epochs_log,
+)
 from src.training.setup import build_training_objects, resolve_device
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -55,8 +62,22 @@ def run_training(
     total_epochs = int(epochs_override or cfg.training.get("epochs", 50))
     save_each_epoch = bool(cfg.training.get("checkpoint_every_epoch", True))
     threshold = float(cfg.evaluation.get("threshold", 0.5))
+    resolved_device = resolve_device(str(cfg.training.get("device", "cuda")))
 
-    print(f"Device: {device} ({resolve_device(str(cfg.training.get('device', 'cuda')))})")
+    reset_epochs_log(cfg, fresh=fresh_start)
+    log_training_run_info(
+        cfg,
+        train_samples=len(train_loader.dataset),
+        val_samples=len(val_loader.dataset),
+        feature_dim=feature_dim,
+        hidden_dim=hidden_dim,
+        start_epoch=start_epoch,
+        total_epochs=total_epochs,
+        fresh_start=fresh_start,
+        device=str(resolved_device),
+    )
+
+    print(f"Device: {device} ({resolved_device})")
     print(f"Samples: train={len(train_loader.dataset)} val={len(val_loader.dataset)}")
     print(f"Epochs: {start_epoch + 1} → {total_epochs}")
 
@@ -87,6 +108,15 @@ def run_training(
             f"train_loss={train_loss:.4f} val_loss={val_loss:.4f} lr={lr:.6f} "
             f"{format_metrics(val_metrics)}"
         )
+        log_epoch(
+            cfg,
+            epoch=epoch + 1,
+            total_epochs=total_epochs,
+            train_loss=train_loss,
+            val_loss=val_loss,
+            learning_rate=lr,
+            val_metrics=val_metrics,
+        )
 
         if save_each_epoch:
             save_checkpoint(
@@ -105,6 +135,10 @@ def run_training(
             )
 
     print(f"Training complete. Latest checkpoint: {checkpoint_path}")
+    log_checkpoint_summary(cfg, checkpoint_path)
+    manifest = finalize_run_manifest(cfg)
+    if manifest is not None:
+        print(f"Run manifest updated: {manifest}")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

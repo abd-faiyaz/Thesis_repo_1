@@ -1,0 +1,20 @@
+{
+  "split": "val",
+  "loss": 0.24926409686061865,
+  "accuracy": 0.9397905759162304,
+  "f1": 0.907258064516129,
+  "roc_auc": 0.9817254433154016,
+  "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/checkpoints/best.pt",
+  "threshold": 0.5,
+  "n_samples": 1528,
+  "confusion_matrix": [
+    [
+      986,
+      64
+    ],
+    [
+      28,
+      450
+    ]
+  ]
+}

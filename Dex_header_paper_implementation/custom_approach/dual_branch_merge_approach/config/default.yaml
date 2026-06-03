@@ -31,6 +31,9 @@ preprocessing:
   bow_encoding: multihot
   manifest_parser: pyaxmlparser
   cache_format: shard_npz
+  split_mode: temporal_year
+  train_years: [2020, 2021]
+  val_years: [2022, 2023]
   train_ratio: 0.9
   seed: 42
 

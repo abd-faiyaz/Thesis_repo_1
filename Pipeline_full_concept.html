@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New Model Pipeline — Implementation Guide</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #5eb3ff;
+      --accent2: #7ee787;
+      --warn: #f0b429;
+      --border: #2d3a4f;
+      --code-bg: #0d1117;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+    header {
+      background: linear-gradient(135deg, #1a3a5c 0%, #0f1419 60%);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem;
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.6rem; }
+    header p { color: var(--muted); margin: 0; max-width: 48rem; }
+    nav#toc {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 2rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav#toc a { color: var(--accent); text-decoration: none; margin-right: 1.2rem; font-size: 0.9rem; }
+    main { max-width: 52rem; margin: 0 auto; padding: 2rem; }
+    h2 {
+      color: var(--accent);
+      font-size: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.35rem;
+      margin: 2.5rem 0 1rem;
+    }
+    h3 { color: var(--accent2); font-size: 1.05rem; margin-top: 1.25rem; }
+    .callout {
+      background: var(--surface);
+      border-left: 4px solid var(--accent2);
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+    .callout.warn { border-left-color: var(--warn); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    th, td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+    th { background: var(--surface2); color: var(--accent); }
+    pre, code {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.85rem;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 6px;
+      line-height: 1.45;
+    }
+    .diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      white-space: pre;
+      overflow-x: auto;
+      border-radius: 6px;
+    }
+    ul.checklist { list-style: none; padding-left: 0; }
+    ul.checklist li::before { content: "☐ "; color: var(--muted); }
+    ol.steps { counter-reset: step; padding-left: 0; }
+    ol.steps > li {
+      list-style: none;
+      padding-left: 2.25rem;
+      position: relative;
+      margin-bottom: 0.85rem;
+    }
+    ol.steps > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute; left: 0;
+      width: 1.6rem; height: 1.6rem;
+      background: var(--accent); color: var(--bg);
+      border-radius: 50%;
+      text-align: center; line-height: 1.6rem;
+      font-weight: 700; font-size: 0.8rem;
+    }
+    footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem; color: var(--muted); font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>New Model Pipeline — Implementation Guide</h1>
+  <p>
+    How to take a malware-detection model from a paper and implement it end-to-end:
+    static features from APKs, PyTorch training on a PC, ONNX export, and on-device inference in an Android app (VigiDroid-style).
+    This document is for <strong>new models only</strong> — design your phases around it on your own machine and workspace.
+  </p>
+</header>
+
+<nav id="toc">
+  <a href="#ai">For AI planners</a>
+  <a href="#flow">Pipeline flow</a>
+  <a href="#dataset">Dataset &amp; splits</a>
+  <a href="#phases">Phases P0–P8</a>
+  <a href="#layout">Project layout</a>
+  <a href="#onnx">ONNX bundle</a>
+  <a href="#parity">Parity</a>
+  <a href="#android">Android</a>
+  <a href="#metrics">Metrics</a>
+  <a href="#orchestration">Orchestration (optional)</a>
+</nav>
+
+<main>
+
+<section id="ai">
+  <h2>For AI planners</h2>
+  <div class="callout">
+    You have a rough plan for a paper’s model. Output implementation <strong>phases</strong> that follow this pipeline.
+    Each phase should list deliverables, scripts, and exit criteria. Do not assume access to any other repo’s shared folders or prior models.
+  </div>
+
+  <p><strong>Assign up front:</strong></p>
+  <ul>
+    <li><code>model_id</code> — snake_case id for artifacts and Android assets (e.g. <code>paper_xyz_detector</code>)</li>
+    <li><code>domain</code> — short name for the feature type (e.g. <code>api_ngrams</code>, <code>dex_header_manifest</code>)</li>
+    <li>Whether the model is <strong>on-device feasible</strong> or <strong>offline-only</strong> (too slow/heavy for phone)</li>
+  </ul>
+
+  <h3>Phase plan template</h3>
+  <pre>NEW MODEL: &lt;paper title&gt;
+model_id: &lt;snake_case&gt;
+domain: &lt;feature description&gt;
+
+── Project 1 (Python) — self-contained folder on training PC ──
+P0  config/, requirements.txt, verify_setup.py
+P1  index APKs; apply year-based train/test split (see Dataset section)
+P2  preprocess: APK → tensors + vocab/norm JSON + failed_apks.log
+P3  Dataset + DataLoader
+P4  PyTorch model (paper architecture or mobile-safe variant)
+P5  train → artifacts/checkpoints/
+P6  evaluate on test split → metrics JSON + confusion matrix
+P7  export ONNX + export bundle (manifest, thresholds, parity_samples)
+P8  parity: PyTorch vs ONNX ≤ 1e-4 on parity_samples
+
+── Project 2 (Android) — vigidroid/ or equivalent app ──
+A1  FeatureExtractor: same semantics as Python P2
+A2  Load ONNX + assets; run inference; map score (sigmoid/softmax/etc.)
+A3  Register model; record per-scan stage in device metrics JSON
+A4  Instrumented parity test vs parity_samples/
+
+Execution order: P0→P8 on PC, then A1→A4. Never run export (P7) before full training (P5).
+Never implement Java extractors (A1) before final vocab/norm stats exist from P2 on full train set.</pre>
+</section>
+
+<section id="flow">
+  <h2>Pipeline flow</h2>
+  <p>Two codebases cooperate. Training and evaluation happen on a PC; scanning happens on Android. Features at inference time must match training semantics.</p>
+
+  <div class="diagram">┌──────────────────────── OFFLINE (Python) ─────────────────────────┐
+│  APK corpus (by year folders)                                      │
+│       → feature extraction → train → evaluate (test years)         │
+│       → export .onnx + preprocessing assets + parity_samples       │
+└────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────── ON-DEVICE (Java / Android) ────────────────┐
+│  Trigger (manual / download / schedule)                            │
+│       → extract features (must match Python) → ONNX Runtime        │
+│       → score + latency/memory logs (JSON per scan)                │
+└────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+                         Evaluation & thesis plots
+              (accuracy from offline test · latency/CPU/mem from device)</div>
+
+  <table>
+    <thead><tr><th>Side</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Python</strong></td><td>Feature engineering at scale, training, test-set metrics (ACC, F1, AUC), ONNX export, parity samples</td></tr>
+      <tr><td><strong>Android</strong></td><td>Parse APK on phone, build feature tensors, ONNX inference, structured scan metrics</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <strong>Train/serve parity:</strong> If Java features differ from Python, reported accuracy is meaningless. P8 and A4 exist to catch this before deployment.
+  </div>
+</section>
+
+<section id="dataset">
+  <h2>Dataset handling &amp; splits</h2>
+
+  <h3>Corpus layout</h3>
+  <p>APKs live on disk outside git. Organize by <strong>year</strong> and label (benign / malware). Example:</p>
+  <pre>apk_root/
+├── 2020/
+│   ├── benign/
+│   └── malware/
+├── 2021/
+│   ├── benign/
+│   └── malware/
+├── 2022/
+│   └── ...
+└── 2023/
+    └── ...</pre>
+
+  <h3>Train / test policy (required)</h3>
+  <div class="callout">
+    When indexing, preprocessing, training, and evaluating a model, use this split:
+    <ul style="margin: 0.5rem 0 0;">
+      <li><strong>Train:</strong> all APKs under <code>2020/</code> and <code>2021/</code></li>
+      <li><strong>Test:</strong> all APKs under <code>2022/</code> and <code>2023/</code></li>
+    </ul>
+  </div>
+  <p>
+    Implement this in dataset code explicitly — e.g. walk <code>apk_root</code>, assign <code>split</code> from parent year folder,
+    or build manifest CSV with a <code>split</code> column derived from year. Preprocess and train only on <code>train</code>;
+    report final metrics on <code>test</code> (temporal generalization: older years → newer years).
+  </p>
+  <p>
+    <strong>Validation:</strong> hold out a fraction of <em>train</em> (e.g. 10% of 2020+2021) for early stopping and threshold tuning if needed.
+    Do not use 2022/2023 for validation or hyperparameter search.
+  </p>
+
+  <h3>Indexing checklist (P1)</h3>
+  <ul class="checklist">
+    <li>SHA-256 per APK; skip corrupt zips</li>
+    <li>Record: path, label, year, sha256, optional apk_size_bytes, num_dex_files</li>
+    <li>Apply train = {2020, 2021}, test = {2022, 2023}</li>
+    <li>Deduplicate identical hashes before training</li>
+    <li>Never copy the full corpus into the model repo — only manifests or path lists</li>
+  </ul>
+
+  <h3>Preprocess (P2)</h3>
+  <p>Read APKs in place from <code>apk_root</code>. Write sharded features under <code>artifacts/processed/</code>. Log failures to <code>failed_apks.log</code>. Training loops load tensors only — no APK I/O during epochs.</p>
+</section>
+
+<section id="phases">
+  <h2>Per-model phases P0–P8</h2>
+  <p>One model = one top-level folder. All phases below live inside that folder unless noted (Android app is separate).</p>
+
+  <table>
+    <thead><tr><th>Phase</th><th>Name</th><th>Outputs</th></tr></thead>
+    <tbody>
+      <tr><td><strong>P0</strong></td><td>Config &amp; environment</td><td><code>config/default.yaml</code> (paths, hyperparams), <code>requirements.txt</code>, <code>verify_setup.py</code></td></tr>
+      <tr><td><strong>P1</strong></td><td>Dataset indexing</td><td>Manifest or split lists with train/test from year rule; metadata columns</td></tr>
+      <tr><td><strong>P2</strong></td><td>Feature extraction</td><td>Sharded <code>.pt</code> / <code>.npy</code>, <code>vocab.json</code>, <code>normalization_*.json</code>, <code>failed_apks.log</code></td></tr>
+      <tr><td><strong>P3</strong></td><td>DataLoaders</td><td><code>Dataset</code> + <code>DataLoader</code> (train loader uses train split only)</td></tr>
+      <tr><td><strong>P4</strong></td><td>Model definition</td><td>PyTorch modules matching paper (or smaller variant for mobile)</td></tr>
+      <tr><td><strong>P5</strong></td><td>Training</td><td><code>artifacts/checkpoints/</code>; handle class imbalance (<code>pos_weight</code>, etc.)</td></tr>
+      <tr><td><strong>P6</strong></td><td>Evaluation</td><td>Metrics on <strong>test</strong> (2022+2023): ACC, F1, AUC, confusion matrix, chosen threshold → <code>artifacts/metrics/test_results.json</code></td></tr>
+      <tr><td><strong>P7</strong></td><td>ONNX export</td><td>Export bundle under <code>artifacts/export/&lt;model_id&gt;/</code> (see next section)</td></tr>
+      <tr><td><strong>P8</strong></td><td>Parity check</td><td>PyTorch vs ONNX on <code>parity_samples/</code>; max prob delta ≤ 1e-4</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Config example (P0)</h3>
+  <pre>paths:
+  apk_root: /path/to/apk_corpus          # edit per machine
+  train_years: [2020, 2021]
+  test_years: [2022, 2023]
+artifacts:
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  export: artifacts/export</pre>
+</section>
+
+<section id="layout">
+  <h2>Project layout (standalone workspace)</h2>
+  <pre>&lt;workspace&gt;/
+├── &lt;ModelFolder&gt;/              # one paper / one model
+│   ├── config/default.yaml
+│   ├── src/
+│   │   ├── features/           # paper-specific extraction
+│   │   ├── models/             # architecture
+│   │   └── training/           # train.py, evaluate.py
+│   ├── scripts/
+│   │   ├── run_preprocess.sh
+│   │   ├── run_train.sh
+│   │   ├── run_evaluate.sh
+│   │   └── export_onnx.py
+│   └── artifacts/
+│       ├── processed/
+│       ├── checkpoints/
+│       ├── metrics/
+│       └── export/&lt;model_id&gt;/
+│
+└── vigidroid/                    # Android app (may be sibling repo)
+    └── app/src/main/assets/models/&lt;model_id&gt;/   # copy from export bundle</pre>
+  <p>Create your own indexing/preprocess scripts inside <code>&lt;ModelFolder&gt;/scripts/</code>. Do not depend on another project’s shared tooling.</p>
+</section>
+
+<section id="onnx">
+  <h2>ONNX export bundle (P7)</h2>
+  <pre>artifacts/export/&lt;model_id&gt;/
+├── model.onnx
+├── export_manifest.json
+├── thresholds.json
+├── features/                  # if model needs them on device
+│   ├── vocab.json
+│   └── normalization_*.json
+└── parity_samples/            # ~10 inputs + expected scores from Python</pre>
+
+  <h3>export_manifest.json</h3>
+  <pre>{
+  "model_id": "&lt;model_id&gt;",
+  "domain": "&lt;domain&gt;",
+  "opset": 14,
+  "inputs": [{"name": "input", "shape": [1, L], "dtype": "float32"}],
+  "outputs": [{"name": "malware_prob", "dtype": "float32"}],
+  "preprocessing_version": "&lt;date or git hash&gt;",
+  "multidex_mode": "sum | primary_only | n/a"
+}</pre>
+  <p>Copy the whole folder into Android <code>assets/models/&lt;model_id&gt;/</code>. Use ONNX opset 14; verify on target minSdk device early.</p>
+</section>
+
+<section id="parity">
+  <h2>Parity (P8 / A4)</h2>
+  <p>Before treating on-device results as valid, verify every item below:</p>
+  <ul class="checklist">
+    <li>Same APK parts read (manifest, dex files, byte ranges) as in Python</li>
+    <li>Same normalization stats loaded from export <code>features/</code></li>
+    <li>Same vocabulary / UNK rules for discrete features</li>
+    <li>If multidex: same aggregation (document in <code>export_manifest.json</code>)</li>
+    <li>ONNX input dtype and shape match manifest</li>
+    <li>Same post-processing (sigmoid vs softmax vs raw margin)</li>
+    <li>Scores on <code>parity_samples/</code> within 1e-4 of Python reference</li>
+  </ul>
+</section>
+
+<section id="android">
+  <h2>Android integration (A1–A4)</h2>
+  <p>Target pattern: pluggable extractors + ONNX runner + scan orchestrator (exact class names may vary).</p>
+
+  <table>
+    <thead><tr><th>Step</th><th>Work</th></tr></thead>
+    <tbody>
+      <tr><td><strong>A1</strong></td><td>Implement feature extractor from Python <code>src/features/</code> and export <code>features/</code> assets</td></tr>
+      <tr><td><strong>A2</strong></td><td>Load <code>model.onnx</code>; build input tensors per <code>export_manifest.json</code>; apply correct score transform</td></tr>
+      <tr><td><strong>A3</strong></td><td>Register <code>model_id</code>; on each APK scan append one <code>stages[]</code> entry (domain, timings, score)</td></tr>
+      <tr><td><strong>A4</strong></td><td>Instrumented test: Java features + ONNX vs <code>parity_samples/</code></td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Per-scan flow:</strong> baseline timing/memory → extract features → ONNX inference → append stage metrics → optional fusion if multiple models run in one app.</p>
+</section>
+
+<section id="metrics">
+  <h2>Metrics (store inside your project)</h2>
+
+  <h3>Offline (P6) — model quality</h3>
+  <p>Written after evaluation on <strong>test</strong> (2022+2023). Suggested path: <code>artifacts/metrics/test_results.json</code></p>
+  <pre>{
+  "model_id": "&lt;model_id&gt;",
+  "split": "test",
+  "train_years": [2020, 2021],
+  "test_years": [2022, 2023],
+  "n_samples": 8000,
+  "metrics": {"accuracy": 0.0, "f1": 0.0, "roc_auc": 0.0},
+  "confusion_matrix": [[tn, fp], [fn, tp]],
+  "threshold": 0.5
+}</pre>
+
+  <h3>On-device — resource &amp; latency</h3>
+  <p>One JSON file per APK scan on the phone (path via app external storage). Used for thesis plots: parse_ms, vectorize_ms, inference_ms, score, mem/cpu deltas.</p>
+  <pre>{
+  "scan_id": "&lt;uuid&gt;",
+  "apk": {"name": "app.apk", "size_bytes": 0},
+  "trigger": "manual | download | scheduled",
+  "stages": [{
+    "domain": "&lt;model_id or domain&gt;",
+    "parse_ms": 0, "vectorize_ms": 0, "inference_ms": 0,
+    "score": 0.0, "mem_delta_bytes": 0
+  }],
+  "totals": {"wall_ms": 0, "cpu_ms": 0}
+}</pre>
+  <p>Pull JSON from device with <code>adb</code> into your local <code>results/device/</code> (create that folder in your workspace) for plotting.</p>
+</section>
+
+<section id="orchestration">
+  <h2>Orchestration (optional, later)</h2>
+  <p>Only after a single model works end-to-end:</p>
+  <ul>
+    <li><strong>Sequential:</strong> run all registered models on every APK; log each stage.</li>
+    <li><strong>Multistep cascade:</strong> cheap model first; run expensive models only if score is in an uncertain band (<code>t_low</code>, <code>t_high</code> from validation on train holdout).</li>
+    <li><strong>Ensemble:</strong> weighted average of calibrated scores in [0,1]; weights from validation, shipped as JSON in assets.</li>
+  </ul>
+  <p>If the paper’s model is too heavy for on-device SLOs, stop after P6/P8 and document as offline-only baseline.</p>
+</section>
+
+</main>
+
+<footer>
+  New Model Pipeline Guide · Standalone workspace · Train: 2020–2021 · Test: 2022–2023
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,103 @@
+{
+  "run_id": "run_20260604_temporal_split",
+  "model_id": "mlp_header",
+  "domain": "dex_header_d3",
+  "created_at": "2026-06-03T20:18:51.488477+00:00",
+  "git_commit": "929926c8700c87e700412f87cb51f1a5910b0c53",
+  "apk_root": "/mnt/Files/thesis_full_dataset",
+  "preprocessing": {
+    "timestamp": "2026-06-03T20:12:53.718762+00:00",
+    "run_id": "run_20260604_temporal_split",
+    "apk_root": "/mnt/Files/thesis_full_dataset",
+    "total_apks": 13528,
+    "successful": 13528,
+    "failed": 0,
+    "feature_dim": 104,
+    "multidex_mode": "sum",
+    "cache_version": 2,
+    "dex_file_counts": {
+      "1": 9743,
+      "2": 2250,
+      "3": 571,
+      "4": 416,
+      "5": 402,
+      "6": 58,
+      "7": 9,
+      "8": 4,
+      "9": 9,
+      "10": 9,
+      "11": 18,
+      "12": 8,
+      "13": 7,
+      "17": 2,
+      "18": 4,
+      "19": 2,
+      "22": 1,
+      "23": 2,
+      "24": 8,
+      "26": 1,
+      "27": 1,
+      "29": 1,
+      "54": 1,
+      "118": 1
+    },
+    "output": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/processed/dex_header_features.pt"
+  },
+  "training": {
+    "timestamp": "2026-06-03T20:15:34.309639+00:00",
+    "run_id": "run_20260604_temporal_split",
+    "model_id": "mlp_header",
+    "domain": "dex_header_d3",
+    "train_samples": 12000,
+    "val_samples": 1528,
+    "feature_dim": 104,
+    "hidden_dim": 128,
+    "start_epoch": 0,
+    "total_epochs": 50,
+    "fresh_start": true,
+    "device": "cuda",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3060 Ti",
+    "apk_root": "/mnt/Files/thesis_full_dataset",
+    "batch_size": 16,
+    "split_mode": "temporal_year",
+    "train_years": [
+      2020,
+      2021
+    ],
+    "val_years": [
+      2022,
+      2023
+    ],
+    "val_fraction": 0.2,
+    "seed": 42,
+    "splits_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/splits"
+  },
+  "final_val_metrics": {
+    "accuracy": 0.9672774869109948,
+    "f1": 0.9465811965811965,
+    "roc_auc": 0.9762502490535965
+  },
+  "final_val_loss": 0.14620611831802913,
+  "n_val_samples": 1528,
+  "checkpoint_summary": {
+    "timestamp": "2026-06-03T20:18:51.488047+00:00",
+    "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
+    "next_epoch": 50,
+    "train_loss": 0.08758504908174897,
+    "val_loss": 0.14620611831802913,
+    "val_metrics": {
+      "accuracy": 0.9672774869109948,
+      "f1": 0.9465811965811965,
+      "roc_auc": 0.9762502490535965
+    },
+    "feature_dim": 104,
+    "hidden_dim": 128
+  },
+  "artifact_paths": {
+    "features_pt": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/processed/dex_header_features.pt",
+    "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
+    "normalization": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/normalization.json",
+    "metrics_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/metrics"
+  }
+}

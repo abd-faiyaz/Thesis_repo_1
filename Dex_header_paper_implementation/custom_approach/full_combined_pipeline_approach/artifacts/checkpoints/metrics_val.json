@@ -1,0 +1,20 @@
+{
+  "split": "val",
+  "loss": 0.27870601662046585,
+  "accuracy": 0.9659685863874345,
+  "f1": 0.9445628997867804,
+  "roc_auc": 0.9823311416616857,
+  "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/checkpoints/best.pt",
+  "threshold": 0.5,
+  "n_samples": 1528,
+  "confusion_matrix": [
+    [
+      1033,
+      17
+    ],
+    [
+      35,
+      443
+    ]
+  ]
+}

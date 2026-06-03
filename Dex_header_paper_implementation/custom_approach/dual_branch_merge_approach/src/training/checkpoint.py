@@ -34,9 +34,19 @@ def restore_rng_state(state: dict[str, Any] | None) -> None:
     if "numpy" in state:
         np.random.set_state(state["numpy"])
     if "torch" in state:
-        torch.set_rng_state(state["torch"])
+        t = state["torch"]
+        if not isinstance(t, torch.Tensor):
+            t = torch.as_tensor(t)
+        torch.set_rng_state(t.cpu())
     if "torch_cuda" in state and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(state["torch_cuda"])
+        cuda_states = state["torch_cuda"]
+        if isinstance(cuda_states, (list, tuple)):
+            cpu_states = [
+                s.cpu() if isinstance(s, torch.Tensor) else s for s in cuda_states
+            ]
+            torch.cuda.set_rng_state_all(cpu_states)
+        else:
+            torch.cuda.set_rng_state_all(cuda_states)
 
 
 def save_checkpoint(path: Path, state: dict[str, Any]) -> None:
@@ -86,6 +96,8 @@ def restore_from_checkpoint(
     model: DualBranchNet,
     optimizer: Optimizer,
     scheduler: LRScheduler,
+    *,
+    restore_rng: bool = True,
 ) -> tuple[int, int, float | None]:
     """
     Load weights and optimizer/scheduler/RNG state.
@@ -94,10 +106,19 @@ def restore_from_checkpoint(
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-    restore_rng_state(checkpoint.get("rng_state"))
+    if restore_rng:
+        restore_rng_state(checkpoint.get("rng_state"))
 
     next_epoch = int(checkpoint.get("next_epoch", checkpoint.get("epoch", 0)))
     global_step = int(checkpoint.get("global_step", 0))
     best_val = checkpoint.get("best_val_loss")
     best_val_loss = float(best_val) if best_val is not None else None
     return next_epoch, global_step, best_val_loss
+
+
+def load_model_from_checkpoint(
+    checkpoint: dict[str, Any],
+    model: DualBranchNet,
+) -> None:
+    """Load model weights only (evaluation / inference)."""
+    model.load_state_dict(checkpoint["model_state_dict"])

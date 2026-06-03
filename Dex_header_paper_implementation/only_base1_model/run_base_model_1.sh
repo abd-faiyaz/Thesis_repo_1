@@ -3,12 +3,15 @@
 # run_base_model_1.sh
 # End-to-end runner for MSFDroid Base Model 1 (MLP(H)) — Dex header only.
 #
-# Pipeline (Phases 2 → 6):
-#   1. Optional: install Python dependencies
-#   2. Optional: verify environment
-#   3. Preprocess APKs → dex_header_features.pt
-#   4. Train MLP(H) with checkpoint resume
-#   5. Evaluate checkpoint (ACC, F1, AUC)
+# Pipeline (aligns with Pipeline_full_concept.html P0–P8 for Python / D3):
+#   P0  verify_setup (+ optional pip install)
+#   P2  preprocess APKs → dex_header_features.pt + corpus stats
+#   P3  verify_dataloader (temporal or random split from config)
+#   P5  train MLP(H) with checkpoint resume
+#   P6  evaluate on val/test split (ACC, F1, AUC)
+#   P7  export ONNX bundle (artifacts/export/mlp_header/)
+#   P8  PyTorch vs ONNX parity on parity_samples
+#   +   figures, archive finalize, THESIS_SNIPPET when BM1_ARCHIVE=1
 #
 # Usage examples:
 #   ./run_base_model_1.sh
@@ -65,15 +68,44 @@ SKIP_TRAIN="${SKIP_TRAIN:-0}"
 # SKIP_EVAL: if 1, skip Phase 6 standalone evaluation
 SKIP_EVAL="${SKIP_EVAL:-0}"
 
+# SKIP_VERIFY_DATALOADER: if 1, skip P3 DataLoader / split check
+SKIP_VERIFY_DATALOADER="${SKIP_VERIFY_DATALOADER:-0}"
+
+# SKIP_EXPORT_ONNX: if 1, skip P7 ONNX export bundle
+SKIP_EXPORT_ONNX="${SKIP_EXPORT_ONNX:-0}"
+
+# SKIP_PARITY: if 1, skip P8 PyTorch vs ONNX parity
+SKIP_PARITY="${SKIP_PARITY:-0}"
+
+# SKIP_PLOTS: if 1, skip thesis figures (requires BM1_ARCHIVE=1)
+SKIP_PLOTS="${SKIP_PLOTS:-0}"
+
 # FRESH_TRAIN: if 1, pass --fresh to training (ignore existing checkpoint)
 FRESH_TRAIN="${FRESH_TRAIN:-0}"
 
 # PREPROCESS_LIMIT: if set (e.g. 100), only process first N APKs (smoke test)
 PREPROCESS_LIMIT="${PREPROCESS_LIMIT:-}"
 
+# BM1_ARCHIVE: if 1, tee logs + mirror JSON metrics to output_archives/${BM1_RUN_ID}/
+BM1_ARCHIVE="${BM1_ARCHIVE:-0}"
+BM1_RUN_ID="${BM1_RUN_ID:-}"
+
 # --- Python import path ------------------------------------------------------
 # Tell Python to import `src.*` from this package root
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+
+# --- Optional run archive (output_archives/) ---------------------------------
+if [[ "$BM1_ARCHIVE" == "1" ]]; then
+  if [[ -z "$BM1_RUN_ID" ]]; then
+    BM1_RUN_ID="run_$(date +%Y%m%d_%H%M%S)_bm1"
+  fi
+  export BM1_RUN_ID
+  ARCHIVE_DIR="$ROOT/output_archives/$BM1_RUN_ID"
+  mkdir -p "$ARCHIVE_DIR"/{logs,metrics,corpus_stats,figures,config,export,parity}
+  echo "$BM1_RUN_ID" > "$ROOT/output_archives/LATEST_RUN.txt"
+  cp "$CONFIG" "$ARCHIVE_DIR/config/default.yaml.snapshot"
+  exec > >(tee -a "$ARCHIVE_DIR/logs/pipeline_full.log") 2>&1
+fi
 
 # --- Helper: print a visible section banner ----------------------------------
 section() {
@@ -93,9 +125,19 @@ echo "CONFIG:          $CONFIG"
 echo "SKIP_PREPROCESS: $SKIP_PREPROCESS"
 echo "SKIP_TRAIN:      $SKIP_TRAIN"
 echo "SKIP_EVAL:       $SKIP_EVAL"
+echo "SKIP_VERIFY_DL:  $SKIP_VERIFY_DATALOADER"
+echo "SKIP_EXPORT:     $SKIP_EXPORT_ONNX"
+echo "SKIP_PARITY:     $SKIP_PARITY"
+echo "SKIP_PLOTS:      $SKIP_PLOTS"
 echo "FRESH_TRAIN:     $FRESH_TRAIN"
 echo "INSTALL_DEPS:    $INSTALL_DEPS"
 echo "VERIFY_SETUP:    $VERIFY_SETUP"
+echo "BM1_ARCHIVE:     $BM1_ARCHIVE"
+echo "BM1_RUN_ID:      ${BM1_RUN_ID:-<auto when BM1_ARCHIVE=1>}"
+SPLIT_MODE="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('split_mode','?'))")"
+TRAIN_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('train_years','?'))")"
+VAL_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('val_years','?'))")"
+echo "SPLIT_MODE:      $SPLIT_MODE (train years $TRAIN_YEARS, val years $VAL_YEARS)"
 
 # --- Step 1 (optional): Install dependencies -----------------------------------
 if [[ "$INSTALL_DEPS" == "1" ]]; then
@@ -151,7 +193,19 @@ if [[ ! -f "$PROCESSED_FILE" ]]; then
   exit 1
 fi
 
-# --- Step 4: Train MLP(H) (Phases 4–5) -----------------------------------------
+# Corpus stats JSON (labels, dex counts, year folders)
+"$PYTHON" "$ROOT/scripts/export_corpus_stats.py" ${CONFIG:+--config "$CONFIG"}
+
+# --- Step 3b: Verify DataLoaders / split (P3) ----------------------------------
+if [[ "$SKIP_VERIFY_DATALOADER" != "1" ]]; then
+  section "Step 3b: Verifying DataLoaders and split"
+  "$PYTHON" "$ROOT/scripts/verify_dataloader.py" ${CONFIG:+--config "$CONFIG"}
+else
+  echo ""
+  echo "(Skipping DataLoader verify; SKIP_VERIFY_DATALOADER=1)"
+fi
+
+# --- Step 4: Train MLP(H) (P5) -------------------------------------------------
 if [[ "$SKIP_TRAIN" != "1" ]]; then
   section "Step 4: Training MLP(H)"
 
@@ -183,7 +237,7 @@ if [[ ! -f "$CHECKPOINT" ]]; then
   exit 1
 fi
 
-# --- Step 5: Standalone evaluation (Phase 6) -----------------------------------
+# --- Step 5: Standalone evaluation (P6) ----------------------------------------
 if [[ "$SKIP_EVAL" != "1" ]]; then
   section "Step 5: Evaluation (ACC, F1, AUC)"
 
@@ -200,10 +254,64 @@ else
   echo "(Skipping evaluation; SKIP_EVAL=1)"
 fi
 
+# --- Step 6: ONNX export bundle (P7) -------------------------------------------
+if [[ "$SKIP_EXPORT_ONNX" != "1" ]]; then
+  section "Step 6: ONNX export (P7)"
+  EXPORT_ARGS=()
+  [[ -n "$CONFIG" ]] && EXPORT_ARGS+=(--config "$CONFIG")
+  EXPORT_ARGS+=(--checkpoint "$CHECKPOINT")
+  "$PYTHON" "$ROOT/scripts/export_onnx.py" "${EXPORT_ARGS[@]}"
+else
+  echo ""
+  echo "(Skipping ONNX export; SKIP_EXPORT_ONNX=1)"
+fi
+
+# --- Step 7: PyTorch vs ONNX parity (P8) ---------------------------------------
+if [[ "$SKIP_PARITY" != "1" ]]; then
+  section "Step 7: ONNX parity check (P8)"
+  PARITY_ARGS=()
+  [[ -n "$CONFIG" ]] && PARITY_ARGS+=(--config "$CONFIG")
+  PARITY_ARGS+=(--checkpoint "$CHECKPOINT")
+  "$PYTHON" "$ROOT/scripts/parity_check_onnx.py" "${PARITY_ARGS[@]}"
+else
+  echo ""
+  echo "(Skipping parity check; SKIP_PARITY=1)"
+fi
+
+# --- Step 8: Figures + archive finalize (when BM1_ARCHIVE=1) -------------------
+if [[ "$BM1_ARCHIVE" == "1" ]]; then
+  if [[ "$SKIP_PLOTS" != "1" ]]; then
+    section "Step 8a: Thesis figures"
+    PLOT_ARGS=(--checkpoint "$CHECKPOINT")
+    [[ -n "$CONFIG" ]] && PLOT_ARGS+=(--config "$CONFIG")
+    "$PYTHON" "$ROOT/scripts/plot_bm1_results.py" "${PLOT_ARGS[@]}"
+  else
+    echo ""
+    echo "(Skipping figures; SKIP_PLOTS=1)"
+  fi
+
+  section "Step 8b: Finalize run archive"
+  "$ROOT/scripts/archive_run.sh" "$BM1_RUN_ID"
+
+  section "Step 8c: Thesis snippet"
+  "$PYTHON" "$ROOT/scripts/generate_thesis_snippet.py"
+else
+  echo ""
+  echo "(Skipping figures/archive finalize/thesis snippet; set BM1_ARCHIVE=1 to enable)"
+fi
+
 # --- Done ---------------------------------------------------------------------
 section "Base Model 1 pipeline finished"
 echo "Processed features: $PROCESSED_FILE"
 echo "Checkpoint:         $CHECKPOINT"
+echo "Metrics dir:        $ROOT/artifacts/metrics"
+echo "ONNX bundle:        $ROOT/artifacts/export/mlp_header/"
+echo "Splits:             $ROOT/artifacts/splits/ (train.txt, val.txt)"
 echo "Failed APK log:     $ROOT/artifacts/failed_apks.log (if any failures)"
+if [[ "$BM1_ARCHIVE" == "1" ]]; then
+  echo "Run archive:        $ROOT/output_archives/$BM1_RUN_ID"
+  echo "  RUN_MANIFEST:     $ROOT/output_archives/$BM1_RUN_ID/RUN_MANIFEST.json"
+  echo "  THESIS_SNIPPET:   $ROOT/output_archives/$BM1_RUN_ID/THESIS_SNIPPET.md"
+fi
 echo ""
 echo "Done."

@@ -15,6 +15,7 @@ from src.pipeline_integration import (
 from src.preprocessing.common import (
     scan_apk_rows,
     stratified_split,
+    temporal_year_split,
     write_dataset_index,
     write_split_file,
 )
@@ -53,11 +54,30 @@ def main(argv: list[str] | None = None) -> int:
             f"(train={len(train_rows)}, val={len(val_rows)})"
         )
     else:
-        train_rows, val_rows = stratified_split(
-            rows,
-            train_ratio=float(pre.get("train_ratio", 0.9)),
-            seed=int(pre.get("seed", 42)),
-        )
+        split_mode = str(pre.get("split_mode", "stratified_random"))
+        if split_mode == "temporal_year":
+            train_years = pre.get("train_years", [2020, 2021])
+            val_years = pre.get("val_years", [2022, 2023])
+            train_rows, val_rows = temporal_year_split(
+                rows,
+                train_years=train_years,
+                val_years=val_years,
+            )
+            print(
+                f"Temporal year split: train={train_years} val={val_years} "
+                f"(train={len(train_rows)}, val={len(val_rows)})"
+            )
+        elif split_mode == "stratified_random":
+            train_rows, val_rows = stratified_split(
+                rows,
+                train_ratio=float(pre.get("train_ratio", 0.9)),
+                seed=int(pre.get("seed", 42)),
+            )
+        else:
+            raise ValueError(
+                f"Unknown preprocessing.split_mode={split_mode!r}; "
+                "use 'temporal_year' or 'stratified_random'"
+            )
 
     write_dataset_index(cfg.paths.dataset_index, rows)
     write_split_file(cfg.paths.splits_dir / "train.txt", train_rows)

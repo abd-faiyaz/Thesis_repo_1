@@ -161,14 +161,16 @@ APK_ROOT=/path/to/your/dataset ./run_base_model_1.sh
 
 Optional overrides:
 
-| Variable | Effect |
-|----------|--------|
-| `INSTALL_DEPS=1` | Run `pip install` before the pipeline |
-| `FRESH_TRAIN=1` | Ignore existing checkpoint; train from scratch |
-| `EPOCHS=50` | Override epoch count from config |
+
+| Variable            | Effect                                                      |
+| ------------------- | ----------------------------------------------------------- |
+| `INSTALL_DEPS=1`    | Run `pip install` before the pipeline                       |
+| `FRESH_TRAIN=1`     | Ignore existing checkpoint; train from scratch              |
+| `EPOCHS=50`         | Override epoch count from config                            |
 | `SKIP_PREPROCESS=1` | Reuse existing `artifacts/processed/dex_header_features.pt` |
-| `SKIP_TRAIN=1` | Preprocess only |
-| `SKIP_EVAL=1` | Skip final metrics step |
+| `SKIP_TRAIN=1`      | Preprocess only                                             |
+| `SKIP_EVAL=1`       | Skip final metrics step                                     |
+
 
 On **Windows PowerShell**:
 
@@ -232,13 +234,15 @@ Metrics are printed to the terminal.
 
 ## Expected outputs (full run)
 
-| Path | Description |
-|------|-------------|
-| `artifacts/processed/dex_header_features.pt` | All APK features + labels (main preprocess output) |
-| `artifacts/normalization.json` | Min–max stats + multi-dex metadata |
-| `artifacts/failed_apks.log` | APKs that failed extraction (should be small) |
-| `artifacts/checkpoints/latest_checkpoint.pth` | Trained model + optimizer state |
-| Terminal output | Validation ACC, F1, AUC at end of train/eval |
+
+| Path                                          | Description                                        |
+| --------------------------------------------- | -------------------------------------------------- |
+| `artifacts/processed/dex_header_features.pt`  | All APK features + labels (main preprocess output) |
+| `artifacts/normalization.json`                | Min–max stats + multi-dex metadata                 |
+| `artifacts/failed_apks.log`                   | APKs that failed extraction (should be small)      |
+| `artifacts/checkpoints/latest_checkpoint.pth` | Trained model + optimizer state                    |
+| Terminal output                               | Validation ACC, F1, AUC at end of train/eval       |
+
 
 Default training: **50 epochs** (`config/default.yaml` → `training.epochs`).
 
@@ -246,14 +250,16 @@ Default training: **50 epochs** (`config/default.yaml` → `training.epochs`).
 
 ## Troubleshooting
 
-| Problem | What to do |
-|---------|------------|
-| `APK_ROOT does not exist` | Set `APK_ROOT` to the folder containing `2020/`, `2021/`, etc. |
-| `No .apk files under ...` | Check path; APKs must end in `.apk` |
-| `No label folder found` | APK must live under a folder named `benign` or `malware` |
-| CUDA out of memory | Edit `config/default.yaml` → `training.device: cpu` or lower `data.batch_size` |
-| Preprocess interrupted | Re-run preprocess; it processes all APKs again (no per-APK resume in BM1) |
-| Train interrupted | Re-run `./run_base_model_1.sh` with `SKIP_PREPROCESS=1` or `train --resume` |
+
+| Problem                   | What to do                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `APK_ROOT does not exist` | Set `APK_ROOT` to the folder containing `2020/`, `2021/`, etc.                 |
+| `No .apk files under ...` | Check path; APKs must end in `.apk`                                            |
+| `No label folder found`   | APK must live under a folder named `benign` or `malware`                       |
+| CUDA out of memory        | Edit `config/default.yaml` → `training.device: cpu` or lower `data.batch_size` |
+| Preprocess interrupted    | Re-run preprocess; it processes all APKs again (no per-APK resume in BM1)      |
+| Train interrupted         | Re-run `./run_base_model_1.sh` with `SKIP_PREPROCESS=1` or `train --resume`    |
+
 
 ---
 
@@ -276,12 +282,14 @@ Use this section when the repo and dataset live on the **CachyOS** machine and y
 
 ### Fixed paths on CachyOS
 
-| What | Path |
-|------|------|
-| Project (git) root | `/mnt/Files/thesis_vigidroid/thesis_vigidroid` |
-| Shared Python venv | `/mnt/Files/thesis_vigidroid/thesis_vigidroid/thesis_venv` |
+
+| What                 | Path                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| Project (git) root   | `/mnt/Files/thesis_vigidroid/thesis_vigidroid`                                                  |
+| Shared Python venv   | `/mnt/Files/thesis_vigidroid/thesis_vigidroid/thesis_venv`                                      |
 | This pipeline folder | `/mnt/Files/thesis_vigidroid/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model` |
-| APK dataset root | `/mnt/Files/thesis_full_dataset` |
+| APK dataset root     | `/mnt/Files/thesis_full_dataset`                                                                |
+
 
 Your tree (`2020`–`2023` / `benign` / `malware`) is valid for `label_mode: parent_folder`. Ignore Windows / PowerShell steps in this guide on CachyOS.
 
@@ -300,11 +308,13 @@ tmux new -s bm1
 
 ### Replace generic paths in this guide
 
-| Guide placeholder | Use on CachyOS |
-|-------------------|----------------|
-| `/path/to/thesis_vigidroid/...` | `/mnt/Files/thesis_vigidroid/thesis_vigidroid/...` |
-| `/path/to/your/dataset` or `/path/to/dataset` | `/mnt/Files/thesis_full_dataset` |
-| `D:\path\to\dataset` (Windows) | not used on CachyOS |
+
+| Guide placeholder                             | Use on CachyOS                                     |
+| --------------------------------------------- | -------------------------------------------------- |
+| `/path/to/thesis_vigidroid/...`               | `/mnt/Files/thesis_vigidroid/thesis_vigidroid/...` |
+| `/path/to/your/dataset` or `/path/to/dataset` | `/mnt/Files/thesis_full_dataset`                   |
+| `D:\path\to\dataset` (Windows)                | not used on CachyOS                                |
+
 
 **Step 0 — project folder:**
 
@@ -382,3 +392,6 @@ APK_ROOT=/mnt/Files/thesis_full_dataset ./run_base_model_1.sh
 
 - Preprocess writes a **single** `artifacts/processed/dex_header_features.pt`; a full corpus run can take hours and is **not** per-APK resumable like Pattern A/B shards. Use `PREPROCESS_LIMIT` smoke test first.
 - Use the **same** `thesis_venv` for Pattern A and B; only `cd` and `artifacts/` differ per pipeline.
+
+
+

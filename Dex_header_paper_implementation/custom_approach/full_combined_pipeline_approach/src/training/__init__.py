@@ -1,33 +1,7 @@
-"""Training loop, loss, and checkpoint helpers (Phase 5)."""
+"""Training loop, checkpointing, and evaluation (Phases 5–6).
 
-from src.training.checkpoint import (
-    build_checkpoint_state,
-    load_checkpoint,
-    restore_from_checkpoint,
-    save_checkpoint,
-)
-from src.training.losses import build_criterion, resolve_pos_weight
-from src.training.loops import train_one_epoch, validate_one_epoch
-from src.training.evaluate import (
-    compute_metrics,
-    format_metrics,
-    run_evaluation,
-    validation_epoch,
-)
-from src.training.train import run_training
-
-__all__ = [
-    "build_checkpoint_state",
-    "build_criterion",
-    "compute_metrics",
-    "format_metrics",
-    "load_checkpoint",
-    "resolve_pos_weight",
-    "restore_from_checkpoint",
-    "run_evaluation",
-    "run_training",
-    "save_checkpoint",
-    "train_one_epoch",
-    "validate_one_epoch",
-    "validation_epoch",
-]
+Import submodules directly (e.g. ``from src.training.train import run_training``).
+Do not import train/evaluate here: ``python -m src.training.train`` loads this
+package first; eager imports register ``src.training.train`` in sys.modules before
+runpy executes it, which triggers RuntimeWarning and spams logs from DataLoader workers.
+"""

@@ -163,3 +163,5 @@ Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/patte
 Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/patternA_specifics.md
 Dex_header_paper_implementation/only_base1_model/BM1_multidex_specifics.md
 
+latest_cursor_chat.json
+restore_cursor_chats.py
