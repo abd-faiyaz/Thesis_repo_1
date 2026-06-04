@@ -1,0 +1,244 @@
+{
+  "device": {
+    "model": "sdk_gphone64_arm64",
+    "manufacturer": "Google",
+    "api": 36
+  },
+  "scans": [
+    {
+      "scan_id": "7fa9455f-d18d-4c52-b994-849f88889954",
+      "timestamp_ms": 1780411339919,
+      "device": {
+        "model": "sdk_gphone64_arm64",
+        "manufacturer": "Google",
+        "api": 36
+      },
+      "apk": {
+        "name": "004B759969C2BE8D6100099779B0011765446E4FE645DF234F84F4FBB0FDAF97.apk",
+        "path": "\/storage\/emulated\/0\/Download\/004B759969C2BE8D6100099779B0011765446E4FE645DF234F84F4FBB0FDAF97.apk",
+        "size_bytes": 6680295,
+        "sha256_short": "33d0590a"
+      },
+      "trigger": "manual",
+      "stages": [
+        {
+          "domain": "manifest_xgb",
+          "parse_ms": 191.152542,
+          "vectorize_ms": 6.816125,
+          "inference_ms": 3.530625,
+          "score": 0,
+          "mem_delta_bytes": 349528
+        },
+        {
+          "domain": "bytecnn",
+          "parse_ms": 1.418083,
+          "vectorize_ms": 0,
+          "inference_ms": 3.831958,
+          "score": 0.2778056561946869,
+          "mem_delta_bytes": 349528
+        }
+      ],
+      "ensemble": {
+        "score": 0.13789703,
+        "decision": "benign",
+        "policy": "weighted_validation_accuracy"
+      },
+      "totals": {
+        "wall_ms": 212.0115,
+        "cpu_ms": 191.685921,
+        "mem_delta_bytes": 699056,
+        "total_dex_files_found": 4,
+        "structural_parsing_time_ms": 202,
+        "battery_pct_delta": null
+      }
+    },
+    {
+      "scan_id": "5bbc490d-a6d2-48a1-bbcd-a5bf5a98ef85",
+      "timestamp_ms": 1780411339996,
+      "device": {
+        "model": "sdk_gphone64_arm64",
+        "manufacturer": "Google",
+        "api": 36
+      },
+      "apk": {
+        "name": "5.apk",
+        "path": "\/storage\/emulated\/0\/Download\/5.apk",
+        "size_bytes": 19091552,
+        "sha256_short": "de33e62b"
+      },
+      "trigger": "manual",
+      "stages": [
+        {
+          "domain": "manifest_xgb",
+          "parse_ms": 63.121292,
+          "vectorize_ms": 0.268167,
+          "inference_ms": 0.198042,
+          "score": 1,
+          "mem_delta_bytes": 160640
+        },
+        {
+          "domain": "bytecnn",
+          "parse_ms": 0.461417,
+          "vectorize_ms": 0,
+          "inference_ms": 0.447625,
+          "score": 0.9608396291732788,
+          "mem_delta_bytes": 160640
+        }
+      ],
+      "ensemble": {
+        "score": 0.98056155,
+        "decision": "malware",
+        "policy": "weighted_validation_accuracy"
+      },
+      "totals": {
+        "wall_ms": 71.271125,
+        "cpu_ms": 58.162578,
+        "mem_delta_bytes": 321280,
+        "total_dex_files_found": 1,
+        "structural_parsing_time_ms": 70,
+        "battery_pct_delta": null
+      }
+    },
+    {
+      "scan_id": "57891752-846d-4915-87a9-26eed2daeef5",
+      "timestamp_ms": 1780411340011,
+      "device": {
+        "model": "sdk_gphone64_arm64",
+        "manufacturer": "Google",
+        "api": 36
+      },
+      "apk": {
+        "name": "3.apk",
+        "path": "\/storage\/emulated\/0\/Download\/3.apk",
+        "size_bytes": 3355613,
+        "sha256_short": "948baeee"
+      },
+      "trigger": "manual",
+      "stages": [
+        {
+          "domain": "manifest_xgb",
+          "parse_ms": 4.784375,
+          "vectorize_ms": 0.280125,
+          "inference_ms": 0.173167,
+          "score": 0,
+          "mem_delta_bytes": 10560
+        },
+        {
+          "domain": "bytecnn",
+          "parse_ms": 2.927625,
+          "vectorize_ms": 0,
+          "inference_ms": 0.28675,
+          "score": 0.4084641933441162,
+          "mem_delta_bytes": 10560
+        }
+      ],
+      "ensemble": {
+        "score": 0.20275323,
+        "decision": "benign",
+        "policy": "weighted_validation_accuracy"
+      },
+      "totals": {
+        "wall_ms": 12.752792,
+        "cpu_ms": 5.685958,
+        "mem_delta_bytes": 21120,
+        "total_dex_files_found": 1,
+        "structural_parsing_time_ms": 9,
+        "battery_pct_delta": null
+      }
+    },
+    {
+      "scan_id": "59238fe3-19aa-429c-9188-2c8fab26b161",
+      "timestamp_ms": 1780411340103,
+      "device": {
+        "model": "sdk_gphone64_arm64",
+        "manufacturer": "Google",
+        "api": 36
+      },
+      "apk": {
+        "name": "2.apk",
+        "path": "\/storage\/emulated\/0\/Download\/2.apk",
+        "size_bytes": 5405403,
+        "sha256_short": "5eecc0e5"
+      },
+      "trigger": "manual",
+      "stages": [
+        {
+          "domain": "manifest_xgb",
+          "parse_ms": 84.467459,
+          "vectorize_ms": 1.632209,
+          "inference_ms": 0.225666,
+          "score": 0,
+          "mem_delta_bytes": 148848
+        },
+        {
+          "domain": "bytecnn",
+          "parse_ms": 0.60225,
+          "vectorize_ms": 0,
+          "inference_ms": 0.358042,
+          "score": 0.4307765066623688,
+          "mem_delta_bytes": 148848
+        }
+      ],
+      "ensemble": {
+        "score": 0.21382861,
+        "decision": "benign",
+        "policy": "weighted_validation_accuracy"
+      },
+      "totals": {
+        "wall_ms": 90.681417,
+        "cpu_ms": 84.683214,
+        "mem_delta_bytes": 297696,
+        "total_dex_files_found": 2,
+        "structural_parsing_time_ms": 89,
+        "battery_pct_delta": null
+      }
+    },
+    {
+      "scan_id": "355bd833-73fb-4637-9bd6-18eb7a924a17",
+      "timestamp_ms": 1780411340143,
+      "device": {
+        "model": "sdk_gphone64_arm64",
+        "manufacturer": "Google",
+        "api": 36
+      },
+      "apk": {
+        "name": "4.apk",
+        "path": "\/storage\/emulated\/0\/Download\/4.apk",
+        "size_bytes": 35998118,
+        "sha256_short": "1b8f9c35"
+      },
+      "trigger": "manual",
+      "stages": [
+        {
+          "domain": "manifest_xgb",
+          "parse_ms": 30.310459,
+          "vectorize_ms": 0.186501,
+          "inference_ms": 0.199542,
+          "score": 1,
+          "mem_delta_bytes": 54088
+        },
+        {
+          "domain": "bytecnn",
+          "parse_ms": 0.606292,
+          "vectorize_ms": 0,
+          "inference_ms": 0.338459,
+          "score": 0.6910728812217712,
+          "mem_delta_bytes": 54088
+        }
+      ],
+      "ensemble": {
+        "score": 0.8466549,
+        "decision": "malware",
+        "policy": "weighted_validation_accuracy"
+      },
+      "totals": {
+        "wall_ms": 37.900667,
+        "cpu_ms": 29.861084,
+        "mem_delta_bytes": 108176,
+        "total_dex_files_found": 1,
+        "structural_parsing_time_ms": 36,
+        "battery_pct_delta": null
+      }
+    }
+  ]
+}

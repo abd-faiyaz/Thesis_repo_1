@@ -8,6 +8,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,7 @@ public final class MetricsWriter {
 
     private static final String TAG = "MetricsWriter";
     public static final String METRICS_SUBDIR = "metrics";
+    public static final String AGGREGATE_FILENAME = "all_scan_metrics.json";
 
     private MetricsWriter() {}
 
@@ -84,26 +86,24 @@ public final class MetricsWriter {
         public double wallMs;
         public double cpuMs;
         public long memDeltaBytes;
+        public int totalDexFilesFound;
+        public long structuralParsingTimeMs;
         public Float ensembleScore;
         public String ensembleDecision;
         public String ensemblePolicy = "sequential_mean";
     }
 
-    public static File writeScan(Context context, ScanMetrics scan) throws Exception {
-        File dir = getMetricsDir(context);
+    private static JSONObject buildScanObject(ScanMetrics scan) throws Exception {
+        JSONObject obj = new JSONObject();
+        obj.put("scan_id", scan.scanId);
+        obj.put("timestamp_ms", scan.timestampMs);
+
         String hash = shortHash(scan.apkName + ":" + scan.apkSizeBytes);
-        String filename = String.format(Locale.US, "scan_%d_%s.json", scan.timestampMs, hash);
-        File out = new File(dir, filename);
-
-        JSONObject root = new JSONObject();
-        root.put("scan_id", scan.scanId);
-        root.put("timestamp_ms", scan.timestampMs);
-
         JSONObject device = new JSONObject();
         device.put("model", Build.MODEL != null ? Build.MODEL : "unknown");
         device.put("manufacturer", Build.MANUFACTURER != null ? Build.MANUFACTURER : "unknown");
         device.put("api", Build.VERSION.SDK_INT);
-        root.put("device", device);
+        obj.put("device", device);
 
         JSONObject apk = new JSONObject();
         apk.put("name", scan.apkName);
@@ -112,9 +112,9 @@ public final class MetricsWriter {
         }
         apk.put("size_bytes", scan.apkSizeBytes);
         apk.put("sha256_short", hash);
-        root.put("apk", apk);
+        obj.put("apk", apk);
 
-        root.put("trigger", scan.trigger);
+        obj.put("trigger", scan.trigger);
 
         JSONArray stages = new JSONArray();
         for (StageMetrics s : scan.stages) {
@@ -127,22 +127,65 @@ public final class MetricsWriter {
             stage.put("mem_delta_bytes", s.memDeltaBytes);
             stages.put(stage);
         }
-        root.put("stages", stages);
+        obj.put("stages", stages);
 
         if (scan.ensembleScore != null) {
             JSONObject ensemble = new JSONObject();
             ensemble.put("score", scan.ensembleScore);
             ensemble.put("decision", scan.ensembleDecision != null ? scan.ensembleDecision : "uncertain");
             ensemble.put("policy", scan.ensemblePolicy);
-            root.put("ensemble", ensemble);
+            obj.put("ensemble", ensemble);
         }
 
         JSONObject totals = new JSONObject();
         totals.put("wall_ms", scan.wallMs);
         totals.put("cpu_ms", scan.cpuMs);
         totals.put("mem_delta_bytes", scan.memDeltaBytes);
+        totals.put("total_dex_files_found", scan.totalDexFilesFound);
+        totals.put("structural_parsing_time_ms", scan.structuralParsingTimeMs);
         totals.put("battery_pct_delta", JSONObject.NULL);
-        root.put("totals", totals);
+        obj.put("totals", totals);
+        return obj;
+    }
+
+    public static File writeScan(Context context, ScanMetrics scan) throws Exception {
+        File dir = getMetricsDir(context);
+        File out = new File(dir, AGGREGATE_FILENAME);
+        JSONObject root;
+        JSONArray scans;
+
+        if (out.exists()) {
+            try (FileInputStream fis = new FileInputStream(out)) {
+                byte[] bytes = new byte[(int) out.length()];
+                int offset = 0;
+                while (offset < bytes.length) {
+                    int count = fis.read(bytes, offset, bytes.length - offset);
+                    if (count < 0) break;
+                    offset += count;
+                }
+                String text = offset > 0
+                        ? new String(bytes, 0, offset, StandardCharsets.UTF_8)
+                        : "";
+                root = text.trim().isEmpty() ? new JSONObject() : new JSONObject(text);
+            }
+        } else {
+            root = new JSONObject();
+        }
+
+        if (!root.has("device")) {
+            JSONObject device = new JSONObject();
+            device.put("model", Build.MODEL != null ? Build.MODEL : "unknown");
+            device.put("manufacturer", Build.MANUFACTURER != null ? Build.MANUFACTURER : "unknown");
+            device.put("api", Build.VERSION.SDK_INT);
+            root.put("device", device);
+        }
+
+        scans = root.optJSONArray("scans");
+        if (scans == null) {
+            scans = new JSONArray();
+            root.put("scans", scans);
+        }
+        scans.put(buildScanObject(scan));
 
         try (OutputStreamWriter w = new OutputStreamWriter(new FileOutputStream(out), StandardCharsets.UTF_8)) {
             w.write(root.toString(2));

@@ -1,33 +1,24 @@
-import torch
+#!/usr/bin/env python3
+"""Thin wrapper: export 1dcnn weights to ONNX (uses ../1dcnn)."""
+
+from __future__ import annotations
+
+import subprocess
 import sys
-import os
+from pathlib import Path
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-from model.bytecnn import ByteCNN
+ROOT = Path(__file__).resolve().parent
+ONEDCNN = ROOT.parent / "1dcnn"
 
-def main():
-    print("Initializing model...")
-    model = ByteCNN(embed_dim=8, num_classes=2)
-    pth_path = os.path.join(os.path.dirname(__file__), 'bytecnn_basemodel_2020.pth')
-    onnx_path = os.path.join(os.path.dirname(__file__), 'bytecnn_basemodel_2020.onnx')
 
-    print(f"Loading weights from {pth_path}...")
-    state_dict = torch.load(pth_path, map_location="cpu", weights_only=False)
-    if isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
-        model.load_state_dict(state_dict['model_state_dict'])    
-    else:
-        model.load_state_dict(state_dict)
-    
-    model.eval()
-    print("Exporting ONNX model...")
-    dummy_input = torch.zeros((1, 1024), dtype=torch.long)
-    torch.onnx.export(
-        model, dummy_input, onnx_path,
-        export_params=True, opset_version=14, do_constant_folding=True,
-        input_names=['input_bytes'], output_names=['output'],
-        dynamic_axes={'input_bytes': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
-    )
-    print(f"Model successfully saved to {onnx_path}")
+def main() -> int:
+    script = ONEDCNN / "export_onnx.py"
+    if not script.is_file():
+        print(f"Missing {script}", file=sys.stderr)
+        return 1
+    cmd = [sys.executable, str(script), *sys.argv[1:]]
+    return subprocess.call(cmd, cwd=str(ONEDCNN))
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    raise SystemExit(main())
