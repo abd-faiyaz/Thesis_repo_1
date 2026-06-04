@@ -42,12 +42,35 @@ public class ScanService extends JobIntentService {
 
     private static final int JOB_ID = 2001;
     private static final String TAG = "ScanService";
+    private static final int XGB_FEATURE_DIM = 2500;
+    private static final float XGB_VALIDATION_ACCURACY = 0.9748f;
+    private static final float CNN_VALIDATION_ACCURACY = 0.9607843f;
 
     private OrtEnvironment ortEnvironment;
     private OrtSession ortSession;
     private OrtSession ortSessionCnn;
     private List<String> featureColumns = new ArrayList<>();
     private Map<String, Integer> featureIndex = new HashMap<>();
+
+    private static final class XgbFeatureExtractionResult {
+        final float[] aggregatedVector;
+        final int dexFilesFound;
+        final long structuralParsingTimeMs;
+        final long parseTimeNanos;
+        final long vectorizeTimeNanos;
+
+        XgbFeatureExtractionResult(float[] aggregatedVector,
+                                   int dexFilesFound,
+                                   long structuralParsingTimeMs,
+                                   long parseTimeNanos,
+                                   long vectorizeTimeNanos) {
+            this.aggregatedVector = aggregatedVector;
+            this.dexFilesFound = dexFilesFound;
+            this.structuralParsingTimeMs = structuralParsingTimeMs;
+            this.parseTimeNanos = parseTimeNanos;
+            this.vectorizeTimeNanos = vectorizeTimeNanos;
+        }
+    }
 
 
     public static void enqueueWork(Context context, Intent intent) {
@@ -59,10 +82,15 @@ public class ScanService extends JobIntentService {
         super.onCreate();
         try {
             loadFeatureColumns();
+        } catch (Exception e) {
+            Log.w(TAG, "XGBoost feature list not loaded (CNN-only mode OK)", e);
+            sendLog("XGBoost features skipped: " + e.getMessage(), null);
+        }
+        try {
             initOnnxModel();
         } catch (Exception e) {
-            Log.e(TAG, "Init error", e);
-            sendLog("Initialization error: " + e.getMessage(), "Error");
+            Log.e(TAG, "ONNX init error", e);
+            sendLog("ONNX init error: " + e.getMessage(), "Error");
         }
     }
 
@@ -106,20 +134,34 @@ public class ScanService extends JobIntentService {
             long cpuStart = Debug.threadCpuTimeNanos();
             long memStart = Debug.getNativeHeapAllocatedSize();
 
-            // parse apk
+            // parse apk (XGBoost pipeline — skip if model not loaded)
             long parseStart = SystemClock.elapsedRealtimeNanos();
-            Set<String> extractedTokens = extractManifestFeatures(apk);
-            long parseEnd = SystemClock.elapsedRealtimeNanos();
+            float[] inputVector = new float[XGB_FEATURE_DIM];
+            float score = -1f;
+            long parseEnd = parseStart;
+            long vecStart = parseStart;
+            long vecEnd = parseStart;
+            long inferStart = parseStart;
+            long inferEnd = parseStart;
+            int totalDexFilesFound = 0;
+            long structuralParsingTimeMs = 0L;
 
-            // vectorize
-            long vecStart = SystemClock.elapsedRealtimeNanos();
-            float[] inputVector = vectorize(extractedTokens);
-            long vecEnd = SystemClock.elapsedRealtimeNanos();
+            if (ortSession != null && !featureColumns.isEmpty()) {
+                XgbFeatureExtractionResult extraction = extractAggregatedXgbFeatures(apk);
+                inputVector = extraction.aggregatedVector;
+                totalDexFilesFound = extraction.dexFilesFound;
+                structuralParsingTimeMs = extraction.structuralParsingTimeMs;
 
-            // run inference
-            long inferStart = SystemClock.elapsedRealtimeNanos();
-            float score = runInference(inputVector);
-            long inferEnd = SystemClock.elapsedRealtimeNanos();
+                parseEnd = parseStart + extraction.parseTimeNanos;
+                vecStart = parseEnd;
+                vecEnd = vecStart + extraction.vectorizeTimeNanos;
+
+                inferStart = SystemClock.elapsedRealtimeNanos();
+                score = runInference(inputVector);
+                inferEnd = SystemClock.elapsedRealtimeNanos();
+            } else {
+                sendLog("XGBoost pipeline skipped (model or features missing)", null);
+            }
 
             // 1D CNN inference pipeline
             long cnnParseStart = SystemClock.elapsedRealtimeNanos();
@@ -144,35 +186,83 @@ public class ScanService extends JobIntentService {
             double totalMs = (wallEnd - wallStart) / 1_000_000.0;
             long cpuMs = cpuEnd - cpuStart;
             long memDelta = memEnd - memStart;
+            long xgbMemDelta = memDelta / 2;
+            long cnnMemDelta = memDelta - xgbMemDelta;
 
-            String result = String.format(Locale.US,
-                    "APK=%s xgb_parse=%.2fms vec=%.2fms xgb_infer=%.2fms xgb_score=%.5f | cnn_parse=%.2fms cnn_infer=%.2fms cnn_score=%.5f | total=%.2fms cpuMs=%d memDelta=%d",
-                    apkName, parsingMs, vectorMs, inferenceMs, score, cnnParsingMs, cnnInferenceMs, cnnScore, totalMs, cpuMs, memDelta);
+            float ensemble = computeEnsembleScore(score, cnnScore);
+            String ensembleDecision = null;
+            if (ensemble >= 0f) {
+                ensembleDecision = ensemble >= 0.5f ? "malware" : "benign";
+            }
 
-            sendLog(result, "Idle");
+            sendLog(String.format(
+                    Locale.US,
+                    "XGBoost: score=%.4f parse=%.2fms vec=%.2fms infer=%.2fms mem=%d bytes",
+                    score, parsingMs, vectorMs, inferenceMs, xgbMemDelta
+            ), null);
+            sendLog(String.format(
+                    Locale.US,
+                    "1D-CNN: score=%.4f parse=%.2fms infer=%.2fms mem=%d bytes",
+                    cnnScore, cnnParsingMs, cnnInferenceMs, cnnMemDelta
+            ), null);
 
-            writeScanMetrics(
+            File metricsFile = writeScanMetrics(
                     trigger,
                     apk,
                     parsingMs, vectorMs, inferenceMs, score,
                     cnnParsingMs, cnnInferenceMs, cnnScore,
                     totalMs, cpuMs / 1_000_000.0, memDelta,
-                    memEnd - memStart
+                    xgbMemDelta, cnnMemDelta,
+                    totalDexFilesFound,
+                    structuralParsingTimeMs,
+                    ensemble,
+                    ensembleDecision
             );
+
+            sendScanResult(
+                    apkName, ensemble, ensembleDecision,
+                    totalMs, memDelta / (1024.0 * 1024.0),
+                    metricsFile != null ? metricsFile.getName() : null
+            );
+            sendLog("Scanned: " + apkName, "Idle");
         }
 
         sendLog("Scan completed.", "Idle");
     }
 
     private void sendLog(String log, String status) {
-        Intent i = new Intent("SCAN_LOG");
+        Intent i = new Intent(MainActivity.ACTION_SCAN_LOG);
         i.putExtra("log", log);
         if (status != null) i.putExtra("status", status);
         LocalBroadcastManager.getInstance(this).sendBroadcast(i);
     }
 
-    private Set<String> extractManifestFeatures(File apkFile) {
-        Set<String> features = new HashSet<>();
+    private void sendScanResult(
+            String apkName,
+            float ensembleScore,
+            String ensembleDecision,
+            double totalMs,
+            double totalMemMb,
+            String metricsFileName
+    ) {
+        Intent i = new Intent(MainActivity.ACTION_SCAN_RESULT);
+        i.putExtra("apk_name", apkName);
+        i.putExtra("ensemble_score", ensembleScore);
+        i.putExtra("ensemble_decision", ensembleDecision);
+        i.putExtra("total_ms", totalMs);
+        i.putExtra("total_mem_mb", totalMemMb);
+        if (metricsFileName != null) {
+            i.putExtra("metrics_file", metricsFileName);
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(i);
+    }
+
+    private XgbFeatureExtractionResult extractAggregatedXgbFeatures(File apkFile) {
+        float[] aggregatedVector = new float[XGB_FEATURE_DIM];
+        long parseTimeNanos = 0L;
+        long vectorizeTimeNanos = 0L;
+        int dexFilesFound = 0;
+        long structuralParsingStart = SystemClock.elapsedRealtimeNanos();
 
         try (ZipFile zip = new ZipFile(apkFile)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -180,34 +270,74 @@ public class ScanService extends JobIntentService {
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String entryName = entry.getName();
+                if (entryName == null) {
+                    continue;
+                }
+
                 if (entryName.equalsIgnoreCase("AndroidManifest.xml")) {
-//                    ZipEntry manifestEntry = zip.getEntry("AndroidManifest.xml");
-//                    if (manifestEntry == null) return features;
+                    long manifestParseStart = SystemClock.elapsedRealtimeNanos();
+                    Set<String> manifestFeatures = new HashSet<>();
+                    try (InputStream is = zip.getInputStream(entry)) {
+                        AxmlReader reader = new AxmlReader(is);
+                        Set<String> rawFeatures = reader.parse();
 
-                    InputStream is = zip.getInputStream(entry);
-                    AxmlReader reader = new AxmlReader(is);
-                    Set<String> rawFeatures = reader.parse();
-
-                    for (String rawFeature : rawFeatures) {
-                        if (rawFeature != null && rawFeature.startsWith("android.permission.")){
-                            features.add(normalizePermission(rawFeature));
-                        }
-                        if (rawFeature != null && rawFeature.startsWith("android.intent.action.")){
-                            features.add(normalizeIntent(rawFeature));
+                        for (String rawFeature : rawFeatures) {
+                            if (rawFeature != null && rawFeature.startsWith("android.permission.")) {
+                                manifestFeatures.add(normalizePermission(rawFeature));
+                            }
+                            if (rawFeature != null && rawFeature.startsWith("android.intent.action.")) {
+                                manifestFeatures.add(normalizeIntent(rawFeature));
+                            }
                         }
                     }
+                    parseTimeNanos += (SystemClock.elapsedRealtimeNanos() - manifestParseStart);
+
+                    long manifestVectorStart = SystemClock.elapsedRealtimeNanos();
+                    float[] manifestVector = vectorize(manifestFeatures);
+                    orPoolInto(aggregatedVector, manifestVector);
+                    vectorizeTimeNanos += (SystemClock.elapsedRealtimeNanos() - manifestVectorStart);
+                    continue;
                 }
-                else if (entryName.endsWith(".dex")) {
-                    InputStream is = zip.getInputStream(entry);
-                    MinimalDexParser.parse(is, features::add);
-                    is.close();
+
+                String lowerName = entryName.toLowerCase(Locale.US);
+                if (lowerName.startsWith("classes") && lowerName.endsWith(".dex")) {
+                    dexFilesFound++;
+
+                    long dexParseStart = SystemClock.elapsedRealtimeNanos();
+                    Set<String> dexFeatures = new HashSet<>();
+                    try (InputStream is = zip.getInputStream(entry)) {
+                        MinimalDexParser.parse(is, dexFeatures::add);
+                    }
+                    parseTimeNanos += (SystemClock.elapsedRealtimeNanos() - dexParseStart);
+
+                    long dexVectorStart = SystemClock.elapsedRealtimeNanos();
+                    float[] dexVector = vectorize(dexFeatures);
+                    orPoolInto(aggregatedVector, dexVector);
+                    vectorizeTimeNanos += (SystemClock.elapsedRealtimeNanos() - dexVectorStart);
                 }
             }
         } catch (Exception e) {
             sendLog("Manifest parse error: " + e.getMessage(), null);
         }
 
-        return features;
+        long structuralParsingTimeMs =
+                (SystemClock.elapsedRealtimeNanos() - structuralParsingStart) / 1_000_000L;
+        return new XgbFeatureExtractionResult(
+                aggregatedVector,
+                dexFilesFound,
+                structuralParsingTimeMs,
+                parseTimeNanos,
+                vectorizeTimeNanos
+        );
+    }
+
+    private void orPoolInto(float[] master, float[] candidate) {
+        int n = Math.min(master.length, candidate.length);
+        for (int i = 0; i < n; i++) {
+            if (candidate[i] > 0.0f) {
+                master[i] = 1.0f;
+            }
+        }
     }
 
     private String normalizePermission(String p) {
@@ -230,11 +360,10 @@ public class ScanService extends JobIntentService {
     // Vectorize tokens -> float[] aligned with loaded featureColumns
     // ------------------------------
     private float[] vectorize(Collection<String> tokens) {
-        int n = featureColumns.size();
-        float[] vec = new float[n];
+        float[] vec = new float[XGB_FEATURE_DIM];
         for (String t : tokens) {
             Integer idx = featureIndex.get(t);
-            if (idx != null) vec[idx] = 1.0f;
+            if (idx != null && idx >= 0 && idx < XGB_FEATURE_DIM) vec[idx] = 1.0f;
         }
         return vec;
     }
@@ -243,10 +372,13 @@ public class ScanService extends JobIntentService {
     // ONNX Runtime: init model and run inference
     // ------------------------------
     private void initOnnxModel() throws Exception {
-        try {
-            ortEnvironment = OrtEnvironment.getEnvironment();
+        ortEnvironment = OrtEnvironment.getEnvironment();
+        OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
 
-            // Copy model from assets to a temp file, then create session from path
+        boolean xgbOk = false;
+        boolean cnnOk = false;
+
+        try {
             File modelFile = new File(getCacheDir(), "mh1m_2500_rp_XGBoost.onnx");
             if (!modelFile.exists()) {
                 try (InputStream is = getAssets().open("mh1m_2500_rp_XGBoost.onnx");
@@ -258,13 +390,16 @@ public class ScanService extends JobIntentService {
                     }
                 }
             }
-
-            OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
-            // You can set intra op threads, graph optimization level etc. if desired:
-            // sessionOptions.setIntraOpNumThreads(2);
             ortSession = ortEnvironment.createSession(modelFile.getAbsolutePath(), sessionOptions);
-            
-            // Load the CNN model
+            xgbOk = true;
+            sendLog("XGBoost ONNX loaded", null);
+        } catch (Exception ex) {
+            Log.w(TAG, "XGBoost ONNX not loaded", ex);
+            ortSession = null;
+            sendLog("XGBoost ONNX skipped: " + ex.getMessage(), null);
+        }
+
+        try {
             File cnnModelFile = new File(getCacheDir(), "bytecnn_basemodel_2020.onnx");
             if (!cnnModelFile.exists()) {
                 try (InputStream is = getAssets().open("bytecnn_basemodel_2020.onnx");
@@ -277,17 +412,21 @@ public class ScanService extends JobIntentService {
                 }
             }
             ortSessionCnn = ortEnvironment.createSession(cnnModelFile.getAbsolutePath(), sessionOptions);
-            
-            sendLog("Both ONNX models loaded", null);
+            cnnOk = true;
+            sendLog("ByteCNN ONNX loaded", null);
         } catch (Exception ex) {
-            Log.e(TAG, "ONNX init failed", ex);
-            throw ex;
+            Log.e(TAG, "ByteCNN ONNX not loaded", ex);
+            ortSessionCnn = null;
+            sendLog("ByteCNN ONNX missing: " + ex.getMessage(), "Error");
+        }
+
+        if (!xgbOk && !cnnOk) {
+            throw new IllegalStateException("No ONNX models loaded from assets");
         }
     }
 
     private float runInference(float[] inputVector) {
         if (ortEnvironment == null || ortSession == null) {
-            sendLog("ONNX model not initialized", "Error");
             return -1f;
         }
 
@@ -393,13 +532,18 @@ public class ScanService extends JobIntentService {
         }
     }
 
-    private void writeScanMetrics(
+    private File writeScanMetrics(
             String trigger,
             File apk,
             double xgbParseMs, double xgbVecMs, double xgbInferMs, float xgbScore,
             double cnnParseMs, double cnnInferMs, float cnnScore,
             double wallMs, double cpuMs, long memDeltaBytes,
-            long scanMemDelta
+            long xgbMemDelta,
+            long cnnMemDelta,
+            int totalDexFilesFound,
+            long structuralParsingTimeMs,
+            float ensemble,
+            String ensembleDecision
     ) {
         try {
             MetricsWriter.ScanMetrics scan = new MetricsWriter.ScanMetrics();
@@ -410,41 +554,45 @@ public class ScanService extends JobIntentService {
             scan.wallMs = wallMs;
             scan.cpuMs = cpuMs;
             scan.memDeltaBytes = memDeltaBytes;
+            scan.totalDexFilesFound = totalDexFilesFound;
+            scan.structuralParsingTimeMs = structuralParsingTimeMs;
 
             scan.stages.add(new MetricsWriter.StageMetrics(
-                    "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, scanMemDelta / 2));
+                    "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, xgbMemDelta));
             scan.stages.add(new MetricsWriter.StageMetrics(
-                    "bytecnn", cnnParseMs, 0.0, cnnInferMs, cnnScore, scanMemDelta / 2));
+                    "bytecnn", cnnParseMs, 0.0, cnnInferMs, cnnScore, cnnMemDelta));
 
-            float ensemble = computeEnsembleScore(xgbScore, cnnScore);
             if (ensemble >= 0f) {
                 scan.ensembleScore = ensemble;
-                scan.ensembleDecision = ensemble >= 0.5f ? "malware" : "benign";
-                if (xgbScore >= 0f && cnnScore >= 0f && Math.abs(xgbScore - cnnScore) > 0.4f) {
-                    scan.ensembleDecision = "uncertain";
-                }
+                scan.ensembleDecision = ensembleDecision;
+                scan.ensemblePolicy = "weighted_validation_accuracy";
             }
 
-            File out = MetricsWriter.writeScan(this, scan);
-            sendLog("Metrics JSON: " + out.getName(), null);
+            return MetricsWriter.writeScan(this, scan);
         } catch (Exception e) {
             Log.e(TAG, "Metrics write failed", e);
             sendLog("Metrics JSON error: " + e.getMessage(), null);
+            return null;
         }
     }
 
     private float computeEnsembleScore(float xgbScore, float cnnScore) {
-        int n = 0;
-        float sum = 0f;
-        if (xgbScore >= 0f) {
-            sum += xgbScore;
-            n++;
+        boolean hasXgb = xgbScore >= 0f;
+        boolean hasCnn = cnnScore >= 0f;
+        if (!hasXgb && !hasCnn) {
+            return -1f;
         }
-        if (cnnScore >= 0f) {
-            sum += cnnScore;
-            n++;
+        if (hasXgb && !hasCnn) {
+            return xgbScore;
         }
-        return n > 0 ? sum / n : -1f;
+        if (!hasXgb) {
+            return cnnScore;
+        }
+
+        float total = XGB_VALIDATION_ACCURACY + CNN_VALIDATION_ACCURACY;
+        float wXgb = XGB_VALIDATION_ACCURACY / total;
+        float wCnn = CNN_VALIDATION_ACCURACY / total;
+        return (wXgb * xgbScore) + (wCnn * cnnScore);
     }
 
     // ------------------------------
