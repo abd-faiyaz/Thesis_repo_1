@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-06-03T20:50:20.128216+00:00",
+  "model_id": "pattern_b_dual_branch",
+  "bundle_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch",
+  "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/checkpoints/best.pt",
+  "onnx_file": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch/model.onnx",
+  "tolerance": 0.0001,
+  "passed": true,
+  "n_samples": 8,
+  "pytorch_vs_onnx": {
+    "max_abs_diff": 1.7881393432617188e-07,
+    "mean_abs_diff": 4.7062712837941945e-08,
+    "per_sample": [
+      {
+        "sample_id": "sample_000",
+        "pytorch": 0.0001643046416575089,
+        "onnx": 0.00016430020332336426,
+        "export_expected": 0.0001643046416575089,
+        "abs_diff_pytorch_onnx": 4.43833414465189e-09,
+        "abs_diff_onnx_export": 4.43833414465189e-09
+      },
+      {
+        "sample_id": "sample_001",
+        "pytorch": 0.033520862460136414,
+        "onnx": 0.033520907163619995,
+        "export_expected": 0.033520862460136414,
+        "abs_diff_pytorch_onnx": 4.470348358154297e-08,
+        "abs_diff_onnx_export": 4.470348358154297e-08
+      },
+      {
+        "sample_id": "sample_002",
+        "pytorch": 0.10657820850610733,
+        "onnx": 0.1065782904624939,
+        "export_expected": 0.10657820850610733,
+        "abs_diff_pytorch_onnx": 8.195638656616211e-08,
+        "abs_diff_onnx_export": 8.195638656616211e-08
+      },
+      {
+        "sample_id": "sample_003",
+        "pytorch": 0.004983848892152309,
+        "onnx": 0.004983872175216675,
+        "export_expected": 0.004983848892152309,
+        "abs_diff_pytorch_onnx": 2.3283064365386963e-08,
+        "abs_diff_onnx_export": 2.3283064365386963e-08
+      },
+      {
+        "sample_id": "sample_004",
+        "pytorch": 0.4284595549106598,
+        "onnx": 0.4284597337245941,
+        "export_expected": 0.4284595549106598,
+        "abs_diff_pytorch_onnx": 1.7881393432617188e-07,
+        "abs_diff_onnx_export": 1.7881393432617188e-07
+      },
+      {
+        "sample_id": "sample_005",
+        "pytorch": 0.9866636991500854,
+        "onnx": 0.9866636991500854,
+        "export_expected": 0.9866636991500854,
+        "abs_diff_pytorch_onnx": 0.0,
+        "abs_diff_onnx_export": 0.0
+      },
+      {
+        "sample_id": "sample_006",
+        "pytorch": 0.013097100891172886,
+        "onnx": 0.01309707760810852,
+        "export_expected": 0.013097100891172886,
+        "abs_diff_pytorch_onnx": 2.3283064365386963e-08,
+        "abs_diff_onnx_export": 2.3283064365386963e-08
+      },
+      {
+        "sample_id": "sample_007",
+        "pytorch": 0.0015441873110830784,
+        "onnx": 0.0015442073345184326,
+        "export_expected": 0.0015441873110830784,
+        "abs_diff_pytorch_onnx": 2.0023435354232788e-08,
+        "abs_diff_onnx_export": 2.0023435354232788e-08
+      }
+    ]
+  },
+  "onnx_vs_export_expected": {
+    "max_abs_diff": 1.7881393432617188e-07,
+    "mean_abs_diff": 4.7062712837941945e-08
+  }
+}

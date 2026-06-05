@@ -123,6 +123,7 @@
   <a href="#dataset">Dataset &amp; splits</a>
   <a href="#phases">Phases P0–P8</a>
   <a href="#layout">Project layout</a>
+  <a href="#shared">Shared_pipeline_Files</a>
   <a href="#onnx">ONNX bundle</a>
   <a href="#parity">Parity</a>
   <a href="#android">Android</a>
@@ -136,7 +137,8 @@
   <h2>For AI planners</h2>
   <div class="callout">
     You have a rough plan for a paper’s model. Output implementation <strong>phases</strong> that follow this pipeline.
-    Each phase should list deliverables, scripts, and exit criteria. Do not assume access to any other repo’s shared folders or prior models.
+    Each phase should list deliverables, scripts, and exit criteria.
+    In the <strong>thesis_vigidroid</strong> monorepo, reuse <code>Shared_pipeline_Files/</code> for corpus indexing, metrics schemas, and batch tools — but keep paper-specific features and training inside <code>&lt;ModelFolder&gt;/</code> (see <a href="#shared">Shared_pipeline_Files</a>).
   </div>
 
   <p><strong>Assign up front:</strong></p>
@@ -151,9 +153,9 @@
 model_id: &lt;snake_case&gt;
 domain: &lt;feature description&gt;
 
-── Project 1 (Python) — self-contained folder on training PC ──
-P0  config/, requirements.txt, verify_setup.py
-P1  index APKs; apply year-based train/test split (see Dataset section)
+── Project 1 (Python) — &lt;ModelFolder&gt; on training PC + Shared_pipeline_Files hooks ──
+P0  config/, requirements.txt, verify_setup.py; point apk_root at shared dataset_paths.yaml
+P1  index APKs (shared build_apk_manifest.py or model scan); year-based or shared splits (Dataset + Shared sections)
 P2  preprocess: APK → tensors + vocab/norm JSON + failed_apks.log
 P3  Dataset + DataLoader
 P4  PyTorch model (paper architecture or mobile-safe variant)
@@ -243,11 +245,11 @@ Never implement Java extractors (A1) before final vocab/norm stats exist from P2
 
   <h3>Indexing checklist (P1)</h3>
   <ul class="checklist">
-    <li>SHA-256 per APK; skip corrupt zips</li>
+    <li>SHA-256 per APK; skip corrupt zips (shared <code>build_apk_manifest.py</code> or model indexer)</li>
     <li>Record: path, label, year, sha256, optional apk_size_bytes, num_dex_files</li>
-    <li>Apply train = {2020, 2021}, test = {2022, 2023}</li>
+    <li>Apply train = {2020, 2021}, test = {2022, 2023} (<code>temporal_year</code>) or shared <code>train.txt</code>/<code>test.txt</code></li>
     <li>Deduplicate identical hashes before training</li>
-    <li>Never copy the full corpus into the model repo — only manifests or path lists</li>
+    <li>Never copy the full corpus into the model repo — only manifests under <code>Shared_pipeline_Files/data/manifests/</code> or model-local lists</li>
   </ul>
 
   <h3>Preprocess (P2)</h3>
@@ -306,7 +308,142 @@ artifacts:
 │
 └── vigidroid/                    # Android app (may be sibling repo)
     └── app/src/main/assets/models/&lt;model_id&gt;/   # copy from export bundle</pre>
-  <p>Create your own indexing/preprocess scripts inside <code>&lt;ModelFolder&gt;/scripts/</code>. Do not depend on another project’s shared tooling.</p>
+  <p>Feature extraction, model code, and phase scripts live under <code>&lt;ModelFolder&gt;/</code>. Cross-model corpus and evaluation glue live under <code>Shared_pipeline_Files/</code> (see next section). Full thesis roadmap: <code>PIPELINE_IMPLEMENTATION_PLAN.md</code> at repo root.</p>
+
+  <pre>thesis_vigidroid/
+├── PIPELINE_IMPLEMENTATION_PLAN.md   # domains D1–D6, phases, metrics, roadmap
+├── Pipeline_full_concept.html        # this guide
+├── Shared_pipeline_Files/            # reusable across models (not model-specific)
+├── &lt;ModelFolder&gt;/                    # one paper / one model (P0–P8)
+├── vigidroid/                        # Android (A1–A4)
+└── 1dcnn/                            # example: D2 ByteCNN</pre>
+</section>
+
+<section id="shared">
+  <h2>Shared_pipeline_Files (thesis monorepo)</h2>
+
+  <p>
+    <strong>Yes — this folder holds what is reused across models.</strong>
+    It is the cross-model layer described in <code>PIPELINE_IMPLEMENTATION_PLAN.md</code> §7–§9:
+    one APK corpus pointer, optional shared manifest/splits, standardized metrics JSON, and batch export/parity/plotting tools.
+    It does <em>not</em> contain paper-specific feature extractors or PyTorch architectures; those stay in each <code>&lt;ModelFolder&gt;/src/</code>.
+  </p>
+
+  <div class="diagram">                    ┌── Shared_pipeline_Files ──┐
+                    │  dataset_paths.yaml      │
+  APK corpus ───────┤  manifests / splits      ├──► comparable offline + device JSON
+  (outside git)     │  schemas + results/      │         thesis plots
+                    │  tools/ (manifest, plot) │
+                    └───────────┬──────────────┘
+                                │ optional hooks
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+   only_base1_model/      full_combined_…/        dual_branch_…/
+   (D3 MLP(H))            (D4 Pattern A)          (D5 Pattern B)
+   P0–P8 self-contained   + pipeline_integration  + pipeline_integration</div>
+
+  <h3>What belongs here vs in &lt;ModelFolder&gt;</h3>
+  <table>
+    <thead><tr><th>Shared_pipeline_Files</th><th>&lt;ModelFolder&gt; only</th></tr></thead>
+    <tbody>
+      <tr><td><code>data/dataset_paths.yaml</code> — <code>apk_root</code>, manifest/split paths</td><td><code>config/default.yaml</code> — hyperparams, <code>model_id</code>, <code>domain</code></td></tr>
+      <tr><td><code>tools/build_apk_manifest.py</code>, <code>split_dataset.py</code></td><td><code>src/features/</code>, preprocess scripts (P2)</td></tr>
+      <tr><td><code>schemas/*.schema.json</code> — offline + device metrics shape</td><td><code>src/models/</code>, <code>train.py</code>, <code>evaluate.py</code> (P4–P6)</td></tr>
+      <tr><td><code>results/offline/</code>, <code>results/device/</code>, <code>results/figures/</code></td><td><code>artifacts/processed/</code>, <code>checkpoints/</code>, <code>export/&lt;model_id&gt;/</code></td></tr>
+      <tr><td><code>tools/export_all_onnx.sh</code>, <code>parity_check.py</code>, <code>plot_metrics.py</code></td><td><code>scripts/export_onnx.py</code>, model-local parity samples (P7–P8)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Setup before a new model (once per machine)</h3>
+  <ol class="steps">
+    <li>Edit <code>Shared_pipeline_Files/data/dataset_paths.yaml</code>: set <code>apk_root</code> and <code>project_root</code> to your paths (APKs stay outside git).</li>
+    <li>From repo root, build the corpus index (P1 helper):<br />
+      <code>python Shared_pipeline_Files/tools/build_apk_manifest.py --config Shared_pipeline_Files/data/dataset_paths.yaml</code><br />
+      → <code>data/manifests/apk_index.csv</code> (columns: <code>apk_path</code>, <code>sha256</code>, <code>label</code>, <code>year</code>, <code>split</code>).</li>
+    <li>Choose a split policy (see below). Either implement splits inside <code>&lt;ModelFolder&gt;</code> (recommended for temporal eval) or generate shared split lists with <code>split_dataset.py</code>.</li>
+  </ol>
+
+  <h3>Split policies (pick one and document it)</h3>
+  <div class="callout">
+    <strong>Temporal (thesis default for D3–D5):</strong> train on years <code>2020</code>+<code>2021</code>, final test on <code>2022</code>+<code>2023</code>.
+    Implement in <code>&lt;ModelFolder&gt;</code> via <code>split_mode: temporal_year</code> and <code>train_years</code> / <code>val_years</code> in <code>config/default.yaml</code>.
+    Validation = holdout from train years only — never tune on test years.
+  </div>
+  <p>
+    <strong>Shared stratified splits (optional):</strong>
+    <code>Shared_pipeline_Files/tools/split_dataset.py</code> assigns train/val/test (~70/15/15) stratified by label on the full manifest.
+    Use when you need identical APK lists across models for ablation tables.
+    Point the model at shared files with <code>pipeline.use_shared_splits: true</code> and paths under <code>data/splits/train.txt</code>, <code>val.txt</code>, <code>test.txt</code> (Pattern A/B support this via <code>pipeline_integration.py</code>).
+  </p>
+  <div class="callout warn">
+    Do not mix policies silently: temporal-year test metrics are not comparable to stratified-random test metrics. State which policy each <code>model_id</code> uses in thesis text and in exported JSON (<code>train_years</code> / <code>split</code> fields).
+  </div>
+
+  <h3>Wiring a new model folder</h3>
+  <p>Assign domain id per <code>PIPELINE_IMPLEMENTATION_PLAN.md</code> §2 (e.g. D3 <code>mlp_dex_header</code>, D4 <code>pattern_a_combined</code>). In <code>&lt;ModelFolder&gt;/config/default.yaml</code>:</p>
+  <pre>paths:
+  apk_root: /path/to/apk_corpus    # should match dataset_paths.yaml
+
+pipeline:
+  enabled: true
+  model_id: &lt;snake_case&gt;           # matches artifacts/export and Android assets
+  domain: &lt;short_feature_name&gt;
+  export_offline_json: true         # write P6 JSON to Shared_pipeline_Files/results/offline/
+  use_shared_splits: false          # true only if using shared train.txt / val.txt
+  shared_splits_dir: Shared_pipeline_Files/data/splits
+  shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv</pre>
+  <p>
+    After P6 evaluation, call shared export from training code (copy Pattern A/B <code>src/pipeline_integration.py</code> or invoke <code>tools/offline_metrics_export.py</code>).
+    Local copies under <code>&lt;ModelFolder&gt;/artifacts/metrics/</code> remain the model’s source of truth; shared <code>results/offline/</code> aggregates runs for plotting.
+  </p>
+
+  <h3>Metrics and schemas (plan §7)</h3>
+  <ul class="checklist">
+    <li>Offline eval JSON → <code>Shared_pipeline_Files/results/offline/&lt;model_id&gt;_&lt;split&gt;_*.json</code> (schema: <code>schemas/offline_eval.schema.json</code>)</li>
+    <li>On-device scan JSON → app writes per schema <code>schemas/device_scan.schema.json</code>; pull with <code>tools/pull_device_metrics.sh</code> → <code>results/device/</code></li>
+    <li>Thesis figures → <code>tools/plot_metrics.py</code> → <code>results/figures/</code></li>
+  </ul>
+
+  <h3>ONNX and parity (after P5–P7 in each model)</h3>
+  <ol class="steps">
+    <li>Each model: <code>&lt;ModelFolder&gt;/scripts/export_onnx.py</code> → <code>artifacts/export/&lt;model_id&gt;/</code> (manifest, thresholds, <code>features/</code>, <code>parity_samples/</code>).</li>
+    <li>Batch driver (when checkpoints exist): <code>bash Shared_pipeline_Files/tools/export_all_onnx.sh</code> → copy bundles to <code>vigidroid/app/src/main/assets/models/&lt;model_id&gt;/</code>.</li>
+    <li>Parity: model-local P8, then repo helper <code>Shared_pipeline_Files/tools/parity_check.py</code> (PyTorch vs ONNX ≤ 1e-4 on <code>parity_samples/</code>).</li>
+    <li>Android A4: instrumented test against the same <code>parity_samples/</code>.</li>
+  </ol>
+
+  <h3>New-model checklist (shared + local)</h3>
+  <ul class="checklist">
+    <li><code>model_id</code> and <code>domain</code> assigned; documented in export manifest</li>
+    <li><code>dataset_paths.yaml</code> <code>apk_root</code> matches model <code>paths.apk_root</code></li>
+    <li>Manifest built; dedupe by <code>sha256</code> before training</li>
+    <li>Split policy chosen (temporal_year vs shared stratified) and recorded</li>
+    <li>P0–P8 complete under <code>&lt;ModelFolder&gt;/</code>; P6 also exports to <code>results/offline/</code> if <code>pipeline.export_offline_json: true</code></li>
+    <li>Export bundle copied to VigiDroid assets; device metrics pulled to <code>results/device/</code></li>
+  </ul>
+
+  <h3>Directory reference</h3>
+  <pre>Shared_pipeline_Files/
+├── data/
+│   ├── dataset_paths.yaml      # apk_root, manifest_csv, splits_dir (edit per machine)
+│   ├── manifests/              # apk_index.csv (generated; large file gitignored)
+│   └── splits/                 # train.txt, val.txt, test.txt (optional)
+├── schemas/
+│   ├── offline_eval.schema.json
+│   ├── device_scan.schema.json
+│   └── examples/
+├── tools/
+│   ├── build_apk_manifest.py
+│   ├── split_dataset.py
+│   ├── offline_metrics_export.py
+│   ├── parity_check.py
+│   ├── export_all_onnx.sh
+│   ├── pull_device_metrics.sh
+│   └── plot_metrics.py
+└── results/                    # gitignored outputs
+    ├── offline/
+    ├── device/
+    └── figures/</pre>
 </section>
 
 <section id="onnx">
@@ -368,7 +505,7 @@ artifacts:
   <h2>Metrics (store inside your project)</h2>
 
   <h3>Offline (P6) — model quality</h3>
-  <p>Written after evaluation on <strong>test</strong> (2022+2023). Suggested path: <code>artifacts/metrics/test_results.json</code></p>
+  <p>Written after evaluation on <strong>test</strong> (2022+2023 for temporal splits). Local: <code>&lt;ModelFolder&gt;/artifacts/metrics/test_results.json</code>. Thesis aggregate: <code>Shared_pipeline_Files/results/offline/</code> (schema in <code>schemas/offline_eval.schema.json</code>; see <a href="#shared">Shared_pipeline_Files</a>).</p>
   <pre>{
   "model_id": "&lt;model_id&gt;",
   "split": "test",
@@ -393,7 +530,7 @@ artifacts:
   }],
   "totals": {"wall_ms": 0, "cpu_ms": 0}
 }</pre>
-  <p>Pull JSON from device with <code>adb</code> into your local <code>results/device/</code> (create that folder in your workspace) for plotting.</p>
+  <p>Pull JSON from device with <code>Shared_pipeline_Files/tools/pull_device_metrics.sh</code> (or <code>adb</code>) into <code>Shared_pipeline_Files/results/device/</code> for <code>plot_metrics.py</code>.</p>
 </section>
 
 <section id="orchestration">
@@ -410,7 +547,7 @@ artifacts:
 </main>
 
 <footer>
-  New Model Pipeline Guide · Standalone workspace · Train: 2020–2021 · Test: 2022–2023
+  New Model Pipeline Guide · thesis_vigidroid monorepo · Shared_pipeline_Files + per-model P0–P8 · Temporal default: train 2020–2021 · test 2022–2023
 </footer>
 
 </body>

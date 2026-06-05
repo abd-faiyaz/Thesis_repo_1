@@ -116,7 +116,10 @@ Dex_header_paper_implementation/**/artifacts/normalization.json
 Dex_header_paper_implementation/**/artifacts/splits/
 Dex_header_paper_implementation/**/artifacts/class_balance.json
 Dex_header_paper_implementation/**/artifacts/pattern_a_bundle.tar.gz
-Dex_header_paper_implementation/**/data/
+# Local APK symlinks / dataset pointers only — do NOT use **/data/ (that hides src/data/ Python package)
+Dex_header_paper_implementation/only_base1_model/data/
+Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/data/
+Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/data/
 
 # --- 1dcnn (generated / large media; .pth model weights are tracked) ---
 1dcnn/reports/
@@ -165,3 +168,5 @@ Dex_header_paper_implementation/only_base1_model/BM1_multidex_specifics.md
 
 latest_cursor_chat.json
 restore_cursor_chats.py
+vigidroid_momo_vs_me.html
+vigidroid_present_future_changes.md

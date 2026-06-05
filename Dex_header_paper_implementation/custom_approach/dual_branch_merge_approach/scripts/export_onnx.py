@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export Pattern B DualBranchNet to ONNX (Phase 4 — run after training)."""
+"""Export Pattern B DualBranchNet to ONNX bundle (P7)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,16 @@ import argparse
 import sys
 from pathlib import Path
 
-_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from src.config import load_config
+from src.export.onnx_bundle import export_bundle
+from src.pipeline_integration import get_pipeline_settings
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Export Pattern B model to ONNX bundle.")
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Export Pattern B DualBranchNet ONNX bundle.")
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument(
         "--checkpoint",
@@ -19,34 +24,27 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Default: artifacts/checkpoints/best.pt",
     )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=None,
-        help="Default: artifacts/export/pattern_b_dual_branch/",
-    )
-    args = parser.parse_args(argv)
+    parser.add_argument("--out-dir", type=Path, default=None)
+    parser.add_argument("--num-parity-samples", type=int, default=8)
+    parser.add_argument("--skip-verify", action="store_true")
+    return parser
 
-    if str(_PACKAGE_ROOT) not in sys.path:
-        sys.path.insert(0, str(_PACKAGE_ROOT))
 
-    from src.config import load_config
-    from src.pipeline_integration import find_repo_root, get_pipeline_settings
-
+def main(argv: list[str] | None = None) -> int:
+    args = build_arg_parser().parse_args(argv)
     cfg = load_config(args.config)
     settings = get_pipeline_settings(cfg)
+    checkpoint = args.checkpoint or cfg.paths.best_checkpoint
     out_dir = args.out_dir or (cfg.root / "artifacts" / "export" / settings.model_id)
-    ckpt = args.checkpoint or cfg.paths.best_checkpoint
 
-    print("Pattern B ONNX export (skeleton)")
-    print(f"  model_id: {settings.model_id}")
-    print(f"  checkpoint: {ckpt}")
-    print(f"  out_dir: {out_dir}")
-    print("  Implement torch.onnx.export in Phase 4 after full-dataset training.")
-    repo = find_repo_root(cfg.root)
-    if repo:
-        assets = repo / "vigidroid" / "app" / "src" / "main" / "assets" / "models"
-        print(f"  Then copy bundle to: {assets / settings.model_id}")
+    out_dir = export_bundle(
+        checkpoint=checkpoint.resolve(),
+        out_dir=out_dir,
+        config_path=args.config,
+        num_parity_samples=args.num_parity_samples,
+        skip_verify=args.skip_verify,
+    )
+    print(f"Export bundle written to {out_dir}")
     return 0
 
 

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-03T20:18:54.328973+00:00",
+  "timestamp": "2026-06-03T20:49:41.421656+00:00",
   "model_id": "mlp_header",
   "bundle_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/export/mlp_header",
   "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",

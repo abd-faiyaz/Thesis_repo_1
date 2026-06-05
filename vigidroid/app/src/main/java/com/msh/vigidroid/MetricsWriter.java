@@ -19,8 +19,9 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Writes one JSON file per APK scan under getExternalFilesDir(null)/metrics/.
- * Schema: Shared_pipeline_Files/schemas/device_scan.schema.json
+ * Appends each scan to getExternalFilesDir(null)/metrics/all_scan_metrics.json.
+ * Per-model results live in {@code stages[]}. The optional {@code ensemble} block is
+ * omitted until a fusion policy is configured (see vigidroid_present_future_changes.md).
  */
 public final class MetricsWriter {
 
@@ -90,7 +91,8 @@ public final class MetricsWriter {
         public long structuralParsingTimeMs;
         public Float ensembleScore;
         public String ensembleDecision;
-        public String ensemblePolicy = "sequential_mean";
+        /** Set only when on-device fusion is enabled; otherwise left null. */
+        public String ensemblePolicy;
     }
 
     private static JSONObject buildScanObject(ScanMetrics scan) throws Exception {
