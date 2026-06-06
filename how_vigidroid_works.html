@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How VigiDroid Works</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #5eb3ff;
+      --accent2: #7ee787;
+      --warn: #f0b429;
+      --pink: #f778ba;
+      --border: #2d3a4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      padding: 2rem 1.5rem;
+      background: linear-gradient(135deg, #1a3a5c, #0f1419 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0 0 0.4rem; font-size: 1.6rem; }
+    header p { margin: 0; color: var(--muted); max-width: 42rem; }
+    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+    h2 {
+      color: var(--accent);
+      font-size: 1.15rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3rem;
+      margin: 2rem 0 1rem;
+    }
+    p { margin: 0.5rem 0; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+    .model-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+      text-align: center;
+    }
+    .model-box strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .model-box span { font-size: 0.8rem; color: var(--muted); }
+    .model-box.live { border-color: var(--accent2); }
+    .model-box.soon { border-color: var(--warn); opacity: 0.85; }
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      margin-top: 0.35rem;
+    }
+    .tag-live { background: #1b3d2a; color: var(--accent2); }
+    .tag-soon { background: #3d3018; color: var(--warn); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 0.75rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+    }
+    th { background: var(--surface2); color: var(--accent); }
+    code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85em;
+      background: #0d1117;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+    .flow {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      white-space: pre;
+      color: var(--muted);
+    }
+    .flow .hi { color: var(--accent2); }
+    .flow .hi2 { color: var(--accent); }
+    .flow .hi3 { color: var(--pink); }
+    .mermaid { margin: 1rem 0; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+    li { margin: 0.25rem 0; }
+    .manual-order {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    .manual-order .step-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.35rem 0.85rem;
+    }
+    .manual-order .arrow { color: var(--muted); }
+    .step-box {
+      display: flex;
+      gap: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin: 0.75rem 0;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0f1419;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+    }
+    .step-body { flex: 1; min-width: 0; }
+    .step-body strong { color: var(--text); }
+    .ui-sketch {
+      background: #0d1117;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin: 0.6rem 0 0;
+      font-family: ui-monospace, monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .ui-sketch .bar { background: var(--surface2); padding: 0.35rem 0.5rem; margin-bottom: 0.35rem; border-radius: 4px; }
+    .ui-sketch .green { color: var(--accent2); }
+    .ui-sketch .blue { color: var(--accent); }
+    .ui-sketch .warn { color: var(--warn); }
+    .callout-warn {
+      border-left: 4px solid var(--warn);
+      background: var(--surface);
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+</head>
+<body>
+
+<header>
+  <h1>How VigiDroid Works</h1>
+  <p>On-device APK scanner: <strong>5 models</strong> run on each APK, scores and timings are logged. Simple overview — no deep internals.</p>
+</header>
+
+<main>
+
+  <h2>Big picture: two places</h2>
+  <div class="mermaid">
+flowchart LR
+  PC["🖥️ PC — Python\nTrain & export"]
+  Phone["📱 Phone — VigiDroid\nScan APKs"]
+  PC -->|"model.onnx + config files"| Phone
+  Phone -->|"metrics JSON"| PC
+  </div>
+  <p>Models are <strong>trained on the PC</strong>, copied into the app as <strong>ONNX files</strong>, then run <strong>on the phone</strong> when you scan.</p>
+
+  <h2>Models in the app today</h2>
+  <div class="grid">
+    <div class="model-box live">
+      <strong>XGBoost</strong>
+      <span>Manifest + DEX tokens</span>
+      <span class="tag tag-live">active</span>
+    </div>
+    <div class="model-box live">
+      <strong>1D-CNN</strong>
+      <span>Last 1024 APK bytes</span>
+      <span class="tag tag-live">active</span>
+    </div>
+    <div class="model-box live">
+      <strong>BM1 mlp_header</strong>
+      <span>Dex header only (104 nums)</span>
+      <span class="tag tag-live">active</span>
+    </div>
+    <div class="model-box live">
+      <strong>Pattern A</strong>
+      <span>Header + manifest BoW</span>
+      <span class="tag tag-live">active</span>
+    </div>
+    <div class="model-box live">
+      <strong>Pattern B</strong>
+      <span>Dual branch fused ONNX</span>
+      <span class="tag tag-live">active</span>
+    </div>
+  </div>
+  <p><strong>5 models total.</strong> XGBoost + CNN feed the <strong>main combined verdict</strong> (weighted average) shown in the results table. BM1, Pattern A, and Pattern B are <strong>separate thesis scores</strong> — logged only; they do not change the CNN/XGB verdict.</p>
+
+  <h2>What each model reads from an APK</h2>
+  <table>
+    <thead>
+      <tr><th>Model</th><th>Input (simple)</th><th>Output</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>XGBoost</strong></td>
+        <td>Permissions, intents, DEX structure → 2500 flags</td>
+        <td>Malware score 0–1</td>
+      </tr>
+      <tr>
+        <td><strong>1D-CNN</strong></td>
+        <td>Last 1024 raw bytes of the APK file</td>
+        <td>Malware score 0–1</td>
+      </tr>
+      <tr>
+        <td><strong>BM1 mlp_header</strong></td>
+        <td>All <code>classes*.dex</code> headers summed → 104 numbers</td>
+        <td>Malware score 0–1</td>
+      </tr>
+      <tr>
+        <td><strong>Pattern A</strong></td>
+        <td>Dex header (104) + manifest permissions/intents → 4381-d BoW</td>
+        <td>Malware score 0–1</td>
+      </tr>
+      <tr>
+        <td><strong>Pattern B</strong></td>
+        <td>Same inputs as Pattern A; fusion is inside ONNX (MLP + ASCNN branches)</td>
+        <td>Malware score 0–1</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Full scan workflow (what happens when you tap Start)</h2>
+  <div class="mermaid">
+flowchart TD
+  A[You tap Start scan] --> B[ScanService starts]
+  B --> C[Find all .apk in Download folder]
+  C --> D{Any APKs?}
+  D -->|No| E[Show: no APKs found]
+  D -->|Yes| F[For each APK...]
+  F --> G[Run XGBoost pipeline]
+  F --> H[Run 1D-CNN pipeline]
+  F --> I[Run BM1 mlp_header]
+  F --> N[Run Pattern A]
+  F --> O[Run Pattern B]
+  G --> J[Combine XGB + CNN score]
+  H --> J
+  I --> K[Log all scores + timings]
+  N --> K
+  O --> K
+  J --> K
+  K --> L[Show result in app table]
+  K --> M[Append to all_scan_metrics.json]
+  F --> F
+  </div>
+
+  <h2>Inside one APK (visual)</h2>
+  <div class="flow"><span class="hi2">APK file</span> (in Download/)
+    │
+    ├─► <span class="hi">XGBoost path</span>     open ZIP → manifest + all classes*.dex → 2500-d vector → ONNX → score₁
+    │
+    ├─► <span class="hi">1D-CNN path</span>      read last 1024 bytes → ONNX → score₂
+    │                                      └─► <span class="hi2">ensemble</span> = weighted mix of score₁ + score₂ → shown as main verdict
+    │
+    ├─► <span class="hi3">BM1 path</span>           dex headers summed → 104 floats → ONNX → score₃ (logged separately)
+    │
+    ├─► <span class="hi3">Pattern A path</span>     dex header + manifest BoW → ONNX → score₄ (logged separately)
+    │
+    └─► <span class="hi3">Pattern B path</span>     same features as A → fused ONNX → score₅ (logged separately)</div>
+
+  <h2>Where model files live</h2>
+  <div class="card">
+    <p><strong>Built into the app (assets):</strong></p>
+    <ul>
+      <li><code>assets/bytecnn_basemodel_2020.onnx</code> — CNN</li>
+      <li><code>assets/mh1m_2500_rp_XGBoost.onnx</code> + feature list — XGBoost</li>
+      <li><code>assets/models/mlp_header/</code> — BM1 ONNX + normalization + parity samples</li>
+      <li><code>assets/models/pattern_a_combined/</code> — Pattern A ONNX + vocab + normalization + parity samples</li>
+      <li><code>assets/models/pattern_b_dual_branch/</code> — Pattern B ONNX + vocab + normalization + parity samples</li>
+    </ul>
+    <p><strong>On the phone after a scan:</strong></p>
+    <ul>
+      <li><code>Android/data/.../files/metrics/all_scan_metrics.json</code> — one growing log of all scans</li>
+    </ul>
+  </div>
+
+  <h2>Parity check vs real scans</h2>
+  <div class="mermaid">
+flowchart LR
+  subgraph A4["A4 — Parity (test)"]
+    P1[8 fixed number sets in app] --> P2[Run ONNX on phone]
+    P2 --> P3{Match PC answers?}
+  end
+  subgraph A3["A3 — Real scans"]
+    R1[Your APKs in Download/] --> R2[Extract features from each APK]
+    R2 --> R3[Run all models + save JSON]
+  end
+  A4 -->|pass first| A3
+  </div>
+  <p><strong>A4</strong> = quick exam (Android Studio → run three parity tests). <strong>A3</strong> = real work (use the app, scan APKs, pull JSON to PC). Run all three A4 tests before trusting thesis scores.</p>
+
+  <h2>What you see in the app</h2>
+  <ul>
+    <li><strong>Results table</strong> — one row per APK (XGB+CNN ensemble verdict, time, memory)</li>
+    <li><strong>Log panel</strong> — all 5 model scores as each APK is processed (XGB, CNN, BM1, Pattern A, Pattern B)</li>
+    <li><strong>Metrics file</strong> — detailed JSON with a <code>stages[]</code> list (one entry per model per scan)</li>
+  </ul>
+
+  <h2>Typical stages[] in metrics JSON</h2>
+  <div class="flow">one scan entry
+  ├─ stages[0]  domain: manifest_xgb        → score, parse_ms, inference_ms
+  ├─ stages[1]  domain: bytecnn             → score, parse_ms, inference_ms
+  ├─ stages[2]  domain: dex_header_d3       → BM1 score + timings
+  ├─ stages[3]  domain: dex_header_manifest       → Pattern A score + timings
+  ├─ stages[4]  domain: dex_header_manifest_dual  → Pattern B score + timings
+  ensemble block → combined XGB + CNN verdict only</div>
+
+  <h2>Rules of thumb</h2>
+  <div class="card">
+    <ul>
+      <li>Put APKs in <strong>Download/</strong> — the app scans <em>all</em> of them, not one-by-one picker.</li>
+      <li>Models run <strong>on the phone</strong> — no internet needed for inference.</li>
+      <li>All 5 models run on <strong>every</strong> APK in Download — scans take longer than the old 2-model app.</li>
+      <li>Legacy (XGB + CNN) and thesis models (BM1, Pattern A, Pattern B) coexist; missing assets skip that model only.</li>
+      <li>Train on PC → export ONNX → copy into <code>assets/</code> → rebuild app → re-run A4 → scan on phone.</li>
+    </ul>
+  </div>
+
+  <h2>What you need to manually handle yourself</h2>
+  <p>Everything below happens <strong>outside Cursor</strong> — on your PC (Android Studio) and your POCO F3. The code is already in the repo; you install and run it.</p>
+
+  <div class="callout-warn">
+    <strong>Order matters:</strong> run <strong>A4 (all three parity tests) before A3 (real APK scans)</strong>.
+    A4 checks phone ONNX math in a few minutes — run <code>MlpHeaderParityTest</code>, <code>PatternAParityTest</code>, and <code>PatternBParityTest</code> (8/8 each).
+    Only then scan real APKs and pull metrics.
+  </div>
+
+  <div class="manual-order">
+    <span class="step-pill">① One-time phone setup</span>
+    <span class="arrow">→</span>
+    <span class="step-pill">② Install app (Run ▶)</span>
+    <span class="arrow">→</span>
+    <span class="step-pill">③ A4 parity (BM1 + A + B)</span>
+    <span class="arrow">→</span>
+    <span class="step-pill">④ A3 scan APKs</span>
+    <span class="arrow">→</span>
+    <span class="step-pill">⑤ Pull JSON to PC</span>
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">① One-time: phone + cable</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Enable Developer options on POCO F3</strong><br />
+      Settings → About phone → tap <em>MIUI/HyperOS version</em> 7 times until it says you are a developer.
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Turn on USB debugging</strong><br />
+      Settings → Additional settings → Developer options → enable <em>USB debugging</em> (and <em>Install via USB</em> if you see it).
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Plug phone into PC</strong><br />
+      Use a data USB cable. On the phone popup, tap <em>Allow USB debugging</em> → Allow.
+      <div class="ui-sketch">Phone notification shade → USB mode → choose <span class="blue">File transfer</span> if the PC does not see the device.</div>
+    </div>
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">② Install VigiDroid (every time code changes)</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Open the correct folder in Android Studio</strong><br />
+      File → Open → select <code>thesis_vigidroid/vigidroid</code> (not the repo root). Wait for Gradle sync to finish (progress bar at the bottom).
+      <div class="ui-sketch">
+        <div class="bar">Android Studio window</div>
+        Left: <span class="blue">Project</span> panel &nbsp;|&nbsp; Center: code &nbsp;|&nbsp; Bottom: Build / Run tabs
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Select your phone at the top</strong><br />
+      In the toolbar, open the device dropdown (next to the green triangle). Pick <em>POCO F3</em> or <em>M2012K11AG</em> — not "No devices".
+      <div class="ui-sketch">
+        <div class="bar">[ app ▼ ]  [ <span class="green">POCO F3 ▼</span> ]  [ <span class="green">▶ Run</span> ]  [ 🐛 ]</div>
+        If empty: unplug/replug USB, unlock phone, check USB debugging.
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Click the green Run button (▶)</strong><br />
+      Android Studio builds the app, installs it on the phone, and opens VigiDroid automatically. First build can take several minutes.
+      <div class="ui-sketch">
+        Bottom <span class="blue">Run</span> tab → you should see <span class="green">BUILD SUCCESSFUL</span> then <span class="green">Install successfully finished</span>
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Grant storage permission on the phone</strong><br />
+      When VigiDroid opens, allow storage access. If asked for <em>All files access</em>, go to Settings and enable it for VigiDroid — otherwise scans cannot read <code>Download/</code>.
+    </div>
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">③ A4 — Parity tests (do this <em>before</em> scanning real APKs)</h3>
+  <p>This does <strong>not</strong> use your APK dataset. Each test runs 8 built-in practice inputs and checks scores match the PC export. Run <strong>all three</strong> tests after every install that changes models or assets.</p>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Phone still plugged in</strong> with USB debugging on (same as step ②).
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Find the test files in the Project panel</strong><br />
+      Switch the left panel to <em>Project</em> view (dropdown usually says "Android" — change to <em>Project</em> if needed). Expand:
+      <div class="ui-sketch">
+        app → src → <span class="blue">androidTest</span> → java → com.msh.vigidroid →<br />
+        &nbsp;&nbsp;<span class="green">MlpHeaderParityTest</span> &nbsp;(BM1)<br />
+        &nbsp;&nbsp;<span class="green">PatternAParityTest</span> &nbsp;(Pattern A)<br />
+        &nbsp;&nbsp;<span class="green">PatternBParityTest</span> &nbsp;(Pattern B)
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Run BM1 parity test</strong><br />
+      Right-click <code>MlpHeaderParityTest</code> → <em>Run 'MlpHeaderParityTest'</em>.<br />
+      (This is <strong>not</strong> the green ▶ Run button for the app — that runs the normal app. Tests are a separate run.)
+      <div class="ui-sketch">
+        Bottom panel switches to <span class="blue">Run</span> (or <span class="blue">Test Results</span>)<br />
+        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = BM1 A4 passed<br />
+        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/mlp_header/</code> before doing A3
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Run Pattern A parity test</strong><br />
+      Right-click <code>PatternAParityTest</code> → <em>Run 'PatternAParityTest'</em>.
+      <div class="ui-sketch">
+        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = Pattern A A4 passed<br />
+        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/pattern_a_combined/</code> before doing A3
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <strong>Run Pattern B parity test</strong><br />
+      Right-click <code>PatternBParityTest</code> → <em>Run 'PatternBParityTest'</em>.
+      <div class="ui-sketch">
+        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = Pattern B A4 passed<br />
+        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/pattern_b_dual_branch/</code> before doing A3
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <strong>Pass criteria</strong><br />
+      All three tests green (8/8 samples each). You do not need to touch the phone screen during this — tests run on the connected device in the background.
+      <div class="ui-sketch" style="margin-top:0.5rem;">
+        Optional terminal (all three in one go, after <code>installDebug</code>):<br />
+        cd thesis_vigidroid/vigidroid<br />
+        ./gradlew connectedDebugAndroidTest \<br />
+        &nbsp;&nbsp;-Pandroid.testInstrumentationRunnerArguments.package=com.msh.vigidroid
+      </div>
+    </div>
+  </div>
+
+  <div class="callout-warn">
+    <strong>Do not skip A4.</strong> If any parity test fails, scanning real APKs will produce untrustworthy thesis model scores.
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">④ A3 — Real scans on the phone</h3>
+  <p>Only after <strong>all three</strong> A4 parity tests pass.</p>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Copy APKs onto the phone</strong><br />
+      Put every APK you want scanned into <strong>Internal storage → Download</strong> (not inside the app folder).
+      <ul>
+        <li>USB: copy files into the phone's Download folder from your PC file manager</li>
+        <li>Or: <code>adb push myapp.apk /sdcard/Download/</code> from a terminal</li>
+      </ul>
+      <div class="ui-sketch">
+        Files app on phone → <span class="blue">Internal storage</span> → <span class="blue">Download</span> → your .apk files listed here
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Open VigiDroid on the phone</strong><br />
+      Tap the VigiDroid icon (installed from Android Studio Run ▶). You do not need USB connected for scanning, but keep it connected if you want to watch logs in Android Studio.
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Tap <em>Start APK Scan</em></strong><br />
+      The app finds <strong>all</strong> <code>.apk</code> files in Download and scans them one by one.
+      <div class="ui-sketch">
+        [ <span class="green">Start APK Scan</span> ]  button near the top<br />
+        Status changes to <span class="blue">Scanning…</span><br />
+        Log panel shows XGBoost, 1D-CNN, then thesis lines like:<br />
+        <span class="green">BM1 mlp_header: score=0.87 …</span><br />
+        <span class="green">Pattern A: score=0.12 …</span><br />
+        <span class="green">Pattern B: score=0.65 …</span><br />
+        Results table gets one row per APK (ensemble verdict only)
+      </div>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Wait until finished</strong><br />
+      Status returns to Idle. Metrics are saved automatically to <code>all_scan_metrics.json</code> on the phone (path shown in the app metrics section).
+    </div>
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">⑤ Pull metrics to your PC</h3>
+
+  <div class="step-box">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Phone plugged in, USB debugging on</strong>
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Run the pull script from the repo root</strong>
+      <div class="ui-sketch" style="font-size:0.82rem;">
+        cd /mnt/Files/thesis_vigidroid<br />
+        bash Shared_pipeline_Files/tools/pull_device_metrics.sh
+      </div>
+      Output lands in <code>Shared_pipeline_Files/results/device/</code> — use this for thesis plots.
+    </div>
+  </div>
+  <div class="step-box">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Alternative: Android Studio Device File Explorer</strong><br />
+      View → Tool Windows → <em>Device File Explorer</em> → browse to the metrics path on the phone → right-click file → Save As.
+    </div>
+  </div>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">Quick reference: app Run vs parity tests</h3>
+  <table>
+    <thead>
+      <tr><th>What you want</th><th>What to click in Android Studio</th><th>Runs on phone</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Install / open the app (step ②, A3)</td>
+        <td>Green <strong>▶ Run 'app'</strong> (top toolbar)</td>
+        <td>VigiDroid UI — you tap Start APK Scan</td>
+      </tr>
+      <tr>
+        <td>BM1 parity (A4)</td>
+        <td>Right-click <strong>MlpHeaderParityTest</strong> → Run test</td>
+        <td>Automatic — 8 fixed samples</td>
+      </tr>
+      <tr>
+        <td>Pattern A parity (A4)</td>
+        <td>Right-click <strong>PatternAParityTest</strong> → Run test</td>
+        <td>Automatic — 8 fixed samples</td>
+      </tr>
+      <tr>
+        <td>Pattern B parity (A4)</td>
+        <td>Right-click <strong>PatternBParityTest</strong> → Run test</td>
+        <td>Automatic — 8 fixed samples</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="color:var(--text);margin-top:1.5rem;">Checklist before thesis scans</h3>
+  <div class="card">
+    <ul>
+      <li>Phone: USB debugging on, storage / all-files access granted for VigiDroid</li>
+      <li>PC: Android Studio opened on <code>vigidroid/</code>, POCO F3 selected, <strong>Run ▶</strong> succeeded</li>
+      <li>A4: <code>MlpHeaderParityTest</code>, <code>PatternAParityTest</code>, <code>PatternBParityTest</code> — all green</li>
+      <li>A3: APKs in <code>Download/</code>, tap Start APK Scan, wait for Idle</li>
+      <li>Pull: <code>bash Shared_pipeline_Files/tools/pull_device_metrics.sh</code> → check <code>stages[]</code> has 5 entries per scan</li>
+    </ul>
+  </div>
+
+  <p style="margin-top:1rem;color:var(--muted);font-size:0.9rem;">
+    More install/USB help: <code>vigidroid_for_noobs.html</code>.
+    Per-model details: <code>Android_Works/BM1_android_steps.md</code>,
+    <code>Android_Works/patternA_android_steps.md</code>,
+    <code>Android_Works/patternB_android_steps.md</code>.
+  </p>
+
+</main>
+
+<footer>
+  how_vigidroid_works.html — thesis_vigidroid / VigiDroid overview
+</footer>
+
+</body>
+</html>

@@ -49,6 +49,14 @@ public class ScanService extends JobIntentService {
     private OrtEnvironment ortEnvironment;
     private OrtSession ortSession;
     private OrtSession ortSessionCnn;
+    private MlpHeaderOnnxRunner mlpHeaderRunner;
+    private DexHeaderFeatureExtractor mlpHeaderExtractor;
+    private PatternAOnnxRunner patternARunner;
+    private DexHeaderFeatureExtractor patternAHeaderExtractor;
+    private ManifestBowExtractor patternABowExtractor;
+    private PatternBOnnxRunner patternBRunner;
+    private DexHeaderFeatureExtractor patternBHeaderExtractor;
+    private ManifestBowExtractor patternBBowExtractor;
     private List<String> featureColumns = new ArrayList<>();
     private Map<String, Integer> featureIndex = new HashMap<>();
 
@@ -91,6 +99,24 @@ public class ScanService extends JobIntentService {
         } catch (Exception e) {
             Log.e(TAG, "ONNX init error", e);
             sendLog("ONNX init error: " + e.getMessage(), "Error");
+        }
+        try {
+            initMlpHeaderPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "BM1 mlp_header pipeline not loaded", e);
+            sendLog("BM1 mlp_header skipped: " + e.getMessage(), null);
+        }
+        try {
+            initPatternAPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "Pattern A pipeline not loaded", e);
+            sendLog("Pattern A skipped: " + e.getMessage(), null);
+        }
+        try {
+            initPatternBPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "Pattern B pipeline not loaded", e);
+            sendLog("Pattern B skipped: " + e.getMessage(), null);
         }
     }
 
@@ -172,6 +198,29 @@ public class ScanService extends JobIntentService {
             float cnnScore = runCnnInference(cnnInput);
             long cnnInferEnd = SystemClock.elapsedRealtimeNanos();
 
+            // BM1 mlp_header (Dex header only) — separate stage; does not affect CNN/XGB ensemble
+            double mlpParseMs = 0.0;
+            double mlpVecMs = 0.0;
+            double mlpInferMs = 0.0;
+            float mlpScore = -1f;
+            long mlpMemDelta = 0L;
+            if (mlpHeaderRunner != null && mlpHeaderExtractor != null) {
+                long mlpMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    DexHeaderFeatureExtractor.ExtractionResult mlpExtraction =
+                            mlpHeaderExtractor.extract(apk);
+                    mlpParseMs = mlpExtraction.extractNanos / 1_000_000.0;
+                    mlpVecMs = mlpExtraction.normalizeNanos / 1_000_000.0;
+                    long mlpInferStart = SystemClock.elapsedRealtimeNanos();
+                    mlpScore = mlpHeaderRunner.predict(mlpExtraction.features);
+                    mlpInferMs = (SystemClock.elapsedRealtimeNanos() - mlpInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "BM1 mlp_header failed for " + apkName, ex);
+                    sendLog("BM1 mlp_header error: " + ex.getMessage(), null);
+                }
+                mlpMemDelta = Debug.getNativeHeapAllocatedSize() - mlpMemBefore;
+            }
+
             long cpuEnd = Debug.threadCpuTimeNanos();
             long memEnd = Debug.getNativeHeapAllocatedSize();
             long wallEnd = SystemClock.elapsedRealtimeNanos();
@@ -205,12 +254,92 @@ public class ScanService extends JobIntentService {
                     "1D-CNN: score=%.4f parse=%.2fms infer=%.2fms mem=%d bytes",
                     cnnScore, cnnParsingMs, cnnInferenceMs, cnnMemDelta
             ), null);
+            if (mlpScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "BM1 mlp_header: score=%.4f parse=%.2fms norm=%.2fms infer=%.2fms mem=%d bytes",
+                        mlpScore, mlpParseMs, mlpVecMs, mlpInferMs, mlpMemDelta
+                ), null);
+            }
+
+            // Pattern A (Dex header + manifest BoW) — separate stage; does not affect CNN/XGB ensemble
+            double patternAParseMs = 0.0;
+            double patternABowMs = 0.0;
+            double patternAInferMs = 0.0;
+            float patternAScore = -1f;
+            long patternAMemDelta = 0L;
+            if (patternARunner != null && patternAHeaderExtractor != null && patternABowExtractor != null) {
+                long patternAMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    DexHeaderFeatureExtractor.ExtractionResult headerExtraction =
+                            patternAHeaderExtractor.extract(apk);
+                    ManifestBowExtractor.ExtractionResult bowExtraction =
+                            patternABowExtractor.extract(apk);
+                    patternAParseMs = headerExtraction.extractNanos / 1_000_000.0;
+                    patternABowMs = (bowExtraction.extractNanos + bowExtraction.vectorizeNanos) / 1_000_000.0;
+                    long patternAInferStart = SystemClock.elapsedRealtimeNanos();
+                    patternAScore = patternARunner.predict(
+                            headerExtraction.features, bowExtraction.bow);
+                    patternAInferMs =
+                            (SystemClock.elapsedRealtimeNanos() - patternAInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "Pattern A failed for " + apkName, ex);
+                    sendLog("Pattern A error: " + ex.getMessage(), null);
+                }
+                patternAMemDelta = Debug.getNativeHeapAllocatedSize() - patternAMemBefore;
+            }
+
+            if (patternAScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "Pattern A: score=%.4f header=%.2fms bow=%.2fms infer=%.2fms mem=%d bytes",
+                        patternAScore, patternAParseMs, patternABowMs, patternAInferMs, patternAMemDelta
+                ), null);
+            }
+
+            // Pattern B (dual branch fused ONNX) — separate stage; does not affect CNN/XGB ensemble
+            double patternBParseMs = 0.0;
+            double patternBBowMs = 0.0;
+            double patternBInferMs = 0.0;
+            float patternBScore = -1f;
+            long patternBMemDelta = 0L;
+            if (patternBRunner != null && patternBHeaderExtractor != null && patternBBowExtractor != null) {
+                long patternBMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    DexHeaderFeatureExtractor.ExtractionResult headerExtraction =
+                            patternBHeaderExtractor.extract(apk);
+                    ManifestBowExtractor.ExtractionResult bowExtraction =
+                            patternBBowExtractor.extract(apk);
+                    patternBParseMs = headerExtraction.extractNanos / 1_000_000.0;
+                    patternBBowMs = (bowExtraction.extractNanos + bowExtraction.vectorizeNanos) / 1_000_000.0;
+                    long patternBInferStart = SystemClock.elapsedRealtimeNanos();
+                    patternBScore = patternBRunner.predict(
+                            headerExtraction.features, bowExtraction.bow);
+                    patternBInferMs =
+                            (SystemClock.elapsedRealtimeNanos() - patternBInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "Pattern B failed for " + apkName, ex);
+                    sendLog("Pattern B error: " + ex.getMessage(), null);
+                }
+                patternBMemDelta = Debug.getNativeHeapAllocatedSize() - patternBMemBefore;
+            }
+
+            if (patternBScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "Pattern B: score=%.4f header=%.2fms bow=%.2fms infer=%.2fms mem=%d bytes",
+                        patternBScore, patternBParseMs, patternBBowMs, patternBInferMs, patternBMemDelta
+                ), null);
+            }
 
             File metricsFile = writeScanMetrics(
                     trigger,
                     apk,
                     parsingMs, vectorMs, inferenceMs, score,
                     cnnParsingMs, cnnInferenceMs, cnnScore,
+                    mlpParseMs, mlpVecMs, mlpInferMs, mlpScore, mlpMemDelta,
+                    patternAParseMs, patternABowMs, patternAInferMs, patternAScore, patternAMemDelta,
+                    patternBParseMs, patternBBowMs, patternBInferMs, patternBScore, patternBMemDelta,
                     totalMs, cpuMs / 1_000_000.0, memDelta,
                     xgbMemDelta, cnnMemDelta,
                     totalDexFilesFound,
@@ -425,6 +554,37 @@ public class ScanService extends JobIntentService {
         }
     }
 
+    private void initMlpHeaderPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        mlpHeaderExtractor = DexHeaderFeatureExtractor.fromAssets(this);
+        mlpHeaderRunner = MlpHeaderOnnxRunner.create(this, ortEnvironment);
+        sendLog("BM1 mlp_header ONNX loaded", null);
+    }
+
+    private void initPatternAPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        patternAHeaderExtractor =
+                DexHeaderFeatureExtractor.fromAssets(this, DexHeaderFeatureExtractor.PATTERN_A_NORMALIZATION_ASSET);
+        patternABowExtractor = ManifestBowExtractor.fromAssets(this, ManifestBowExtractor.PATTERN_A_VOCAB_ASSET);
+        patternARunner = PatternAOnnxRunner.create(this, ortEnvironment);
+        sendLog("Pattern A ONNX loaded", null);
+    }
+
+    private void initPatternBPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        patternBHeaderExtractor =
+                DexHeaderFeatureExtractor.fromAssets(this, DexHeaderFeatureExtractor.PATTERN_B_NORMALIZATION_ASSET);
+        patternBBowExtractor = ManifestBowExtractor.fromAssets(this, ManifestBowExtractor.PATTERN_B_VOCAB_ASSET);
+        patternBRunner = PatternBOnnxRunner.create(this, ortEnvironment);
+        sendLog("Pattern B ONNX loaded", null);
+    }
+
     private float runInference(float[] inputVector) {
         if (ortEnvironment == null || ortSession == null) {
             return -1f;
@@ -537,6 +697,11 @@ public class ScanService extends JobIntentService {
             File apk,
             double xgbParseMs, double xgbVecMs, double xgbInferMs, float xgbScore,
             double cnnParseMs, double cnnInferMs, float cnnScore,
+            double mlpParseMs, double mlpVecMs, double mlpInferMs, float mlpScore, long mlpMemDelta,
+            double patternAParseMs, double patternABowMs, double patternAInferMs, float patternAScore,
+            long patternAMemDelta,
+            double patternBParseMs, double patternBBowMs, double patternBInferMs, float patternBScore,
+            long patternBMemDelta,
             double wallMs, double cpuMs, long memDeltaBytes,
             long xgbMemDelta,
             long cnnMemDelta,
@@ -561,6 +726,21 @@ public class ScanService extends JobIntentService {
                     "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, xgbMemDelta));
             scan.stages.add(new MetricsWriter.StageMetrics(
                     "bytecnn", cnnParseMs, 0.0, cnnInferMs, cnnScore, cnnMemDelta));
+            if (mlpScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        MlpHeaderOnnxRunner.DOMAIN,
+                        mlpParseMs, mlpVecMs, mlpInferMs, mlpScore, mlpMemDelta));
+            }
+            if (patternAScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        PatternAOnnxRunner.DOMAIN,
+                        patternAParseMs, patternABowMs, patternAInferMs, patternAScore, patternAMemDelta));
+            }
+            if (patternBScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        PatternBOnnxRunner.DOMAIN,
+                        patternBParseMs, patternBBowMs, patternBInferMs, patternBScore, patternBMemDelta));
+            }
 
             if (ensemble >= 0f) {
                 scan.ensembleScore = ensemble;
@@ -628,6 +808,15 @@ public class ScanService extends JobIntentService {
         }
         if (ortSessionCnn != null) {
             try { ortSessionCnn.close(); } catch (Exception ignored) {}
+        }
+        if (mlpHeaderRunner != null) {
+            try { mlpHeaderRunner.close(); } catch (Exception ignored) {}
+        }
+        if (patternARunner != null) {
+            try { patternARunner.close(); } catch (Exception ignored) {}
+        }
+        if (patternBRunner != null) {
+            try { patternBRunner.close(); } catch (Exception ignored) {}
         }
         if (ortEnvironment != null) {
             try { ortEnvironment.close(); } catch (Exception ignored) {}

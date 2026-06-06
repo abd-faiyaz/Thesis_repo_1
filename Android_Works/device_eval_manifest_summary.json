@@ -1,0 +1,51 @@
+{
+  "target_total": 400,
+  "actual_total": 400,
+  "benign": 300,
+  "malware": 100,
+  "total_size_gb": 7.71,
+  "years": [
+    "2022",
+    "2023"
+  ],
+  "seed": 42,
+  "by_size_bucket": {
+    "00_<1MB": 20,
+    "01_1-5MB": 86,
+    "02_5-10MB": 86,
+    "03_10-20MB": 85,
+    "04_20-50MB": 85,
+    "05_50-100MB": 33,
+    "06_100-200MB": 5
+  },
+  "by_size_bucket_label": {
+    "00_<1MB": {
+      "benign": 20,
+      "malware": 0
+    },
+    "01_1-5MB": {
+      "benign": 78,
+      "malware": 8
+    },
+    "02_5-10MB": {
+      "benign": 66,
+      "malware": 20
+    },
+    "03_10-20MB": {
+      "benign": 65,
+      "malware": 20
+    },
+    "04_20-50MB": {
+      "benign": 71,
+      "malware": 14
+    },
+    "05_50-100MB": {
+      "benign": 0,
+      "malware": 33
+    },
+    "06_100-200MB": {
+      "benign": 0,
+      "malware": 5
+    }
+  }
+}
