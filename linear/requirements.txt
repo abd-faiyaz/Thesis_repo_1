@@ -1,0 +1,9 @@
+numpy>=1.24
+scipy>=1.10
+scikit-learn>=1.3
+PyYAML>=6.0
+tqdm>=4.65
+pyaxmlparser>=0.3
+torch>=2.0
+onnx>=1.14
+onnxruntime>=1.16

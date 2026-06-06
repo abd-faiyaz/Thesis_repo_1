@@ -1,0 +1,8 @@
+artifacts/
+data/apks/
+__pycache__/
+*.pyc
+.pytest_cache/
+thesis_venv/
+*.joblib
+*.pth

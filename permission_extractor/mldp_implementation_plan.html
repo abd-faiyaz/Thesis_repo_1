@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLDP-Pruned Permission Classifier — Implementation Plan</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --accent2: #7ee787; --warn: #f0b429; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); margin-right: 1rem; }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.35rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; }
+    h3 { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.questions { border-left: 4px solid var(--warn); }
+    pre, pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; font-family: 'Cascadia Code', Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; color: var(--accent); }
+    ul.checklist { list-style: none; padding-left: 0; }
+    ul.checklist li::before { content: "☐ "; color: var(--warn); }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    .tag { display: inline-block; background: #21262d; border: 1px solid var(--border); border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.82rem; color: var(--accent2); margin-right: 0.35rem; }
+    .callout { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin: 0.75rem 0; }
+    .callout.warn { background: #2e2410; border-color: var(--warn); }
+    p { margin: 0.65rem 0; }
+    code { font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.88em; }
+  </style>
+</head>
+<body>
+
+<nav class="top">
+  <a href="mldp_pruned_permission_classifier.html">← Architecture</a>
+  <a href="../Pipeline_full_concept.html">Pipeline guide (P0–P8)</a>
+  <a href="../linear/linregdroid_implementation_plan.html">LinRegDroid plan (sibling baseline)</a>
+</nav>
+
+<h1>MLDP-Pruned Permission Classifier — Implementation Plan</h1>
+<p class="meta">
+  Paper: IJACSA 2020 — <em>Permission Extraction Framework for Android Malware Detection</em> (MLDP)<br>
+  Aligned with <code>Pipeline_full_concept.html</code> (P0–P8 + A1–A4)<br>
+  Proposed <code>model_id</code>: <strong>mldp_pruned_permission</strong> · <code>domain</code>: <strong>manifest_permissions_mldp</strong> · On-device: <strong>yes</strong> (~20–40 dims + linear/tiny MLP)
+</p>
+
+<section class="prereq">
+<h2>Scope &amp; role in thesis</h2>
+<p>
+  Unlike LinRegDroid (full permission vocabulary + linear regression), this model applies <strong>Multi-Level Data Pruning (MLDP)</strong>
+  offline on the training corpus: <strong>PRNR ranking</strong> → <strong>support filter</strong> → <strong>association-rule mining</strong>,
+  yielding a frozen permission set \(\mathcal{S}\) with \(|\mathcal{S}| \approx 20\)–40. Inference uses only \(\mathbf{x} \in \{0,1\}^{|\mathcal{S}|}\),
+  then a <strong>linear SVM</strong> (paper) or <strong>tiny MLP</strong> (ONNX-friendly) outputs <code>malware_probability</code>.
+</p>
+<p>
+  Self-contained project under <code>permission_extractor/</code>. Thesis comparison axis:
+  <strong>LinRegDroid</strong> (full ~135–400-d, MLR) vs <strong>MLDP</strong> (pruned ~20–40-d, SVM/MLP) vs VigiDroid XGBoost (~2500-d).
+</p>
+<div class="callout warn">
+  <strong>Critical leakage rule:</strong> PRNR counts, support thresholds, and association rules must be computed from the
+  <strong>train split only</strong>. Val, dev_test, and temporal_holdout only receive encoding with the frozen \(\mathcal{S}\).
+</div>
+</section>
+
+<section class="questions">
+<h2>Resolved decisions</h2>
+<table>
+<tr><th>#</th><th>Decision</th><th>Your choice</th></tr>
+<tr><td>1–2</td><td>Dataset &amp; APK_ROOT</td><td>Hugging Face android-apks; <code>APK_ROOT</code> env later</td></tr>
+<tr><td>3</td><td>Classifier</td><td>Train <strong>LinearSVC + tiny MLP</strong>; pick best on <strong>val F1</strong></td></tr>
+<tr><td>4</td><td>MLDP thresholds</td><td>Fixed defaults in config</td></tr>
+<tr><td>5</td><td>|S| cap</td><td><strong>40</strong> permissions max</td></tr>
+<tr><td>6</td><td>Association rules</td><td><strong>Malware-only</strong> train transactions</td></tr>
+<tr><td>7</td><td>Tokens</td><td>VigiDroid normalization</td></tr>
+<tr><td>8</td><td>Layout</td><td>Self-contained; no cross-folder imports</td></tr>
+<tr><td>9</td><td>Ablation</td><td><strong>No</strong> full-permission baseline</td></tr>
+<tr><td>10</td><td>VigiDroid</td><td>Export only; no Java changes yet</td></tr>
+<tr><td>11</td><td>Rule mining</td><td><code>mlxtend</code> FP-Growth</td></tr>
+<tr><td>12</td><td>ONNX</td><td><code>malware_probability</code>, threshold 0.5</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Architecture → pipeline mapping</h2>
+<pre class="flow">Paper stage                    Pipeline phase(s)
+──────────────────────────────────────────────────────────────────
+Manifest parse (full perms)    P1 + P2a  (transactions cache)
+Stage 1 PRNR                   P2b  (train-only → prnr_scores.json)
+Stage 2 Support filter         P2b  (train-only → support filter)
+Stage 3 Association rules      P2b  (train-only → mldp_selected.json, set S)
+Inference vector x ∈ {0,1}^|S|  P2c  (sharded .npz for all splits)
+Classifier SVM / MLP           P4 + P5
+Evaluation                     P6  (+ optional ablation)
+ONNX + frozen S               P7 + P8
+Android extractor              A1–A4 (deferred)</pre>
+</section>
+
+<section>
+<h2>Project layout (<code>permission_extractor/</code>)</h2>
+<pre>permission_extractor/
+├── config/default.yaml
+├── requirements.txt
+├── run_mldp.sh
+├── mldp_pruned_permission_classifier.html
+├── mldp_implementation_plan.html          # this file
+├── scripts/
+│   ├── verify_setup.py                    # P0
+│   ├── run_preprocess.sh                  # P1 + P2a–P2c
+│   ├── run_train.sh                       # P5
+│   ├── run_evaluate.sh                    # P6
+│   ├── export_onnx.py                     # P7
+│   └── parity_check.py                    # P8
+├── src/
+│   ├── config.py
+│   ├── constants.py
+│   ├── features/
+│   │   └── permission_vector.py           # parse + VigiDroid tokens
+│   ├── mldp/
+│   │   ├── prnr.py                        # Stage 1
+│   │   ├── support_filter.py              # Stage 2
+│   │   ├── association_rules.py           # Stage 3
+│   │   └── pipeline.py                    # PRNR → supp → rules → S
+│   ├── preprocessing/
+│   │   ├── scan_dataset.py                # P1
+│   │   ├── build_transactions.py          # P2a full permission sets
+│   │   ├── run_mldp_selection.py          # P2b freeze S
+│   │   └── extract_pruned_vectors.py        # P2c shards
+│   ├── data/
+│   │   ├── store.py
+│   │   ├── dataset.py
+│   │   └── dataloaders.py
+│   ├── models/
+│   │   ├── linear_svm.py
+│   │   └── tiny_mlp.py                    # optional ONNX path
+│   └── training/
+│       ├── train.py
+│       └── evaluate.py
+└── artifacts/
+    ├── dataset_index.csv
+    ├── splits/
+    ├── mldp/
+    │   ├── prnr_scores.json
+    │   ├── support_stats.json
+    │   ├── association_rules.json
+    │   └── selected_permissions.json      # frozen S
+    ├── processed/shards/
+    ├── checkpoints/
+    ├── metrics/
+    └── export/mldp_pruned_permission/</pre>
+</section>
+
+<!-- P0 -->
+<section>
+<h2>P0 — Config &amp; environment</h2>
+<p><span class="tag">Exit criteria</span> <code>python scripts/verify_setup.py</code> exits 0.</p>
+
+<h3>Deliverables</h3>
+<ul class="checklist">
+<li><code>config/default.yaml</code></li>
+<li><code>requirements.txt</code> — numpy, scipy, scikit-learn, mlxtend, pyaxmlparser, PyYAML, torch, onnx, onnxruntime, tqdm</li>
+<li><code>scripts/verify_setup.py</code></li>
+<li><code>scripts/activate_thesis_env.sh</code> → repo <code>thesis_venv</code></li>
+</ul>
+
+<h3><code>config/default.yaml</code> (sketch)</h3>
+<pre>pipeline:
+  model_id: mldp_pruned_permission
+  domain: manifest_permissions_mldp
+  android_assets_target: vigidroid/app/src/main/assets/models/mldp_pruned_permission/
+
+paths:
+  apk_root: data/apks
+  artifacts: artifacts
+  mldp_dir: artifacts/mldp
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  export: artifacts/export
+
+preprocessing:
+  split_mode: stratified_development
+  development_years: [2020, 2021]
+  train_ratio: 0.70
+  val_ratio: 0.15
+  dev_test_ratio: 0.15
+  temporal_holdout_years: [2022, 2023]
+  random_seed: 42
+  parser: pyaxmlparser
+  token_normalization: vigidroid
+
+mldp:
+  prnr:
+    top_k: 80                    # keep top-K after PRNR rank
+    min_rate_delta: 0.02         # drop |ρ^M - ρ^B| &lt; δ
+    epsilon: 1.0e-6
+  support:
+    min_support: 0.01            # θ_min: ≥1% of train APKs
+    max_support: 0.95            # optional ubiquity drop
+  association:
+    min_support: 0.05            # σ on malware transactions
+    min_confidence: 0.70         # θ_conf
+    min_lift: 1.2
+    algorithm: fpgrowth          # fpgrowth | apriori
+
+model:
+  type: linear_svc               # linear_svc | tiny_mlp
+  C: 1.0
+  class_weight: balanced
+  tiny_mlp_hidden: 32            # if type=tiny_mlp
+
+evaluation:
+  threshold: 0.5
+  run_ablation_full_permissions: true</pre>
+</section>
+
+<!-- P1 -->
+<section>
+<h2>P1 — Dataset indexing</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/dataset_index.csv</code> + split list files.</p>
+
+<h3>Split policy (match LinRegDroid unless Q1 says otherwise)</h3>
+<ul>
+<li><strong>train / val / dev_test:</strong> stratified 70/15/15 from 2020+2021 APKs</li>
+<li><strong>temporal_holdout:</strong> all 2022+2023 APKs (evaluate later, not used in MLDP fitting)</li>
+</ul>
+
+<h3>Script: <code>src/preprocessing/scan_dataset.py</code></h3>
+<ol class="steps">
+<li>Walk <code>apk_root/{year}/{benign|malware}/*.apk</code>; SHA-256 dedup.</li>
+<li>Labels from parent folder: 0=benign, 1=malware.</li>
+<li>Write <code>dataset_index.csv</code> columns: <code>apk_id, path, label, year, split</code>.</li>
+<li>Write <code>artifacts/splits/{train,val,dev_test,temporal_holdout}.txt</code>.</li>
+</ol>
+</section>
+
+<!-- P2 -->
+<section>
+<h2>P2 — Feature extraction &amp; MLDP pruning</h2>
+<p><span class="tag">Exit criteria</span> Frozen <code>selected_permissions.json</code>, pruned shards for all splits, <code>failed_apks.log</code>.</p>
+
+<h3>P2a — Full permission transactions (all splits)</h3>
+<p><strong>Script:</strong> <code>build_transactions.py</code></p>
+<ol class="steps">
+<li>Parse each APK manifest via <code>pyaxmlparser</code>; normalize tokens (VigiDroid).</li>
+<li>Store per APK: <code>transactions/{split}/{apk_id}.json</code> → list of permission strings.</li>
+<li>Also build <code>full_permission_vocab.json</code> from <strong>train transactions only</strong> (for ablation baseline).</li>
+</ol>
+
+<h3>P2b — MLDP selection (train split ONLY)</h3>
+<p><strong>Script:</strong> <code>run_mldp_selection.py</code> → <code>src/mldp/pipeline.py</code></p>
+
+<h4>Stage 1 — PRNR</h4>
+<p>\[ \text{PRNR}_j = \frac{M_j / N_m}{B_j / N_b + \epsilon} \]</p>
+<ol class="steps">
+<li>Count \(M_j, B_j\) per permission on train APKs.</li>
+<li>Drop near-equal rates: \(|\rho_j^M - \rho_j^B| &lt; \delta\).</li>
+<li>Sort by PRNR descending; keep top-K (default 80) → <code>prnr_scores.json</code>.</li>
+</ol>
+
+<h4>Stage 2 — Support filter</h4>
+<p>\[ \text{supp}(j) = \frac{|\{i : j \in \text{APK}_i\}|}{N_{\text{train}}} \]</p>
+<ol class="steps">
+<li>Keep permissions with \(\text{supp}(j) \geq \theta_{\min}\) (default 0.01).</li>
+<li>Optionally drop \(\text{supp}(j) &gt; \theta_{\max}\) (too ubiquitous).</li>
+<li>Write <code>support_stats.json</code>.</li>
+</ol>
+
+<h4>Stage 3 — Association rules</h4>
+<ol class="steps">
+<li>Build transactions from <strong>malware train APKs</strong> using Stage-2 candidates.</li>
+<li>Run FP-Growth (<code>mlxtend</code>) with min support σ.</li>
+<li>Keep rules with confidence ≥ θ_conf and lift ≥ threshold.</li>
+<li>Union all permissions in retained rules → final set \(\mathcal{S}\).</li>
+<li>If \(|\mathcal{S}|\) is too small, fallback: top PRNR permissions after support filter until min size (document in JSON).</li>
+<li>Write <code>selected_permissions.json</code>: <code>{ "permissions": [...], "S": 30, "mldp_version": 1 }</code>.</li>
+</ol>
+
+<h3>P2c — Pruned vector shards</h3>
+<p><strong>Script:</strong> <code>extract_pruned_vectors.py</code></p>
+<ol class="steps">
+<li>Load frozen \(\mathcal{S}\); for each APK build \(\mathbf{x} \in \{0,1\}^{|\mathcal{S}|}\).</li>
+<li>Write <code>processed/shards/{split}/{apk_id}.npz</code> with keys <code>x, label</code>.</li>
+<li>Write <code>manifest_{split}.json</code> for DataLoader.</li>
+</ol>
+<div class="callout"><strong>Do not</strong> re-run MLDP on val/test/holdout — only encode with frozen \(\mathcal{S}\).</div>
+</section>
+
+<!-- P3 -->
+<section>
+<h2>P3 — Dataset &amp; DataLoader</h2>
+<p><span class="tag">Exit criteria</span> Batches of shape <code>(B, |S|)</code>; verify script prints \(|\mathcal{S}|\) and class balance.</p>
+<ul class="checklist">
+<li><code>PrunedPermissionDataset</code> loads shards</li>
+<li><code>scripts/verify_dataloader.py</code></li>
+</ul>
+</section>
+
+<!-- P4 -->
+<section>
+<h2>P4 — Model definition</h2>
+<p><span class="tag">Exit criteria</span> Forward pass: <code>x → malware_probability</code>.</p>
+
+<h3>Option A — Linear SVM (paper-default)</h3>
+<p><code>sklearn.svm.LinearSVC</code> with <code>probability=False</code> at train time; calibrate with <code>CalibratedClassifierCV</code> on val if needed, or use Platt-style sigmoid on decision function for ONNX.</p>
+<p>Decision: \(\hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b)\) for export consistency.</p>
+
+<h3>Option B — Tiny MLP (mobile ONNX)</h3>
+<pre>Linear(|S|, 32) → ReLU → Linear(32, 1) → Sigmoid</pre>
+<p>Train with <code>BCEWithLogitsLoss</code>; ~few KB weights. Easier ONNX parity than native SVM export.</p>
+
+<h3>PyTorch export wrapper</h3>
+<p>Regardless of sklearn/PyTorch train path, P7 copies trained weights into a fixed <code>nn.Sequential</code> for ONNX.</p>
+</section>
+
+<!-- P5 -->
+<section>
+<h2>P5 — Training</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/checkpoints/mldp_pruned.pth</code> + sklearn joblib if applicable.</p>
+<ol class="steps">
+<li>Load train shards → \(\mathbf{X}_{\text{train}}, \mathbf{y}\).</li>
+<li>Fit classifier (SVM or tiny MLP) on pruned vectors only.</li>
+<li>Save checkpoint, hyperparams, and \(|\mathcal{S}|\) in <code>training_meta.json</code>.</li>
+<li>Log top weighted permissions (SVM coef magnitudes) for thesis interpretability.</li>
+</ol>
+<p><strong>Optional P5b:</strong> Grid-search MLDP thresholds on <strong>val</strong> only (re-run P2b+P5 inner loop); never touch dev_test or temporal_holdout for tuning.</p>
+</section>
+
+<!-- P6 -->
+<section>
+<h2>P6 — Evaluation</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/metrics/evaluation_results.json</code></p>
+
+<h3>Primary metrics (val + dev_test)</h3>
+<ul>
+<li>accuracy, F1 (malware positive), ROC-AUC</li>
+<li>confusion matrix; threshold 0.5 on <code>malware_probability</code></li>
+</ul>
+
+<h3>Optional ablation (Q9)</h3>
+<p>Train/eval a <strong>full-vocab linear SVM</strong> on the same splits; write <code>ablation_full_vs_mldp.json</code> comparing:</p>
+<table>
+<tr><th>Model</th><th>Dims</th><th>Val F1</th><th>Dev-test F1</th><th>Inference cost proxy</th></tr>
+<tr><td>Full permissions</td><td>~135–400</td><td>…</td><td>…</td><td>higher dot-product cost</td></tr>
+<tr><td>MLDP-pruned</td><td>~20–40</td><td>…</td><td>…</td><td>thesis target: equal/better F1, faster</td></tr>
+</table>
+
+<h3>Temporal holdout (later)</h3>
+<pre>python -m src.training.evaluate --splits temporal_holdout</pre>
+</section>
+
+<!-- P7 -->
+<section>
+<h2>P7 — ONNX export bundle</h2>
+<p><span class="tag">Exit criteria</span> Complete folder under <code>artifacts/export/mldp_pruned_permission/</code></p>
+
+<pre>artifacts/export/mldp_pruned_permission/
+├── model.onnx
+├── export_manifest.json
+├── thresholds.json
+├── features/
+│   ├── selected_permissions.json    # frozen S (required on device)
+│   ├── mldp_rules.json              # optional audit trail
+│   └── token_normalization.json     # "vigidroid"
+└── parity_samples/
+    ├── sample_vectors.npz
+    └── index.json</pre>
+
+<h3><code>export_manifest.json</code></h3>
+<pre>{
+  "model_id": "mldp_pruned_permission",
+  "domain": "manifest_permissions_mldp",
+  "feature_dim": 30,
+  "inputs": [{"name": "permissions", "shape": [1, "S"], "dtype": "float32"}],
+  "outputs": [{"name": "malware_probability", "dtype": "float32"}],
+  "preprocessing": "MLDP frozen set S; see features/selected_permissions.json",
+  "android_assets_target": "vigidroid/app/src/main/assets/models/mldp_pruned_permission/",
+  "ensemble_note": "Third model slot alongside LinRegDroid + existing VigiDroid ONNX models"
+}</pre>
+</section>
+
+<!-- P8 -->
+<section>
+<h2>P8 — Parity check</h2>
+<p><span class="tag">Exit criteria</span> Max |Δ| PyTorch/sklearn vs ONNX ≤ 1e-4 on parity samples.</p>
+<p>Verify pruned vectorization separately: same APK → same \(\mathbf{x}\) when re-parsed in Python reference script.</p>
+</section>
+
+<!-- Android -->
+<section>
+<h2>A1–A4 — Android (VigiDroid, deferred)</h2>
+<table>
+<tr><th>Step</th><th>Work</th></tr>
+<tr><td><strong>A1</strong></td><td><code>MldpPermissionExtractor</code>: parse manifest, load <code>selected_permissions.json</code>, build \(\mathbf{x}\) with VigiDroid token normalization</td></tr>
+<tr><td><strong>A2</strong></td><td>ONNX Runtime → <code>malware_probability</code>; threshold 0.5</td></tr>
+<tr><td><strong>A3</strong></td><td>Register <code>mldp_pruned_permission</code> in scan orchestrator; log stage timing/memory</td></tr>
+<tr><td><strong>A4</strong></td><td>Instrumented parity vs <code>parity_samples/</code></td></tr>
+</table>
+<p><strong>Ensemble (later):</strong> Run LinRegDroid + MLDP + existing model; majority vote or weighted average; compare verdict, wall time, and memory deltas in device JSON — no VigiDroid code changes until you approve integration sprint.</p>
+</section>
+
+<!-- Execution -->
+<section>
+<h2>Execution order</h2>
+<pre class="flow">P0 verify_setup
+  → P1 scan_dataset
+  → P2a build_transactions
+  → P2b run_mldp_selection        (train only)
+  → P2c extract_pruned_vectors
+  → P3 verify_dataloader
+  → P5 train
+  → P6 evaluate (+ optional ablation)
+  → P7 export_onnx
+  → P8 parity_check
+  → A1–A4 (later)
+
+APK_ROOT=/path/to/android-apks ./run_mldp.sh</pre>
+</section>
+
+<section>
+<h2>Phase summary</h2>
+<table>
+<tr><th>Phase</th><th>Name</th><th>Key outputs</th></tr>
+<tr><td>P0</td><td>Config &amp; env</td><td><code>default.yaml</code>, verify OK</td></tr>
+<tr><td>P1</td><td>Indexing</td><td><code>dataset_index.csv</code>, splits</td></tr>
+<tr><td>P2a</td><td>Transactions</td><td>Per-APK permission sets</td></tr>
+<tr><td>P2b</td><td>MLDP (train-only)</td><td><code>selected_permissions.json</code>, rule artifacts</td></tr>
+<tr><td>P2c</td><td>Pruned shards</td><td><code>shards/{split}/*.npz</code></td></tr>
+<tr><td>P3</td><td>DataLoader</td><td><code>PrunedPermissionDataset</code></td></tr>
+<tr><td>P4</td><td>Model</td><td>SVM or tiny MLP module</td></tr>
+<tr><td>P5</td><td>Training</td><td>checkpoint + meta</td></tr>
+<tr><td>P6</td><td>Evaluation</td><td>metrics JSON (+ ablation)</td></tr>
+<tr><td>P7</td><td>ONNX export</td><td>export bundle with frozen S</td></tr>
+<tr><td>P8</td><td>Parity</td><td><code>parity_report.json</code></td></tr>
+</table>
+</section>
+
+<section>
+<h2>Thesis comparison hooks</h2>
+<table>
+<tr><th>Model</th><th>Feature selection</th><th>Typical dims</th><th>Classifier</th></tr>
+<tr><td>LinRegDroid (<code>linear/</code>)</td><td>None (full train vocab)</td><td>~135–400</td><td>MLR + threshold</td></tr>
+<tr><td><strong>MLDP (this)</strong></td><td>PRNR + support + rules</td><td><strong>~20–40</strong></td><td>Linear SVM / tiny MLP</td></tr>
+<tr><td>VigiDroid XGBoost</td><td>Structural manifest + DEX</td><td>~2500</td><td>XGBoost ONNX</td></tr>
+</table>
+<p>Report val/dev_test F1, model size (KB), and dot-product cost \(O(|\mathcal{S}|)\) vs LinRegDroid \(O(M)\) vs XGBoost.</p>
+</section>
+
+</body>
+</html>

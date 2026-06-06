@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinRegDroid — Phase-by-Phase Implementation Plan</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --accent2: #7ee787; --warn: #f0b429; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); margin-right: 1rem; }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.35rem; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; }
+    h3 { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.questions { border-left: 4px solid var(--warn); }
+    section.done { border-left: 4px solid var(--accent2); }
+    pre, pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; font-family: 'Cascadia Code', Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; color: var(--accent); }
+    ul.checklist { list-style: none; padding-left: 0; }
+    ul.checklist li::before { content: "☐ "; color: var(--warn); }
+    ul.checklist li.done::before { content: "☑ "; color: var(--accent2); }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    .tag { display: inline-block; background: #21262d; border: 1px solid var(--border); border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.82rem; color: var(--accent2); margin-right: 0.35rem; }
+    .callout { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin: 0.75rem 0; }
+    .callout.warn { background: #2e2410; border-color: var(--warn); }
+    p { margin: 0.65rem 0; }
+    code { font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.88em; }
+  </style>
+</head>
+<body>
+
+<nav class="top">
+  <a href="linregdroid_permission_classifier.html">← Architecture</a>
+  <a href="../Pipeline_full_concept.html">Pipeline guide (P0–P8)</a>
+</nav>
+
+<h1>LinRegDroid — Implementation Plan</h1>
+<p class="meta">
+  Paper: Şahin et al., IEEE Access 2022 · Aligned with <code>Pipeline_full_concept.html</code> (P0–P8 + A1–A4)<br>
+  Proposed <code>model_id</code>: <strong>linregdroid_permission</strong> · <code>domain</code>: <strong>manifest_permissions</strong> · On-device: <strong>yes</strong> (single dot product + threshold)
+</p>
+
+<section class="prereq">
+<h2>Scope &amp; role in thesis</h2>
+<p>
+  LinRegDroid is an <strong>ultra-minimal permission-only baseline</strong>: binary permission vector \(\mathbf{p} \in \{0,1\}^M\),
+  multiple linear regression by least squares, then LinRegDroid1 (threshold 0.5) or LinRegDroid2 (nearest class).
+  Optional bagging (Ensemble-1 / Ensemble-2) improves F-measure on AMD in the paper (~0.956 with mixed learners).
+</p>
+<p>
+  This folder is a <strong>self-contained Python project</strong> under <code>linear/</code>. It does not depend on Dex-header or ASCNN code,
+  but reuses the same <strong>corpus layout</strong>, <strong>temporal split</strong>, and <strong>metrics JSON</strong> conventions as BM1 / Pattern A/B.
+</p>
+<div class="callout">
+  <strong>Label encoding note:</strong> The paper trains MLR with \(y=1\) benign, \(y=0\) malware.
+  Your thesis pipelines use <code>label 0 = benign</code>, <code>label 1 = malware</code>.
+  Implementation must document and apply an explicit mapping at train, eval, and ONNX export time (see §Label mapping).
+</div>
+</section>
+
+<section class="questions">
+<h2>Resolved decisions (2026-06-06)</h2>
+<table>
+<tr><th>#</th><th>Decision</th><th>Your choice</th></tr>
+<tr><td>1</td><td>Dataset</td><td><a href="https://huggingface.co/buckets/sakhawat2088/android-apks">Hugging Face android-apks</a> (~13.5k APKs, 2020–2023)</td></tr>
+<tr><td>2</td><td><code>APK_ROOT</code></td><td>Placeholder in config; set via <code>APK_ROOT=...</code> when corpus is mounted</td></tr>
+<tr><td>3</td><td>Permission vocabulary</td><td><strong>All unique permissions</strong> from train APKs only; <strong>no intents</strong>; tokens use VigiDroid normalization (<code>permissions::send_sms</code>)</td></tr>
+<tr><td>4</td><td>Classifier</td><td><strong>LinRegDroid1</strong> (threshold 0.5 on <code>malware_probability</code>); LinRegDroid2 available in code for comparison</td></tr>
+<tr><td>5</td><td>Training</td><td>sklearn least-squares fit + <strong>PyTorch wrapper</strong> for ONNX export</td></tr>
+<tr><td>6</td><td>Split policy</td><td><strong>2020+2021 only:</strong> 70% train / 15% val / 15% dev_test (stratified). <strong>2022+2023:</strong> <code>temporal_holdout</code> — evaluate later with <code>EVAL_TEMPORAL=1</code></td></tr>
+<tr><td>7</td><td>Android</td><td>Export bundle ready for <code>vigidroid/.../assets/models/linregdroid_permission/</code>; <strong>do not modify VigiDroid now</strong></td></tr>
+<tr><td>8</td><td>Parser</td><td><code>pyaxmlparser</code></td></tr>
+<tr><td>9</td><td>ONNX output</td><td><code>malware_probability</code> in [0, 1] (thesis convention: 0=benign, 1=malware)</td></tr>
+<tr><td>10</td><td>VigiDroid alignment</td><td>Same permission token format as <code>ScanService.normalizePermission</code> so Java can reuse the same string→index mapping when ensemble integration runs</td></tr>
+</table>
+<p><strong>Ensemble goal (later):</strong> Run LinRegDroid + existing VigiDroid models in parallel; compare verdict, memory, and latency. Weights/thresholds JSON can ship in assets when you wire the orchestrator.</p>
+</section>
+
+<section>
+<h2>Architecture → pipeline mapping</h2>
+<pre class="flow">Paper component          Pipeline phase(s)
+─────────────────────────────────────────────────────────
+A  Permission extraction  P1 (index) + P2 (vocab + shards)
+B  MLR least squares       P4 (model) + P5 (fit on train)
+C  LinRegDroid1 threshold  P4 (post-process) + P6 (eval)
+D  LinRegDroid2 nearest    P4 variant + P6 comparison
+   Bagging ensemble       P5 extension (optional P5b)
+   ONNX deploy             P7 + P8
+   Android scanner         A1–A4</pre>
+</section>
+
+<section>
+<h2>Project layout (<code>linear/</code>)</h2>
+<pre>linear/
+├── config/default.yaml
+├── requirements.txt
+├── run_linregdroid.sh              # P0 → P2 → P5 → P6 → P7 → P8
+├── linregdroid_permission_classifier.html
+├── linregdroid_implementation_plan.html   # this file
+├── scripts/
+│   ├── verify_setup.py             # P0
+│   ├── run_preprocess.sh           # P1 + P2
+│   ├── run_train.sh                # P5
+│   ├── run_evaluate.sh             # P6
+│   ├── export_onnx.py              # P7
+│   └── parity_check.py             # P8
+├── src/
+│   ├── config.py
+│   ├── constants.py
+│   ├── features/
+│   │   └── permission_vector.py    # APK → permission list → binary p
+│   ├── preprocessing/
+│   │   ├── scan_dataset.py         # P1
+│   │   ├── build_permission_vocab.py
+│   │   └── extract_to_cache.py     # P2
+│   ├── data/
+│   │   ├── store.py
+│   │   ├── dataset.py              # P3
+│   │   └── dataloaders.py
+│   ├── models/
+│   │   ├── mlr.py                  # sklearn + decision rules
+│   │   ├── linregdroid1.py
+│   │   ├── linregdroid2.py
+│   │   └── bagging_ensemble.py     # optional
+│   └── training/
+│       ├── train.py                # P5
+│       └── evaluate.py             # P6
+└── artifacts/
+    ├── dataset_index.csv
+    ├── splits/{train,val,test}.txt
+    ├── processed/shards/{train,val,test}/
+    ├── permission_vocab.json
+    ├── checkpoints/
+    ├── metrics/test_results.json
+    └── export/linregdroid_permission/</pre>
+</section>
+
+<section>
+<h2>Label mapping (thesis ↔ paper)</h2>
+<table>
+<tr><th>Convention</th><th>Benign</th><th>Malware</th><th>Used where</th></tr>
+<tr><td>Thesis (<code>dataset_index.csv</code>)</td><td><code>0</code></td><td><code>1</code></td><td>P1 indexing, P6 metrics, confusion matrix</td></tr>
+<tr><td>Paper MLR target \(y\)</td><td><code>1</code></td><td><code>0</code></td><td>P5 <code>LinearRegression.fit(X, y_paper)</code></td></tr>
+</table>
+<p>Conversion: <code>y_paper = 1 - y_thesis</code>. LinRegDroid1: predict benign if \(\hat{y} \geq 0.5\). For thesis malware F1, convert predictions back to <code>0/1</code> malware labels before sklearn metrics.</p>
+</section>
+
+<!-- P0 -->
+<section class="done">
+<h2>P0 — Config &amp; environment</h2>
+<p><span class="tag">Exit criteria</span> <code>python scripts/verify_setup.py</code> exits 0; artifact dirs created.</p>
+
+<h3>Deliverables</h3>
+<ul class="checklist">
+<li><code>config/default.yaml</code> — paths, split years, parser choice, ensemble flags</li>
+<li><code>requirements.txt</code> — numpy, scipy, scikit-learn, pyaxmlparser, PyYAML, torch (export only), onnx, onnxruntime, tqdm</li>
+<li><code>scripts/verify_setup.py</code> — import smoke test + config load</li>
+<li><code>src/config.py</code> — <code>load_config()</code>, <code>APK_ROOT</code> env override (match BM1)</li>
+</ul>
+
+<h3><code>config/default.yaml</code> (sketch)</h3>
+<pre>pipeline:
+  model_id: linregdroid_permission
+  domain: manifest_permissions
+
+paths:
+  apk_root: data/apks
+  artifacts: artifacts
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  export: artifacts/export
+
+preprocessing:
+  split_mode: stratified_development
+  development_years: [2020, 2021]
+  train_ratio: 0.70
+  val_ratio: 0.15
+  dev_test_ratio: 0.15
+  temporal_holdout_years: [2022, 2023]
+  label_mode: parent_folder
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  parser: pyaxmlparser
+  permissions_only: true      # no intent tokens
+  min_permission_freq: 1      # 1 = full vocab (paper)
+
+model:
+  variant: linregdroid1       # linregdroid1 | linregdroid2
+  fit_intercept: true
+  decision_threshold: 0.5     # LinRegDroid1 only
+
+ensemble:
+  enabled: false
+  n_estimators: 5
+  mode: linreg_only           # linreg_only | mixed (Ensemble-2)
+
+evaluation:
+  threshold: 0.5
+  metrics: [accuracy, f1, roc_auc]</pre>
+
+<h3>Tasks</h3>
+<ol class="steps">
+<li>Create folder scaffold above; add <code>.gitignore</code> for <code>artifacts/</code>, <code>data/</code>.</li>
+<li>Wire <code>scripts/activate_thesis_env.sh</code> to repo-root <code>thesis_venv</code> (same as BM1).</li>
+<li>Document <code>APK_ROOT=/path/to/thesis_full_dataset</code> in <code>run_linregdroid.sh</code> header comment.</li>
+</ol>
+</section>
+
+<!-- P1 -->
+<section>
+<h2>P1 — Dataset indexing</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/dataset_index.csv</code> with train/test from year rule; deduplicated SHA-256.</p>
+
+<h3>Deliverables</h3>
+<ul class="checklist">
+<li><code>artifacts/dataset_index.csv</code></li>
+<li><code>artifacts/splits/train.txt</code>, <code>val.txt</code>, <code>test.txt</code></li>
+<li>Corrupt APKs skipped with log entry</li>
+</ul>
+
+<h3>Index columns</h3>
+<table>
+<tr><th>Column</th><th>Description</th></tr>
+<tr><td><code>path</code></td><td>Relative path under <code>apk_root</code></td></tr>
+<tr><td><code>sha256</code></td><td>Content hash for dedup and shard filenames</td></tr>
+<tr><td><code>label</code></td><td>0 benign, 1 malware (thesis convention)</td></tr>
+<tr><td><code>year</code></td><td>Parent folder (2020–2023)</td></tr>
+<tr><td><code>split</code></td><td><code>train</code> | <code>val</code> | <code>test</code></td></tr>
+<tr><td><code>apk_size_bytes</code></td><td>Optional metadata</td></tr>
+</table>
+
+<h3>Split policy</h3>
+<ul>
+<li><strong>Train:</strong> APKs in <code>2020/</code>, <code>2021/</code> minus val holdout</li>
+<li><strong>Val:</strong> 10% stratified sample from train years (seed 42)</li>
+<li><strong>Test:</strong> all APKs in <code>2022/</code>, <code>2023/</code> — never used for vocab or coefficient fitting</li>
+</ul>
+
+<h3>Script: <code>src/preprocessing/scan_dataset.py</code></h3>
+<ol class="steps">
+<li>Walk <code>apk_root/{year}/{benign|malware}/*.apk</code>.</li>
+<li>Compute SHA-256; drop duplicate hashes (keep first path).</li>
+<li>Assign <code>split</code> from year + val_fraction holdout.</li>
+<li>Write CSV and split list files.</li>
+</ol>
+
+<div class="callout warn"><strong>Do not</strong> copy APKs into the repo — manifests only.</div>
+</section>
+
+<!-- P2 -->
+<section>
+<h2>P2 — Permission feature extraction</h2>
+<p><span class="tag">Exit criteria</span> Sharded <code>.npz</code> per APK, frozen <code>permission_vocab.json</code>, <code>failed_apks.log</code>.</p>
+
+<h3>Component A implementation</h3>
+<p>For each APK, extract only <code>&lt;uses-permission android:name="…"&gt;</code> via <code>pyaxmlparser</code> (<code>APK.get_permissions()</code>). No intent actions/categories (unlike Pattern A/B <code>manifest_bow.py</code>).</p>
+
+<h3>Vocabulary (train split only)</h3>
+<ol class="steps">
+<li>Scan all <strong>train</strong> APKs (not val/test); collect unique permission strings \(\mathcal{P}\).</li>
+<li>Sort lexicographically for stable index order; save <code>artifacts/permission_vocab.json</code>:
+  <code>{ "permissions": [...], "M": 137, "version": 1 }</code>.</li>
+<li>At inference: permissions not in \(\mathcal{P}\) are ignored (paper rule).</li>
+</ol>
+
+<h3>Per-APK encoding</h3>
+<p>\[ p_{i,k} = \mathbb{1}[\text{perm}_k \in \text{Manifest}(i)] \]</p>
+<p>Store <code>p</code> as <code>float32</code> vector of length \(M\) (0/1).</p>
+
+<h3>Shard layout</h3>
+<pre>artifacts/processed/shards/{split}/{sha256}.npz
+  p: (M,) float32
+  label: int64 scalar (thesis 0/1)
+  sha256: str (optional)</pre>
+
+<h3>Script chain (<code>scripts/run_preprocess.sh</code>)</h3>
+<ol class="steps">
+<li><code>scan_dataset.py</code> (if index missing)</li>
+<li><code>build_permission_vocab.py</code> — train APKs only</li>
+<li><code>extract_to_cache.py</code> — all splits using frozen vocab; resume via <code>processed_ids.txt</code></li>
+</ol>
+
+<h3>Failure handling</h3>
+<p>Unreadable manifest → append to <code>artifacts/failed_apks.log</code>; skip sample. Empty permission list is valid (all-zero vector) — do not treat as failure unless parser throws.</p>
+</section>
+
+<!-- P3 -->
+<section>
+<h2>P3 — Dataset &amp; DataLoader</h2>
+<p><span class="tag">Exit criteria</span> <code>PermissionDataset</code> loads shards; batch shape <code>(B, M)</code>; train loader excludes test.</p>
+
+<h3>Deliverables</h3>
+<ul class="checklist">
+<li><code>src/data/store.py</code> — read <code>manifest_{split}.json</code> or glob shards</li>
+<li><code>src/data/dataset.py</code> — <code>PermissionDataset</code> returns <code>(p, label)</code></li>
+<li><code>src/data/dataloaders.py</code> — train / val / test loaders</li>
+<li><code>scripts/verify_dataloader.py</code> — print batch stats, <code>M</code>, class counts</li>
+</ul>
+
+<h3>Notes</h3>
+<p>No augmentation. No normalization (binary features). Training loop may use full-matrix fit (load all train <code>X</code> at once) since \(M \approx 135\)–400 and \(N \approx 10k\) — fits in RAM; DataLoader still useful for eval batches.</p>
+</section>
+
+<!-- P4 -->
+<section>
+<h2>P4 — Model definition</h2>
+<p><span class="tag">Exit criteria</span> Forward pass: <code>p → ŷ → class</code> matches paper Algorithms 1 &amp; 2.</p>
+
+<h3>Component B — MLR</h3>
+<p>\[ \hat{y}_i = \beta_0 + \sum_{k=1}^{M} \beta_k p_{i,k} \]</p>
+<p>Fit via sklearn <code>LinearRegression(fit_intercept=True)</code> on \((\mathbf{X}, \mathbf{y}_\text{paper})\) — equivalent to normal equations \((\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{y}\).</p>
+
+<h3>Component C — <code>LinRegDroid1</code></h3>
+<pre>def predict_class(y_hat: float, threshold: float = 0.5) -> int:
+    # returns thesis label: 0 benign, 1 malware
+    benign_paper = y_hat >= threshold
+    return 0 if benign_paper else 1</pre>
+
+<h3>Component D — <code>LinRegDroid2</code></h3>
+<pre>def predict_class_nearest(y_hat: float) -> int:
+    c = min((0, 1), key=lambda k: abs(y_hat - k))  # paper encoding
+    return 0 if c == 1 else 1  # map paper c to thesis label</pre>
+
+<h3>PyTorch mirror (for ONNX)</h3>
+<p><code>nn.Linear(M, 1, bias=True)</code> with weights copied from sklearn — used only at export/parity, not for gradient training.</p>
+
+<h3>Optional — Bagging (<code>bagging_ensemble.py</code>)</h3>
+<ul>
+<li><strong>Ensemble-1:</strong> \(B=5\) bootstrap samples of train set; each fits MLR; majority vote on LinRegDroid1 labels.</li>
+<li><strong>Ensemble-2:</strong> Mix MLR, <code>LinearSVC</code>, <code>DecisionTreeClassifier</code> on bootstrap samples; majority vote.</li>
+</ul>
+</section>
+
+<!-- P5 -->
+<section>
+<h2>P5 — Training (coefficient fitting)</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/checkpoints/linregdroid1.joblib</code> (or <code>.pt</code> mirror) + fitted coefficients JSON.</p>
+
+<h3>Script: <code>src/training/train.py</code></h3>
+<ol class="steps">
+<li>Load all train shards → \(\mathbf{X} \in \mathbb{R}^{N \times M}\), labels → \(\mathbf{y}_\text{paper}\).</li>
+<li>Fit <code>LinearRegression</code> (single model or bagging ensemble).</li>
+<li>Save: coefficients, intercept, <code>permission_vocab.json</code> copy, training metadata (N, M, date).</li>
+<li>Log top-|β_k| permissions for thesis interpretability table.</li>
+</ol>
+
+<h3>Checkpoint contents</h3>
+<pre>artifacts/checkpoints/
+  linregdroid1.joblib       # sklearn model
+  coefficients.json         # β0, β[], permission names
+  training_meta.json        # n_train, M, variant, git hash</pre>
+
+<div class="callout"><strong>No GPU required.</strong> Fitting completes in seconds on CPU for thesis-scale data.</div>
+</section>
+
+<!-- P6 -->
+<section>
+<h2>P6 — Evaluation (test split 2022+2023)</h2>
+<p><span class="tag">Exit criteria</span> <code>artifacts/metrics/test_results.json</code> + confusion matrix PNG/CSV.</p>
+
+<h3>Script: <code>src/training/evaluate.py</code></h3>
+<ol class="steps">
+<li>Load test shards and fitted model.</li>
+<li>Compute \(\hat{y}\) for each APK; apply LinRegDroid1 (and optionally LinRegDroid2 for comparison table).</li>
+<li>Report on <strong>test only</strong>: accuracy, F1 (malware as positive), ROC-AUC.</li>
+<li>Compare LinRegDroid1 vs LinRegDroid2 vs bagging if enabled.</li>
+<li>Write JSON matching pipeline guide schema.</li>
+</ol>
+
+<h3>Output schema</h3>
+<pre>{
+  "model_id": "linregdroid_permission",
+  "split": "test",
+  "train_years": [2020, 2021],
+  "test_years": [2022, 2023],
+  "n_samples": 0,
+  "M_permissions": 0,
+  "variant": "linregdroid1",
+  "metrics": { "accuracy": 0.0, "f1": 0.0, "roc_auc": 0.0 },
+  "confusion_matrix": [[tn, fp], [fn, tp]],
+  "threshold": 0.5,
+  "linregdroid2_f1": null
+}</pre>
+</section>
+
+<!-- P7 -->
+<section>
+<h2>P7 — ONNX export bundle</h2>
+<p><span class="tag">Exit criteria</span> Complete folder under <code>artifacts/export/linregdroid_permission/</code> ready to copy into VigiDroid assets.</p>
+
+<h3>Bundle layout</h3>
+<pre>artifacts/export/linregdroid_permission/
+├── model.onnx                    # Linear(M, 1): input p → output y_hat
+├── export_manifest.json
+├── thresholds.json               # LinRegDroid1: 0.5
+├── features/
+│   └── permission_vocab.json
+├── coefficients.json             # human-readable β
+└── parity_samples/
+    ├── sample_000.npz            # p vector
+    └── expected.json             # y_hat from Python reference</pre>
+
+<h3><code>export_manifest.json</code></h3>
+<pre>{
+  "model_id": "linregdroid_permission",
+  "domain": "manifest_permissions",
+  "opset": 14,
+  "inputs": [{"name": "permissions", "shape": [1, "M"], "dtype": "float32"}],
+  "outputs": [
+    {"name": "regression_score", "dtype": "float32"},
+    {"name": "malware_prob", "dtype": "float32", "note": "1 - clamp(regression_score,0,1)"}
+  ],
+  "decision_rule": "linregdroid1",
+  "decision_threshold": 0.5,
+  "label_encoding": "paper_train: benign=1 malware=0; app: 0=benign 1=malware",
+  "preprocessing_version": "2026-06-06",
+  "multidex_mode": "n/a"
+}</pre>
+
+<h3>Script: <code>scripts/export_onnx.py</code></h3>
+<ol class="steps">
+<li>Copy sklearn weights into <code>torch.nn.Linear</code>.</li>
+<li>Export with opset 14; dynamic or fixed <code>M</code> from vocab.</li>
+<li>Generate ~10 parity samples from held-out val APKs.</li>
+</ol>
+</section>
+
+<!-- P8 -->
+<section>
+<h2>P8 — Parity check (Python)</h2>
+<p><span class="tag">Exit criteria</span> Max |Δ| between sklearn ŷ and ONNX output ≤ 1e-4 on all parity samples.</p>
+
+<h3>Script: <code>scripts/parity_check.py</code></h3>
+<ol class="steps">
+<li>Load parity <code>.npz</code> inputs.</li>
+<li>Run sklearn / reference forward.</li>
+<li>Run ONNX Runtime inference.</li>
+<li>Assert element-wise tolerance; write <code>artifacts/metrics/parity_report.json</code>.</li>
+</ol>
+</section>
+
+<!-- Android -->
+<section>
+<h2>A1–A4 — Android integration (VigiDroid)</h2>
+<p>Execute after P8. Permission extraction on-device must match Python semantics exactly.</p>
+
+<table>
+<tr><th>Step</th><th>Work</th><th>Deliverable</th></tr>
+<tr><td><strong>A1</strong></td><td><code>PermissionFeatureExtractor</code>: parse manifest, load <code>permission_vocab.json</code>, build binary <code>p</code></td><td>Java/Kotlin class under <code>vigidroid/...</code></td></tr>
+<tr><td><strong>A2</strong></td><td>ONNX Runtime: input <code>[1,M]</code> float32 → <code>regression_score</code>; apply LinRegDroid1 threshold; map to scan result</td><td>Model runner registered as <code>linregdroid_permission</code></td></tr>
+<tr><td><strong>A3</strong></td><td>Append stage to scan metrics JSON: <code>parse_ms</code>, <code>vectorize_ms</code>, <code>inference_ms</code>, score</td><td>Device metrics compatible with thesis plots</td></tr>
+<tr><td><strong>A4</strong></td><td>Instrumented test: Java extractor + ONNX vs <code>parity_samples/</code></td><td>JUnit / androidTest green</td></tr>
+</table>
+
+<div class="callout warn">
+  VigiDroid already normalizes permissions for XGBoost (<code>permissions::foo_bar</code>). LinRegDroid must use the <strong>same raw permission strings as Python</strong> (<code>android.permission.SEND_SMS</code>) unless you retrain with normalized names — decide in Q8/Q9 follow-up.
+</div>
+</section>
+
+<!-- Orchestration -->
+<section>
+<h2>Execution order</h2>
+<pre class="flow">P0 verify_setup
+  → P1 scan_dataset
+  → P2 build_permission_vocab + extract_to_cache
+  → P3 verify_dataloader
+  → P5 train (P4 code must exist)
+  → P6 evaluate (test 2022+2023)
+  → P7 export_onnx
+  → P8 parity_check
+  → A1–A4 (optional, VigiDroid)
+
+Single entry:  ./run_linregdroid.sh
+Env override:  APK_ROOT=/path/to/thesis_full_dataset ./run_linregdroid.sh</pre>
+</section>
+
+<section>
+<h2>Phase summary table</h2>
+<table>
+<tr><th>Phase</th><th>Name</th><th>Key scripts</th><th>Primary outputs</th></tr>
+<tr><td>P0</td><td>Config &amp; env</td><td><code>verify_setup.py</code></td><td><code>default.yaml</code>, dirs</td></tr>
+<tr><td>P1</td><td>Indexing</td><td><code>scan_dataset.py</code></td><td><code>dataset_index.csv</code>, splits</td></tr>
+<tr><td>P2</td><td>Permission extract</td><td><code>build_permission_vocab.py</code>, <code>extract_to_cache.py</code></td><td>shards, <code>permission_vocab.json</code></td></tr>
+<tr><td>P3</td><td>DataLoader</td><td><code>verify_dataloader.py</code></td><td><code>PermissionDataset</code></td></tr>
+<tr><td>P4</td><td>Model</td><td><code>mlr.py</code>, <code>linregdroid1/2.py</code></td><td>Decision rules + sklearn wrapper</td></tr>
+<tr><td>P5</td><td>Training</td><td><code>train.py</code></td><td><code>linregdroid1.joblib</code>, coefficients</td></tr>
+<tr><td>P6</td><td>Evaluation</td><td><code>evaluate.py</code></td><td><code>test_results.json</code></td></tr>
+<tr><td>P7</td><td>ONNX export</td><td><code>export_onnx.py</code></td><td>export bundle</td></tr>
+<tr><td>P8</td><td>Parity</td><td><code>parity_check.py</code></td><td><code>parity_report.json</code></td></tr>
+<tr><td>A1–A4</td><td>Android</td><td>VigiDroid PR</td><td>On-device scans + parity test</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Thesis comparison hooks</h2>
+<table>
+<tr><th>Model</th><th>Features</th><th>Dim</th><th>Role vs LinRegDroid</th></tr>
+<tr><td>LinRegDroid (this)</td><td>Permissions only</td><td>~135–400</td><td>Minimal linear baseline</td></tr>
+<tr><td>Pattern A/B manifest BoW</td><td>Permissions + intents</td><td>4381</td><td>Richer manifest signal + ASCNN</td></tr>
+<tr><td>BM1</td><td>Dex header</td><td>104</td><td>Structure-only baseline</td></tr>
+<tr><td>VigiDroid XGBoost</td><td>Manifest structural</td><td>~2500</td><td>Production-weighted ensemble member</td></tr>
+</table>
+<p>Report LinRegDroid test F1 alongside BM1 and Pattern B on the <strong>same temporal split</strong> for fair thesis tables.</p>
+</section>
+
+</body>
+</html>
