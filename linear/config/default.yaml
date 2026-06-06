@@ -1,0 +1,54 @@
+# LinRegDroid permission-only baseline — default configuration
+# Dataset: https://huggingface.co/buckets/sakhawat2088/android-apks
+# Override corpus path: APK_ROOT=/path/to/android-apks ./run_linregdroid.sh
+
+pipeline:
+  model_id: linregdroid_permission
+  domain: manifest_permissions
+  # Future VigiDroid copy target (do not modify vigidroid repo until integration sprint)
+  android_assets_target: vigidroid/app/src/main/assets/models/linregdroid_permission/
+
+paths:
+  apk_root: data/apks
+  artifacts: artifacts
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  export: artifacts/export
+  dataset_index: artifacts/dataset_index.csv
+  splits_dir: artifacts/splits
+  failed_apks_log: artifacts/failed_apks.log
+  permission_vocab: artifacts/permission_vocab.json
+  latest_checkpoint: artifacts/checkpoints/linregdroid.pth
+
+preprocessing:
+  # Development split: 2020+2021 only → 70% train / 15% val / 15% dev_test
+  split_mode: stratified_development
+  development_years: [2020, 2021]
+  train_ratio: 0.70
+  val_ratio: 0.15
+  dev_test_ratio: 0.15
+  temporal_holdout_years: [2022, 2023]
+  random_seed: 42
+  label_mode: parent_folder
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  parser: pyaxmlparser
+  # Permission tokens only (no intents); names match VigiDroid ScanService.normalizePermission
+  permissions_only: true
+  token_normalization: vigidroid
+
+model:
+  variant: linregdroid1
+  fit_intercept: true
+  decision_threshold: 0.5
+
+training:
+  save_sklearn: true
+
+evaluation:
+  threshold: 0.5
+  metrics: [accuracy, f1, roc_auc]
+
+export:
+  onnx_opset: 14
+  num_parity_samples: 10

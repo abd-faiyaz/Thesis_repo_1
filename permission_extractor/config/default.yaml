@@ -1,0 +1,72 @@
+# MLDP-pruned permission classifier
+# Dataset: https://huggingface.co/buckets/sakhawat2088/android-apks
+
+pipeline:
+  model_id: mldp_pruned_permission
+  domain: manifest_permissions_mldp
+  android_assets_target: vigidroid/app/src/main/assets/models/mldp_pruned_permission/
+
+paths:
+  apk_root: data/apks
+  artifacts: artifacts
+  mldp_dir: artifacts/mldp
+  transactions_dir: artifacts/transactions
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  export: artifacts/export
+  dataset_index: artifacts/dataset_index.csv
+  splits_dir: artifacts/splits
+  failed_apks_log: artifacts/failed_apks.log
+  selected_permissions: artifacts/mldp/selected_permissions.json
+  latest_checkpoint: artifacts/checkpoints/mldp_pruned.pth
+
+preprocessing:
+  split_mode: stratified_development
+  development_years: [2020, 2021]
+  train_ratio: 0.70
+  val_ratio: 0.15
+  dev_test_ratio: 0.15
+  temporal_holdout_years: [2022, 2023]
+  random_seed: 42
+  label_mode: parent_folder
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  parser: pyaxmlparser
+  token_normalization: vigidroid
+
+mldp:
+  prnr:
+    top_k: 80
+    min_rate_delta: 0.02
+    epsilon: 1.0e-6
+  support:
+    min_support: 0.01
+    max_support: 0.95
+  association:
+    min_support: 0.05
+    min_confidence: 0.70
+    min_lift: 1.2
+    algorithm: fpgrowth
+  max_permissions: 40
+  min_permissions: 5
+
+model:
+  candidates: [linear_svc, tiny_mlp]
+  selection_metric: val_f1
+  linear_svc:
+    C: 1.0
+    class_weight: balanced
+  tiny_mlp:
+    hidden_dim: 32
+    learning_rate: 0.01
+    epochs: 100
+    batch_size: 256
+
+evaluation:
+  threshold: 0.5
+  metrics: [accuracy, f1, roc_auc]
+  run_ablation_full_permissions: false
+
+export:
+  onnx_opset: 14
+  num_parity_samples: 10

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinRegDroid Permission Classifier — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+  </style>
+</head>
+<body>
+<nav class="top">
+  <a href="linregdroid_implementation_plan.html">Implementation plan (P0–P8)</a>
+</nav>
+<h1>LinRegDroid Permission Classifier</h1>
+<p class="meta">Paper: Şahin et al., IEEE Access 2022 — <em>LinRegDroid: Detection of Android Malware Using Multiple Linear Regression Models-Based Classifiers</em></p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>APK &amp; manifest:</strong> An APK is a ZIP archive; <code>AndroidManifest.xml</code> lists declared <code>&lt;uses-permission&gt;</code> names — no code execution needed for this model.</p>
+<p><strong>Linear regression:</strong> Fit a weighted sum of inputs to predict a continuous target. Here the target is a class encoding (benign ≈ 1, malware ≈ 0), so regression acts as a linear classifier.</p>
+<p><strong>Multiple linear regression (MLR):</strong> Many features at once: \(y = \beta_0 + \sum_k \beta_k x_k\). Coefficients \(\beta\) are found by <strong>least squares</strong> (minimize squared error on training labels).</p>
+<p><strong>Bagging:</strong> Train several models on random bootstrap samples of the training set; aggregate predictions by majority vote or averaging — reduces variance.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission feature extraction</li>
+<li>Component B — Multiple linear regression (coefficient learning)</li>
+<li>Component C — LinRegDroid1 (threshold rule)</li>
+<li>Component D — LinRegDroid2 (nearest-class rule)</li>
+<li>Ensemble / bagging mechanism</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine you have <strong>50,000 APK files</strong> and need malware labels before install. Heavy models (deep nets, large SVMs) are accurate but slow on phones and in batch scanners. Şahin et al. ask: for <strong>permission-only</strong> static detection, is a <strong>multiple linear regression</strong> model enough? <strong>LinRegDroid</strong> answers yes: build a binary permission vector from <code>AndroidManifest.xml</code>, learn coefficients \(\boldsymbol{\beta}\) by least squares, map the continuous score to {benign, malware} with <strong>LinRegDroid1</strong> (threshold 0.5) or <strong>LinRegDroid2</strong> (nearest label 0/1). Optional <strong>bagging</strong> over linear models, linear-SVM, or decision trees pushes F-measure to <strong>0.956</strong> on the AMD dataset (paper). The architecture is manifest-only, ~135–400 dimensions, and equivalent to one linear layer + decision rule — ideal as an ultra-minimal baseline in your thesis stack.</p>
+</section>
+
+<section>
+<h2>Component A — Permission feature extraction</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Every <code>android:name</code> in <code>&lt;uses-permission&gt;</code> tags inside <code>AndroidManifest.xml</code> for each APK.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Permissions are the cheapest high-level security signal on Android: malware that sends premium SMS, reads contacts, or installs packages must often declare dangerous permissions visible in the manifest. The paper uses the <strong>full</strong> permission vocabulary (not pruned subsets) to match classic Drebin-style permission detectors.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip the APK; locate <code>AndroidManifest.xml</code> (binary XML — decode with AAPT2, Apktool, or equivalent).</li>
+<li>Enumerate all <code>&lt;uses-permission android:name="…"&gt;</code> strings.</li>
+<li>From the <strong>training corpus only</strong>, build vocabulary \(\mathcal{P} = \{\text{perm}_1,\ldots,\text{perm}_M\}\) (paper reports \(M \approx 135\)–400 depending on dataset).</li>
+<li>For APK \(i\), set \(p_{i,k} = 1\) if \(\text{perm}_k\) appears, else \(0\).</li>
+<li>Freeze \(\mathcal{P}\) at inference; permissions not in vocabulary are ignored.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ p_{i,k} = \begin{cases} 1 & \text{if } \text{perm}_k \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{p}_i \in \{0,1\}^{M} \]</p>
+<p>Stack \(N\) training APKs into design matrix \(\mathbf{X} \in \mathbb{R}^{N \times M}\) (each row \(\mathbf{p}_i^T\)).</p>
+<ul class="vars"><li><strong>\(M\)</strong> — permission vocabulary size (feature dimension)</li><li><strong>\(p_{i,k}\)</strong> — bit for permission \(k\) in APK \(i\)</li><li><strong>\(\mathbf{p}_i\)</strong> — permission feature row fed to regression</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Raw APK
+  │
+  └─► AndroidManifest.xml
+         │
+         └─► &lt;uses-permission&gt; tags
+                │
+                ▼
+         Permission vector  p  (1×M)
+         e.g. M = 1×200  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{p} \in \{0,1\}^{M}\). This vector is the sole input to MLR training and to LinRegDroid1/2 at inference.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Deliberately minimal feature set — no intents, no API calls, no Dex — to prove linear permission models remain competitive with SVM/RF on several benchmarks.</div>
+</section>
+<section>
+<h2>Component B — Multiple linear regression (coefficient learning)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Labeled training pairs \((\mathbf{p}_i, y_i)\) where \(y_i \in \{0,1\}\) encodes class (paper: 0 = malware, 1 = benign).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Linear models train in milliseconds, require no GPU, and yield interpretable \(\beta_k\): positive \(\beta_k\) means permission \(k\) pushes the score toward benign. Least squares has a closed-form solution on moderate \(M\).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Form label vector \(\mathbf{y} \in \mathbb{R}^N\) from training malware/benign flags.</li>
+<li>Build \(\mathbf{X}\) with rows \(\mathbf{p}_i^T\) (add column of ones if using intercept \(\beta_0\)).</li>
+<li>Solve normal equations for coefficients \(\boldsymbol{\beta}\).</li>
+<li>Store \(\beta_0, \beta_1, \ldots, \beta_M\) for deployment (ONNX: single <code>Linear(M,1)</code>).</li>
+<li>At inference, compute continuous score \(\hat{y}_i\) for each new APK.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>Model:</strong> \[ \hat{y}_i = \beta_0 + \sum_{k=1}^{M} \beta_k \, p_{i,k} = \beta_0 + \boldsymbol{\beta}^T \mathbf{p}_i \]</p>
+<p><strong>Training (least squares):</strong> \[ \boldsymbol{\beta}^* = \arg\min_{\boldsymbol{\beta}} \|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2 \quad \Rightarrow \quad \boldsymbol{\beta}^* = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{y} \]</p>
+<ul class="vars"><li><strong>\(\hat{y}_i\)</strong> — continuous predicted score (not yet a class label)</li><li><strong>\(\beta_0\)</strong> — intercept bias term</li><li><strong>\(\boldsymbol{\beta}\)</strong> — weight vector over permissions</li><li><strong>\(\mathbf{X}, \mathbf{y}\)</strong> — training design matrix and labels</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Training APKs (N)
+         │
+         ├─► X  (N×M)  permission matrix
+         └─► y  (N×1)  labels
+                │
+                ▼
+         Least squares  →  β*  (M+1 coeffs)
+                │
+                ▼
+         Deploy:  ŷ = β0 + β^T p</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs learned \(\boldsymbol{\beta}^*\) and produces \(\hat{y}_i \in \mathbb{R}\) per APK. \(\hat{y}_i\) feeds <strong>LinRegDroid1</strong> or <strong>LinRegDroid2</strong> decision rules.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard XGBoost/SVM:</strong> No kernels, no trees — pure linear boundary in permission space; smallest possible model for ablation vs your 2500-d manifest pipeline.</div>
+</section>
+<section>
+<h2>Component C — LinRegDroid1 (threshold classifier, Algorithm 1)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Continuous score \(\hat{y}_i\) from Component B for a single test APK.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Regression outputs real numbers, not probabilities. A fixed threshold at 0.5 (midpoint between encoded labels 0 and 1) is the simplest calibration-free decision rule — same spirit as sigmoid + 0.5 cutoff.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Compute \(\hat{y}_i = \beta_0 + \boldsymbol{\beta}^T \mathbf{p}_i\) for the APK.</li>
+<li>Compare \(\hat{y}_i\) to threshold \(t = 0.5\).</li>
+<li>If \(\hat{y}_i \geq 0.5\), assign <strong>benign</strong>; else <strong>malware</strong>.</li>
+<li>Return hard label (and optionally \(\hat{y}_i\) as confidence proxy).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{class}_i = \begin{cases} \text{benign} & \text{if } \hat{y}_i \geq 0.5 \\ \text{malware} & \text{otherwise} \end{cases} \]</p>
+<ul class="vars"><li><strong>\(t = 0.5\)</strong> — fixed decision threshold (paper Algorithm 1)</li><li><strong>\(\hat{y}_i\)</strong> — regression output before thresholding</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">p  (1×M)  →  ŷ = β0 + β^T p  (scalar)
+                │
+                ▼
+         ŷ ≥ 0.5 ?  ──Yes──► benign
+                │
+               No
+                ▼
+            malware</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs binary class label. In bagging ensembles, each base LinRegDroid1 model contributes one vote.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> One comparison operation at inference — negligible latency after dot product.</div>
+</section>
+<section>
+<h2>Component D — LinRegDroid2 (nearest-class rule, Algorithm 2)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Same continuous \(\hat{y}_i\) as LinRegDroid1; alternative discretization when scores cluster away from 0.5.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>If \(\hat{y}_i = 0.72\), threshold rule says benign; if \(\hat{y}_i = 0.48\), threshold says malware. Nearest-class assigns whichever of {0, 1} is closer in absolute distance — handles scores that drift above 1 or below 0 from linear extrapolation.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Compute \(\hat{y}_i\) as in Component B.</li>
+<li>Consider candidate encodings \(c \in \{0, 1\}\) (malware, benign).</li>
+<li>Pick \(c^* = \arg\min_{c} |\hat{y}_i - c|\).</li>
+<li>Map \(c^*\) back to class name.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{class}_i = \arg\min_{c \in \{0,1\}} |\hat{y}_i - c| \]</p>
+<p>Example: \(\hat{y}_i = 0.35\) → distances 0.35 and 0.65 to 0 and 1 → choose 0 (malware).</p>
+<ul class="vars"><li><strong>\(c\)</strong> — encoded class value (0 malware, 1 benign in paper)</li><li><strong>\(|\hat{y}_i - c|\)</strong> — distance used for nearest-label assignment</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">ŷ  (scalar)
+  │
+  ├─► |ŷ − 0|  ──┐
+  └─► |ŷ − 1|  ──┼──► argmin  →  class
+                 ┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs binary label (alternative to LinRegDroid1). Paper compares both; pick one for deployment or ensemble both as diverse voters.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from LinRegDroid1:</strong> Robust when regression scores are not well-calibrated to [0,1] but still ordered — no fixed threshold hyperparameter.</div>
+</section>
+<section>
+<h2>5. Ensemble / bagging mechanism</h2>
+<p>The paper improves LinRegDroid with <strong>bagging</strong> (bootstrap aggregating): train multiple models on random subsets of training APKs, aggregate votes.</p>
+<p><strong>Ensemble-1:</strong> Five multiple linear regression models on bootstrap samples → majority vote on LinRegDroid1/2 labels.</p>
+<p><strong>Ensemble-2:</strong> Mix linear regression, <strong>linear-SVM</strong>, and <strong>decision trees</strong> on subsets → majority vote.</p>
+<p>\[ \hat{y}_{\text{ens}} = \frac{1}{B}\sum_{b=1}^{B} f_b(\mathbf{p}), \quad \text{or} \quad \text{class} = \mathrm{mode}\big(\{f_b(\mathbf{p})\}_{b=1}^{B}\big) \]</p>
+<ul class="vars">
+<li><strong>\(B\)</strong> — number of bagged models (paper uses 5 for linear ensemble)</li>
+<li><strong>\(f_b\)</strong> — base learner trained on bootstrap sample \(b\)</li>
+</ul>
+<pre class="flow">Training set
+     │
+     ├─► bootstrap sample 1 ──► LinReg / SVM / DT  ──► vote 1
+     ├─► bootstrap sample 2 ──► LinReg / SVM / DT  ──► vote 2
+     │         ...
+     └─► bootstrap sample B ──► LinReg / SVM / DT  ──► vote B
+                    │
+                    ▼
+            Majority vote  →  final class</pre>
+<p><strong>Key novelty:</strong> Shows +1–2% F-measure over single linear model without deep learning — diversity from algorithm type (Ensemble-2) matters more than depth.</p>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Method</th><th>Dataset (paper)</th><th>F-measure / metric</th><th>Notes</th></tr>
+<tr><td>LinRegDroid1 / LinRegDroid2 (single MLR)</td><td>AMD, Drebin, etc.</td><td>~0.94–0.95 F-measure</td><td>Competitive with SVM/RF on permissions</td></tr>
+<tr><td>Ensemble-1 (5× LinReg bagging)</td><td>AMD</td><td>~0.95+</td><td>Variance reduction</td></tr>
+<tr><td class="best"><strong>Ensemble-2 / Bagging-DT (mixed learners)</strong></td><td class="best"><strong>AMD</strong></td><td class="best"><strong>0.956 F-measure</strong></td><td class="best"><strong>Best in paper on AMD</strong></td></tr>
+<tr><td>Heavy DL / large feature sets</td><td>Various</td><td>Higher cost</td><td>LinReg trades accuracy for speed/size</td></tr>
+</table>
+<p><strong>Why improvement happened:</strong> Bagging reduces overfitting when some permissions are rare or noisy; mixing SVM and trees captures mild nonlinearity that a single hyperplane misses — while staying orders of magnitude smaller than neural detectors.</p>
+<p><strong>Thesis note:</strong> Overlaps with deployed 2500-d XGBoost manifest model; use LinRegDroid as <strong>ultra-minimal baseline</strong> or with MLDP-pruned permissions to differentiate feature sets.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │
+│ (uses-permission tags)  │
+└──────────┬──────────────┘
+           ▼
+    p  (1×M)   e.g. M ≈ 135–400, binary
+           ▼
+    ŷ = β0 + β^T p   (scalar, MLR)
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+ LinRegDroid1   LinRegDroid2
+  ŷ ≥ 0.5?    nearest {0,1}
+     │           │
+     └─────┬─────┘
+           ▼
+   benign / malware
+           │
+ optional ▼
+   Bagging: B models → majority vote
+           ▼
+   final label  (F ≈ 0.956 AMD, Ensemble-2)</pre>
+</section>
+
+</body>
+</html>

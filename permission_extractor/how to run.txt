@@ -1,0 +1,17 @@
+Dataset: https://huggingface.co/buckets/sakhawat2088/android-apks
+
+cd permission_extractor
+pip install -r requirements.txt
+APK_ROOT=/path/to/android-apks ./run_mldp.sh
+
+Temporal eval (2022+2023):
+EVAL_TEMPORAL=1 APK_ROOT=/path/to/android-apks ./run_mldp.sh
+
+Or after training:
+python3 -m src.training.evaluate --splits val dev_test temporal_holdout
+
+Outputs
+artifacts/mldp/selected_permissions.json     frozen MLDP set S (≤40 perms)
+artifacts/metrics/evaluation_results.json      val + dev_test scores
+artifacts/checkpoints/mldp_pruned.pth          selected model (SVM or MLP)
+artifacts/export/mldp_pruned_permission/       ONNX bundle for VigiDroid later

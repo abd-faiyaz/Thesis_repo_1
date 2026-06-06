@@ -1,0 +1,17 @@
+Dataset: Hugging Face android-apks bucket (~13.5k APKs, year folders 2020–2023).
+cd linear
+pip install -r requirements.txt   
+APK_ROOT=/path/to/android-apks ./run_linregdroid.sh
+
+When you want 2022+2023 results:
+EVAL_TEMPORAL=1 APK_ROOT=/path/to/android-apks ./run_linregdroid.sh
+Or after training:
+python -m src.training.evaluate --splits val dev_test temporal_holdout
+
+
+Outputs to check
+File |	Purpose
+artifacts/metrics/evaluation_results.json |Val + dev_test (and optional temporal) scores
+artifacts/checkpoints/linregdroid.pth |PyTorch checkpoint
+artifacts/export/linregdroid_permission/model.onnx |Ready for VigiDroid assets
+artifacts/export/linregdroid_permission/features/permission_vocab.json |Must ship with the model on device
