@@ -26,6 +26,18 @@ public class ModelRegistryTest {
   }
 
   @Test
+  public void mldpDexheaderCascade_assetsMatchExportManifest() {
+    assertEquals(
+        "mldp_dexheader_cascade_mode_a", ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.modelId);
+    assertEquals(
+        "mldp_dexheader_cascade_mode_b", ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_B.modelId);
+    assertEquals(
+        MldpDexHeaderModeAOnnxRunner.DOMAIN, ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.domain);
+    assertTrue(
+        ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.assetsPrefix.contains("mldp_dexheader_cascade"));
+  }
+
+  @Test
   public void broadcastMldpHybrid_assetsMatchExportManifest() {
     assertEquals("broadcast_mldp_hybrid", ModelRegistry.BROADCAST_MLDP_HYBRID.modelId);
     assertEquals("manifest_mldp_perm_receiver_actions", ModelRegistry.BROADCAST_MLDP_HYBRID.domain);

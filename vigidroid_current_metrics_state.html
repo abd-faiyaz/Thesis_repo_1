@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VigiDroid — Current Metrics State</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #5eb3ff;
+      --accent2: #7ee787;
+      --warn: #f0b429;
+      --danger: #f85149;
+      --pink: #f778ba;
+      --border: #2d3a4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      padding: 2rem 1.5rem;
+      background: linear-gradient(135deg, #1a3a5c, #0f1419 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0 0 0.4rem; font-size: 1.6rem; }
+    header p { margin: 0; color: var(--muted); max-width: 52rem; }
+    main { max-width: 58rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+    h2 {
+      color: var(--accent);
+      font-size: 1.15rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3rem;
+      margin: 2rem 0 1rem;
+    }
+    h3 {
+      color: var(--accent2);
+      font-size: 1rem;
+      margin: 1.5rem 0 0.6rem;
+    }
+    p { margin: 0.5rem 0; color: var(--muted); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.75rem 0 1.25rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--surface2); color: var(--accent); }
+    tr:nth-child(even) td { background: rgba(36, 48, 68, 0.35); }
+    code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85em;
+      background: #0d1117;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: var(--pink);
+    }
+    .yes { color: var(--accent2); }
+    .no { color: var(--danger); }
+    .partial { color: var(--warn); }
+    .note {
+      background: #1c2a1c;
+      border-left: 3px solid var(--accent2);
+      padding: 0.6rem 0.9rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .warn-box {
+      background: #2a2218;
+      border-left: 3px solid var(--warn);
+      padding: 0.6rem 0.9rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    ol.limitations {
+      padding-left: 1.25rem;
+      margin: 0.5rem 0;
+    }
+    ol.limitations li {
+      margin: 1rem 0;
+      color: var(--text);
+    }
+    ol.limitations li strong { color: var(--warn); }
+    ol.limitations li .fix {
+      display: block;
+      margin-top: 0.35rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    ol.limitations li .fix em { color: var(--accent2); font-style: normal; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .toc a { color: var(--accent); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .mermaid { margin: 1rem 0; overflow-x: auto; }
+    .tier-1 td:first-child { box-shadow: inset 3px 0 0 var(--accent2); }
+    .tier-2 td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+    .tier-3 td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+    .tier-4 td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+    .impl-yes { color: var(--accent2); font-weight: 600; }
+    .impl-partial { color: var(--warn); font-weight: 600; }
+    .impl-no { color: var(--danger); }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+</head>
+<body>
+  <header>
+    <h1>VigiDroid — Current Metrics State</h1>
+    <p>
+      Snapshot of what the app collects today during APK scans, what exists at batch level,
+      and known gaps with suggested fixes. Based on
+      <code>ScanService.java</code>, <code>MetricsWriter.java</code>, and
+      <code>device_scan.schema.json</code> (2026-06-07).
+    </p>
+  </header>
+
+  <main>
+    <div class="card toc">
+      <strong>Contents</strong>
+      <ol>
+        <li><a href="#per-apk">Metrics collected per APK</a></li>
+        <li><a href="#per-model">Per-model stage metrics</a></li>
+        <li><a href="#full-scan">Full scan (batch) metrics</a></li>
+        <li><a href="#cascade">Planned model cascade (thesis Task 2)</a></li>
+        <li><a href="#limitations">Current limitations &amp; suggested fixes</a></li>
+      </ol>
+    </div>
+
+    <!-- ── 1. Per-APK ── -->
+    <h2 id="per-apk">1. Metrics collected per APK during scan</h2>
+    <p>
+      Each <code>.apk</code> in <code>/sdcard/Download/</code> produces <strong>one JSON object</strong>
+      appended to <code>getExternalFilesDir(null)/metrics/all_scan_metrics.json</code>
+      inside the <code>scans[]</code> array. Written by <code>MetricsWriter.writeScan()</code>.
+    </p>
+
+    <h3>1a. Scan metadata (top-level fields)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>JSON field</th>
+          <th>Type</th>
+          <th>Source / meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>scan_id</code></td>
+          <td>string (UUID)</td>
+          <td>Unique ID per APK scan</td>
+        </tr>
+        <tr>
+          <td><code>timestamp_ms</code></td>
+          <td>integer</td>
+          <td><code>System.currentTimeMillis()</code> when metrics are written</td>
+        </tr>
+        <tr>
+          <td><code>device.model</code></td>
+          <td>string</td>
+          <td><code>Build.MODEL</code> (e.g. <code>POCO F3</code>)</td>
+        </tr>
+        <tr>
+          <td><code>device.manufacturer</code></td>
+          <td>string</td>
+          <td><code>Build.MANUFACTURER</code></td>
+        </tr>
+        <tr>
+          <td><code>device.api</code></td>
+          <td>integer</td>
+          <td>Android API level (<code>Build.VERSION.SDK_INT</code>)</td>
+        </tr>
+        <tr>
+          <td><code>apk.name</code></td>
+          <td>string</td>
+          <td>APK filename in Download/</td>
+        </tr>
+        <tr>
+          <td><code>apk.path</code></td>
+          <td>string</td>
+          <td>Absolute path on device</td>
+        </tr>
+        <tr>
+          <td><code>apk.size_bytes</code></td>
+          <td>integer</td>
+          <td>File length on disk</td>
+        </tr>
+        <tr>
+          <td><code>apk.sha256_short</code></td>
+          <td>string (8 hex chars)</td>
+          <td>First 4 bytes of SHA-256 of <code>name:size_bytes</code> (not full APK hash)</td>
+        </tr>
+        <tr>
+          <td><code>trigger</code></td>
+          <td>string</td>
+          <td><code>manual</code> (Start Scan button) or <code>download</code> (broadcast receiver)</td>
+        </tr>
+        <tr>
+          <td><code>stages[]</code></td>
+          <td>array</td>
+          <td>Per-model results — see table below</td>
+        </tr>
+        <tr>
+          <td><code>ensemble.score</code></td>
+          <td>float (0–1)</td>
+          <td>Weighted blend of <strong>XGBoost + 1D-CNN only</strong></td>
+        </tr>
+        <tr>
+          <td><code>ensemble.decision</code></td>
+          <td>string</td>
+          <td><code>malware</code> if score ≥ 0.5, else <code>benign</code></td>
+        </tr>
+        <tr>
+          <td><code>ensemble.policy</code></td>
+          <td>string</td>
+          <td>Always <code>weighted_validation_accuracy</code> today</td>
+        </tr>
+        <tr>
+          <td><code>totals</code></td>
+          <td>object</td>
+          <td>Scan-level resource totals — see section 2</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── Per-model ── -->
+    <h2 id="per-model">1b. Per-model metrics in <code>stages[]</code></h2>
+    <p>
+      Up to <strong>8 model pipelines</strong> run per APK (if assets load successfully).
+      Each stage entry shares the same field schema. Stages for thesis models are
+      <strong>omitted</strong> when inference fails (<code>score &lt; 0</code>).
+      Legacy XGBoost and 1D-CNN are always written even on failure.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Stage field</th>
+          <th>Meaning</th>
+          <th>Timer / source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>domain</code></td>
+          <td>Canonical feature domain ID</td>
+          <td>Hardcoded per runner</td>
+        </tr>
+        <tr>
+          <td><code>model_id</code></td>
+          <td>Canonical model bundle ID</td>
+          <td>Only set for <code>broadcast_mldp_hybrid</code> today; absent for other thesis models</td>
+        </tr>
+        <tr>
+          <td><code>parse_ms</code></td>
+          <td>Feature extraction / APK parsing time</td>
+          <td><code>SystemClock.elapsedRealtimeNanos()</code></td>
+        </tr>
+        <tr>
+          <td><code>vectorize_ms</code></td>
+          <td>Vectorization / normalization time</td>
+          <td>Same clock; <code>0</code> for 1D-CNN (no separate vectorize step)</td>
+        </tr>
+        <tr>
+          <td><code>inference_ms</code></td>
+          <td>ONNX Runtime inference time</td>
+          <td>Same clock, around <code>session.run()</code></td>
+        </tr>
+        <tr>
+          <td><code>score</code></td>
+          <td>Malware probability (0 = benign, 1 = malware)</td>
+          <td>ONNX output (softmax or sigmoid per model)</td>
+        </tr>
+        <tr>
+          <td><code>mem_delta_bytes</code></td>
+          <td>Native heap change during stage</td>
+          <td><code>Debug.getNativeHeapAllocatedSize()</code> before/after</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Per-model breakdown (what each pipeline logs)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Model ID</th>
+          <th>What <code>parse_ms</code> covers</th>
+          <th>What <code>vectorize_ms</code> covers</th>
+          <th><code>score</code> basis</th>
+          <th><code>mem_delta_bytes</code></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>manifest_xgb</code></td>
+          <td><em>(none)</em></td>
+          <td>ZIP open, manifest parse, all <code>classes*.dex</code> token scan</td>
+          <td>Build 2500-d binary feature vector (OR across DEX files)</td>
+          <td>XGBoost ONNX on aggregated vector</td>
+          <td class="partial">Estimated: 50% of combined XGB+CNN total delta</td>
+        </tr>
+        <tr>
+          <td><code>bytecnn</code></td>
+          <td><em>(none)</em></td>
+          <td>Read last 1024 APK bytes (+ zero-pad)</td>
+          <td>Always <code>0</code></td>
+          <td>1D-CNN ONNX softmax (malware class)</td>
+          <td class="partial">Estimated: other 50% of combined XGB+CNN total delta</td>
+        </tr>
+        <tr>
+          <td><code>manifest_mldp_perm_receiver_actions</code></td>
+          <td><code>broadcast_mldp_hybrid</code></td>
+          <td>Manifest parse for MLDP permissions + broadcast receiver actions</td>
+          <td>Build hybrid permission/receiver vector</td>
+          <td>Broadcast+MLDP hybrid ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_d3</code></td>
+          <td><em>(none — should be <code>mlp_header</code>)</em></td>
+          <td>ZIP open, find all <code>classes*.dex</code>, read header bytes 8–111 per DEX, sum-pool</td>
+          <td>Min–max normalization (<code>normalize_ms</code> in code)</td>
+          <td>BM1 MLP header ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_manifest</code></td>
+          <td><em>(none — should be <code>pattern_a_combined</code>)</em></td>
+          <td>DEX header extraction (same as BM1)</td>
+          <td>Manifest bag-of-words extract + vectorize (combined into one field)</td>
+          <td>Pattern A fused ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_manifest_dual</code></td>
+          <td><em>(none — should be <code>pattern_b_dual_branch</code>)</em></td>
+          <td>DEX header extraction</td>
+          <td>Manifest BoW extract + vectorize</td>
+          <td>Pattern B dual-branch fused ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+        <tr>
+          <td><code>manifest_permissions</code></td>
+          <td><em>(none — should be <code>linregdroid_permission</code>)</em></td>
+          <td>Manifest permission extraction</td>
+          <td>Permission token → index vector</td>
+          <td>LinRegDroid ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+        <tr>
+          <td><code>manifest_permissions_mldp</code></td>
+          <td><em>(none — should be <code>mldp_pruned_permission</code>)</em></td>
+          <td>Manifest permission extraction (MLDP-selected subset)</td>
+          <td>Pruned permission vector build</td>
+          <td>MLDP pruned permission ONNX</td>
+          <td class="yes">Measured per stage</td>
+        </tr>
+      </tbody>
+    </table>
+
+  <div class="note">
+    <strong>Ensemble vs stages:</strong> All 8 models write scores to <code>stages[]</code>, but
+    <code>ensemble.score</code> / <code>ensemble.decision</code> use only XGBoost + 1D-CNN
+    (weights: acc_xgb = 0.9748, acc_cnn = 0.9607843). Thesis models do not affect the verdict.
+  </div>
+
+    <!-- ── Full scan ── -->
+    <h2 id="full-scan">2. Metrics collected for the full scan (batch)</h2>
+    <p>
+      Pressing <strong>Start APK Scan</strong> iterates over every <code>.apk</code> in
+      <code>Download/</code> sequentially. There is <strong>no separate batch/session record</strong>
+      in the JSON file — only one object per APK.
+    </p>
+
+    <h3>2a. What exists at file / batch level</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>What</th>
+          <th>Collected?</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Root <code>device</code> block in <code>all_scan_metrics.json</code></td>
+          <td class="yes">Yes</td>
+          <td>Written once on first scan; phone model, manufacturer, API level</td>
+        </tr>
+        <tr>
+          <td><code>scans[]</code> array growth</td>
+          <td class="yes">Yes</td>
+          <td>Each APK appends one entry; file accumulates across multiple button presses</td>
+        </tr>
+        <tr>
+          <td>Batch <code>session_id</code></td>
+          <td class="no">No</td>
+          <td>No way to group APKs from a single button press</td>
+        </tr>
+        <tr>
+          <td>Batch start / end timestamp</td>
+          <td class="no">No</td>
+          <td>Only per-APK <code>timestamp_ms</code></td>
+        </tr>
+        <tr>
+          <td>Total APKs scanned in run</td>
+          <td class="no">No</td>
+          <td>Not written to JSON; visible only in app log</td>
+        </tr>
+        <tr>
+          <td>Batch wall time (whole button press)</td>
+          <td class="no">No</td>
+          <td>Not recorded</td>
+        </tr>
+        <tr>
+          <td>Batch CPU time</td>
+          <td class="no">No</td>
+          <td>Not recorded</td>
+        </tr>
+        <tr>
+          <td>Batch memory peak / delta</td>
+          <td class="no">No</td>
+          <td>Not recorded</td>
+        </tr>
+        <tr>
+          <td>Battery % at start / end of batch</td>
+          <td class="no">No</td>
+          <td>Placeholder <code>battery_pct_delta: null</code> per APK only; never populated</td>
+        </tr>
+        <tr>
+          <td>Per-APK UI table row</td>
+          <td class="yes">Yes (in-app only)</td>
+          <td>APK name, ensemble verdict, <code>total_ms</code>, <code>total_mem_mb</code> — not persisted as batch summary</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2b. Per-APK <code>totals</code> block (labeled “scan-level” in code)</h3>
+    <p>
+      These fields are written per APK under <code>totals</code>. They are <em>not</em> aggregated
+      across the full batch, but they represent the closest thing to “whole APK scan” resource usage.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>JSON field</th>
+          <th>Source</th>
+          <th>Scope / caveat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>totals.wall_ms</code></td>
+          <td><code>SystemClock.elapsedRealtimeNanos()</code></td>
+          <td class="partial">Covers XGB + CNN + Broadcast+MLDP + BM1 only — timers stop <em>before</em> Pattern A, Pattern B, LinReg, MLDP pruned run</td>
+        </tr>
+        <tr>
+          <td><code>totals.cpu_ms</code></td>
+          <td><code>Debug.threadCpuTimeNanos()</code> (scan thread)</td>
+          <td class="partial">Same partial window as <code>wall_ms</code>; no per-stage CPU anywhere</td>
+        </tr>
+        <tr>
+          <td><code>totals.mem_delta_bytes</code></td>
+          <td><code>Debug.getNativeHeapAllocatedSize()</code> delta</td>
+          <td class="partial">Same partial window; native heap only (not Java heap, not RSS)</td>
+        </tr>
+        <tr>
+          <td><code>totals.total_dex_files_found</code></td>
+          <td>Count during XGBoost DEX discovery</td>
+          <td>XGBoost pipeline only</td>
+        </tr>
+        <tr>
+          <td><code>totals.structural_parsing_time_ms</code></td>
+          <td>Wall time for XGBoost ZIP/manifest/DEX parse</td>
+          <td>XGBoost pipeline only</td>
+        </tr>
+        <tr>
+          <td><code>totals.battery_pct_delta</code></td>
+          <td>—</td>
+          <td class="no">Always <code>null</code> (not implemented)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="warn-box">
+      <strong>UI vs JSON mismatch:</strong> The results table shows <code>total_ms</code> and
+      <code>total_mem_mb</code> from the same partial timing window (pre–Pattern A/B/LinReg/MLDP).
+      If all 8 models loaded, actual per-APK cost is higher than what <code>totals</code> and the UI report.
+    </div>
+
+    <!-- ── Cascade ── -->
+    <h2 id="cascade">3. Planned model cascade (thesis Task 2)</h2>
+    <p>
+      <strong>Not implemented today.</strong> The app currently runs all loaded models sequentially on
+      every APK. The tier layout below is the recommended multistep policy from
+      <code>todo_model_ranks.html</code> (usability rank) and
+      <code>opus_suggested_models.md</code> (extract cost + cascade notes). It matches
+      <code>rough_model_explanations/mldp_dex_header_cascade.html</code> and Phase 8 in
+      <code>why_pipeline.md</code>.
+    </p>
+
+    <h3>3a. Cascade exit rule</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Condition</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Score <code>&lt; t_low</code></td>
+            <td>Confident <strong>benign</strong> → stop, record early exit</td>
+          </tr>
+          <tr>
+            <td>Score <code>&gt; t_high</code></td>
+            <td>Confident <strong>malware</strong> → stop, record early exit</td>
+          </tr>
+          <tr>
+            <td><code>t_low ≤ score ≤ t_high</code></td>
+            <td><strong>Uncertain</strong> → escalate to next tier</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top:0.75rem; margin-bottom:0;">
+        Thresholds <code>t_low</code> / <code>t_high</code> are calibrated on a train-holdout validation
+        set (not hard-coded). Goal: cheap models clear most APKs before expensive parsers run.
+      </p>
+    </div>
+
+    <h3>3b. Tier assignment (all suggested models)</h3>
+    <p>Usability rank from <code>todo_model_ranks.html</code> — lower rank = cheaper / better early gate.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Role</th>
+          <th>Model</th>
+          <th>Usability rank</th>
+          <th>Why this tier</th>
+          <th>VigiDroid today</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="tier-1">
+          <td><strong>Tier 1</strong><br>Early gates</td>
+          <td>Run on every APK; maximize early exit</td>
+          <td><strong>Broadcast + MLDP Hybrid</strong></td>
+          <td>1</td>
+          <td>Best manifest-only balance (~50–120-d); no Dex parse</td>
+          <td class="impl-yes">✅ <code>broadcast_mldp_hybrid</code></td>
+        </tr>
+        <tr class="tier-1">
+          <td></td><td></td>
+          <td><strong>MLDP-Pruned Permission</strong></td>
+          <td>3</td>
+          <td>~20–40 dims; manifest-only; lowest-dimensional manifest model</td>
+          <td class="impl-yes">✅ <code>mldp_pruned_permission</code></td>
+        </tr>
+        <tr class="tier-1">
+          <td></td><td></td>
+          <td><strong>Broadcast Receiver + Permission</strong></td>
+          <td>4</td>
+          <td>Subset of Broadcast+MLDP hybrid; skip if hybrid deployed</td>
+          <td class="impl-no">❌ (covered by hybrid)</td>
+        </tr>
+        <tr class="tier-1">
+          <td></td><td></td>
+          <td><strong>LinRegDroid</strong></td>
+          <td>7</td>
+          <td>Fastest inference; optional baseline gate (overlaps XGB manifest signal)</td>
+          <td class="impl-yes">✅ <code>linregdroid_permission</code></td>
+        </tr>
+
+        <tr class="tier-2">
+          <td><strong>Tier 2</strong><br>Escalation</td>
+          <td>Uncertain after Tier 1; medium extract cost</td>
+          <td><strong>MLDP + Dex Header Cascade</strong> (Mode B Stages 1–2)</td>
+          <td>2</td>
+          <td>Designed as fastest accurate filter: MLDP logistic → MLP(H) if still uncertain</td>
+          <td class="impl-partial">⚠️ Split as <code>mldp_pruned</code> + <code>mlp_header</code>, not wired as cascade</td>
+        </tr>
+        <tr class="tier-2">
+          <td></td><td></td>
+          <td><strong>BM1 / MLP(H)</strong></td>
+          <td>—</td>
+          <td>104-d Dex header; ZIP + header bytes only</td>
+          <td class="impl-yes">✅ <code>mlp_header</code></td>
+        </tr>
+        <tr class="tier-2">
+          <td></td><td></td>
+          <td><strong>Dex Header + Broadcast Receiver Fusion</strong></td>
+          <td>5</td>
+          <td>Low extract; header + receiver actions; fallback if ANASTASIA too heavy</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+        <tr class="tier-2">
+          <td></td><td></td>
+          <td><strong>ANASTASIA-lite</strong></td>
+          <td>6</td>
+          <td>Manifest + targeted Dex patterns; best new single-pass accuracy</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+
+        <tr class="tier-3">
+          <td><strong>Tier 3</strong><br>Heavy fallback</td>
+          <td>Still uncertain; high extraction cost</td>
+          <td><strong>Pattern A (ASCNN C)</strong></td>
+          <td>—</td>
+          <td>Dex header + manifest BoW (~4.5K-d)</td>
+          <td class="impl-yes">✅ <code>pattern_a_combined</code></td>
+        </tr>
+        <tr class="tier-3">
+          <td></td><td></td>
+          <td><strong>Pattern B (dual-branch)</strong></td>
+          <td>—</td>
+          <td>Same domains as A; two towers; slightly heavier</td>
+          <td class="impl-yes">✅ <code>pattern_b_dual_branch</code></td>
+        </tr>
+        <tr class="tier-3">
+          <td></td><td></td>
+          <td><strong>XGBoost (D1)</strong></td>
+          <td>—</td>
+          <td>Manifest + all <code>classes*.dex</code> tokens → 2500-d; heaviest structural parse</td>
+          <td class="impl-yes">✅ <code>manifest_xgb</code></td>
+        </tr>
+        <tr class="tier-3">
+          <td></td><td></td>
+          <td><strong>ERBE Permission + Intent MLP</strong></td>
+          <td>8</td>
+          <td>~1K manifest dims; overlaps XGB domain</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+        <tr class="tier-3">
+          <td></td><td></td>
+          <td><strong>ANASTASIA + Manifest BoW Fusion</strong></td>
+          <td>9</td>
+          <td>Behavioral 128-d + BoW; med–high extract, high F1</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+        <tr class="tier-3">
+          <td></td><td></td>
+          <td><strong>FexDroid Category-Pruned Sparse</strong></td>
+          <td>10</td>
+          <td>Opus: run only when cheaper models uncertain (~3K–5K sparse)</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+
+        <tr class="tier-4">
+          <td><strong>Tier 4</strong><br>Late fusion / last resort</td>
+          <td>Final byte-level signal or dual-branch fusion</td>
+          <td><strong>1D-CNN (ByteCNN)</strong></td>
+          <td>—</td>
+          <td>Cheap inference; orthogonal raw tail-byte signal; not a Tier-1 gate</td>
+          <td class="impl-yes">✅ <code>bytecnn</code></td>
+        </tr>
+        <tr class="tier-4">
+          <td></td><td></td>
+          <td><strong>FexDroid + Raw APK Tail Dual-Branch</strong></td>
+          <td>11</td>
+          <td>Opus: reserve for Step 3+; sparse 3K–5K + 1024 tail bytes</td>
+          <td class="impl-no">❌ not implemented</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3c. Deployed models only — recommended cascade order</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th><code>model_id</code></th>
+          <th>Domain</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="tier-1">
+          <td>Early gates</td>
+          <td><code>mldp_pruned_permission</code><br><code>broadcast_mldp_hybrid</code></td>
+          <td><code>manifest_permissions_mldp</code><br><code>manifest_mldp_perm_receiver_actions</code></td>
+          <td>Run first; optional parallel <code>linregdroid_permission</code> for ablation only</td>
+        </tr>
+        <tr class="tier-2">
+          <td>Escalation</td>
+          <td><code>mlp_header</code></td>
+          <td><code>dex_header_d3</code></td>
+          <td>Stage 2 of MLDP+Header cascade (Mode B)</td>
+        </tr>
+        <tr class="tier-3">
+          <td>Heavy fallback</td>
+          <td><code>pattern_a_combined</code> or <code>pattern_b_dual_branch</code><br><code>manifest_xgb</code></td>
+          <td><code>dex_header_manifest</code> / <code>dex_header_manifest_dual</code><br><code>manifest_xgb</code></td>
+          <td>Pick one Pattern variant as default; XGB for max structural signal</td>
+        </tr>
+        <tr class="tier-4">
+          <td>Late fusion</td>
+          <td><code>bytecnn</code></td>
+          <td><code>bytecnn</code></td>
+          <td>Final fallback or weighted blend with Tier 3 scores (current XGB+CNN ensemble policy)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3d. Cascade flowchart (deployed models)</h3>
+    <div class="mermaid">
+flowchart TD
+    APK[APK] --> G1["Tier 1: MLDP pruned / Broadcast+MLDP hybrid"]
+    G1 -->|confident| DONE1["Verdict + early exit"]
+    G1 -->|uncertain| G2["Tier 2: BM1 mlp_header"]
+    G2 -->|confident| DONE2["Verdict + early exit"]
+    G2 -->|uncertain| G3["Tier 3: Pattern A or B → XGBoost"]
+    G3 -->|confident| DONE3["Verdict + early exit"]
+    G3 -->|uncertain| G4["Tier 4: 1D-CNN + late fusion"]
+    G4 --> DONE4["Final verdict"]
+    </div>
+
+    <h3>3e. Cascade vs late fusion</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>When used</th>
+          <th>Models involved</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cascade early exit</strong></td>
+          <td>Score outside uncertain band at any tier</td>
+          <td>Stop immediately; log <code>cascade_path</code>, <code>models_skipped</code>, <code>exit_reason</code></td>
+        </tr>
+        <tr>
+          <td><strong>Late fusion pool</strong></td>
+          <td>Reach Tier 3–4 without confident exit</td>
+          <td>Weighted vote: XGB + CNN (today), optionally Pattern A/B and other Tier 3 scores</td>
+        </tr>
+        <tr>
+          <td><strong>Mode A fused gate</strong> (alternative to Mode B)</td>
+          <td>Single early pass instead of staged MLDP → header</td>
+          <td>Concatenate MLDP pruned + Dex header (~150-d) → one tiny MLP; one threshold check</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Metrics impact when cascade ships:</strong> JSON should record which tiers ran vs skipped,
+      per-tier exit decisions, and true end-to-end <code>totals.wall_ms</code> (including only models
+      actually invoked). This enables thesis feasibility plots: exit rate vs F1 vs average latency.
+    </div>
+
+    <!-- ── Limitations ── -->
+    <h2 id="limitations">4. Current limitations &amp; suggested fixes</h2>
+
+    <ol class="limitations">
+      <li>
+        <strong>Battery not collected (per APK or per batch)</strong>
+        <span class="fix">
+          <code>totals.battery_pct_delta</code> is hard-coded to <code>null</code> in
+          <code>MetricsWriter.java</code>. No <code>BatteryManager</code> usage exists.
+          <br><em>Suggested fix:</em> Read <code>BATTERY_PROPERTY_CAPACITY</code> (or
+          <code>Intent.ACTION_BATTERY_CHANGED</code>) at batch start and per APK before/after;
+          write <code>battery_pct_start</code>, <code>battery_pct_end</code>, and
+          <code>battery_pct_delta</code>. Add batch-level totals in a new <code>session</code> block.
+        </span>
+      </li>
+
+      <li>
+        <strong><code>totals.wall_ms</code> / <code>cpu_ms</code> / <code>mem_delta_bytes</code> exclude 4 models</strong>
+        <span class="fix">
+          In <code>ScanService.java</code>, <code>cpuEnd</code>, <code>memEnd</code>, and
+          <code>wallEnd</code> are captured at line ~284, but Pattern A, Pattern B, LinRegDroid,
+          and MLDP pruned run afterward (lines ~325–454).
+          <br><em>Suggested fix:</em> Move end-timer capture to after all model pipelines complete,
+          immediately before <code>writeScanMetrics()</code>.
+        </span>
+      </li>
+
+      <li>
+        <strong>No per-stage CPU time</strong>
+        <span class="fix">
+          Only wall time is split into <code>parse_ms</code> / <code>vectorize_ms</code> /
+          <code>inference_ms</code>. <code>totals.cpu_ms</code> is scan-level only.
+          <br><em>Suggested fix:</em> Wrap each stage with
+          <code>Debug.threadCpuTimeNanos()</code> and add <code>cpu_ms</code> to each
+          <code>stages[]</code> entry; extend <code>device_scan.schema.json</code>.
+        </span>
+      </li>
+
+      <li>
+        <strong>XGBoost &amp; 1D-CNN memory is estimated, not measured</strong>
+        <span class="fix">
+          Total native heap delta is split 50/50 between the two legacy stages
+          (<code>xgbMemDelta = memDelta / 2</code>).
+          <br><em>Suggested fix:</em> Measure before/after around each legacy pipeline individually,
+          same as thesis models; or drop per-stage mem for XGB/CNN and only report scan-level total.
+        </span>
+      </li>
+
+      <li>
+        <strong>Memory metric is native-heap only</strong>
+        <span class="fix">
+          Uses <code>Debug.getNativeHeapAllocatedSize()</code> — misses Java heap, graphics, ONNX
+          allocator behavior, and system-level RSS.
+          <br><em>Suggested fix:</em> Also log <code>Runtime.getRuntime().totalMemory() - freeMemory()</code>
+          and optionally <code>Debug.getMemoryInfo()</code> (<code>dalvikPss</code>, <code>nativePss</code>)
+          for thesis resource profiling (Phase 10).
+        </span>
+      </li>
+
+      <li>
+        <strong>No batch / session metrics</strong>
+        <span class="fix">
+          A 400-APK eval run produces 400 separate JSON entries with no grouping, no batch
+          duration, and no cumulative battery drain.
+          <br><em>Suggested fix:</em> Generate a <code>session_id</code> per button press; write a
+          <code>sessions[]</code> block with <code>apk_count</code>, <code>wall_ms_total</code>,
+          <code>battery_pct_delta</code>, <code>started_ms</code>, <code>ended_ms</code>.
+        </span>
+      </li>
+
+      <li>
+        <strong>Ensemble ignores 6 of 8 models</strong>
+        <span class="fix">
+          Thesis models populate <code>stages[]</code> but do not affect
+          <code>ensemble.decision</code>. Only XGBoost + 1D-CNN are fused.
+          <br><em>Suggested fix:</em> Add <code>assets/ensemble_policy.json</code> with pluggable
+          policies (<code>legacy_xgb_cnn</code>, <code>weighted_all</code>,
+          <code>cascade_mldp_header</code>). Log <code>ensemble.policy</code> from config.
+        </span>
+      </li>
+
+      <li>
+        <strong>Inconsistent <code>model_id</code> in <code>stages[]</code></strong>
+        <span class="fix">
+          Only <code>broadcast_mldp_hybrid</code> writes <code>model_id</code>. BM1, Pattern A/B,
+          LinReg, and MLDP pruned write <code>domain</code> only despite
+          <code>ModelRegistry</code> defining canonical IDs.
+          <br><em>Suggested fix:</em> Pass <code>model_id</code> from <code>ModelRegistry</code>
+          for every stage in <code>writeScanMetrics()</code>.
+        </span>
+      </li>
+
+      <li>
+        <strong>No model selection at scan time</strong>
+        <span class="fix">
+          All loaded pipelines run on every APK. No UI toggle or intent extra to pick models.
+          <br><em>Suggested fix:</em> Optional checkboxes or <code>enabled_models[]</code> in scan
+          intent; needed for cascade experiments and fair per-model benchmarking.
+        </span>
+      </li>
+
+      <li>
+        <strong><code>sha256_short</code> is not a real APK hash</strong>
+        <span class="fix">
+          Hash is SHA-256 of <code>filename:size</code> truncated to 8 hex chars — two different
+          APKs with the same name and size would collide; renaming breaks identity.
+          <br><em>Suggested fix:</em> Compute full-file SHA-256 (streamed read) once per scan;
+          store as <code>apk.sha256</code>; keep short form as optional display field.
+        </span>
+      </li>
+
+      <li>
+        <strong>Schema allows triggers not implemented</strong>
+        <span class="fix">
+          <code>device_scan.schema.json</code> lists <code>scheduled</code> and
+          <code>install</code> triggers, but only <code>manual</code> and
+          <code>download</code> are used in code.
+          <br><em>Suggested fix:</em> Either implement scheduled/install scan paths or narrow the
+          schema enum to match reality.
+        </span>
+      </li>
+
+      <li>
+        <strong>Metrics file rewrite on every APK (scalability)</strong>
+        <span class="fix">
+          <code>MetricsWriter</code> reads the entire <code>all_scan_metrics.json</code>,
+          parses it, appends one scan, and rewrites the full file — O(n²) for large eval runs.
+          <br><em>Suggested fix:</em> Append newline-delimited JSON (JSONL) per scan, or write
+          individual <code>scan_{id}.json</code> files and merge on pull to PC.
+        </span>
+      </li>
+
+      <li>
+        <strong>Failed thesis models silently omitted from <code>stages[]</code></strong>
+        <span class="fix">
+          Stages with <code>score &lt; 0</code> are not written — you cannot distinguish
+          “model skipped (asset missing)” from “ran but failed” in JSON.
+          <br><em>Suggested fix:</em> Always emit a stage entry with <code>status</code>
+          (<code>ok</code> / <code>skipped</code> / <code>error</code>) and optional
+          <code>error_message</code>.
+        </span>
+      </li>
+
+      <li>
+        <strong>UI shows only ensemble verdict, not per-model scores</strong>
+        <span class="fix">
+          Results table columns: APK name, verdict, total time, total memory. Per-model scores
+          appear only in the scrollable log and JSON export.
+          <br><em>Suggested fix:</em> Expandable row per APK or a detail screen listing all
+          <code>stages[]</code> scores and timings.
+        </span>
+      </li>
+    </ol>
+
+    <div class="card">
+      <strong>Key source files</strong>
+      <ul style="color: var(--muted); margin: 0.5rem 0 0; padding-left: 1.2rem;">
+        <li><code>vigidroid/app/src/main/java/com/msh/vigidroid/ScanService.java</code> — scan loop, timers, ensemble</li>
+        <li><code>vigidroid/app/src/main/java/com/msh/vigidroid/MetricsWriter.java</code> — JSON serialization</li>
+        <li><code>vigidroid/app/src/main/java/com/msh/vigidroid/ModelRegistry.java</code> — model_id / domain map</li>
+        <li><code>Shared_pipeline_Files/schemas/device_scan.schema.json</code> — JSON schema</li>
+        <li><code>vigidroid/device_metrics/all_scan_metrics.json</code> — example pulled metrics</li>
+        <li><code>todo_model_ranks.html</code> — usability / complexity rankings</li>
+        <li><code>opus_suggested_models.md</code> — feature domains &amp; cascade notes</li>
+        <li><code>rough_model_explanations/mldp_dex_header_cascade.html</code> — Mode A/B cascade design</li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    Generated for thesis VigiDroid pipeline · 2026-06-07 (updated with cascade tier plan)
+  </footer>
+</body>
+</html>

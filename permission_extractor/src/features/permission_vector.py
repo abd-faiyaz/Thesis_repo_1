@@ -3,11 +3,27 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
 from pyaxmlparser import APK
+
+_ANDROGUARD_LOGGERS = (
+    "androguard",
+    "androguard.core",
+    "androguard.core.axml",
+    "androguard.core.bytecodes",
+    "androguard.core.bytecodes.apk",
+    "androguard.core.bytecodes.axml",
+)
+
+
+def _suppress_manifest_parser_noise() -> None:
+    """pyaxmlparser uses androguard; packed/obfuscated manifests spam warnings."""
+    for name in _ANDROGUARD_LOGGERS:
+        logging.getLogger(name).setLevel(logging.ERROR)
 
 
 class PermissionExtractError(ValueError):
@@ -23,6 +39,7 @@ def normalize_permission(raw: str) -> str:
 
 
 def extract_permission_tokens(apk_path: Path) -> list[str]:
+    _suppress_manifest_parser_noise()
     try:
         apk = APK(str(apk_path))
     except Exception as exc:

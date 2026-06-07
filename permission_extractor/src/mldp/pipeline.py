@@ -88,8 +88,8 @@ def run_mldp_selection(
         "max_permissions": max_s,
         "association_rule_mode": "malware_only_itemsets",
         "association_rule_note": (
-            "FP-Growth on malware-only transactions; permissions from high-confidence "
-            "rules among PRNR/support candidates (implicit malware consequent)."
+            "Pairwise association rules on malware-only transactions; permissions from "
+            "high-confidence rules among PRNR/support candidates (implicit malware consequent)."
         ),
     }
     save_selected_permissions(cfg.paths.selected_permissions, selected, metadata=metadata)

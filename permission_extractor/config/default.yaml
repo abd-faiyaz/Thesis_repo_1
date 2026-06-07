@@ -56,7 +56,7 @@ mldp:
     min_support: 0.05
     min_confidence: 0.70
     min_lift: 1.2
-    algorithm: fpgrowth
+    algorithm: pairwise_count
     max_stored_rules: 200
     # Paper describes X ⇒ malware rules; code mines itemsets on malware-only APKs
     # and unions permissions from high-confidence rules (implicit malware context).

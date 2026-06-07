@@ -47,6 +47,18 @@ public final class ModelRegistry {
       new Entry(
           PatternBOnnxRunner.MODEL_ID, PatternBOnnxRunner.DOMAIN, "models/pattern_b_dual_branch/");
 
+  public static final Entry MLDP_DEXHEADER_CASCADE_MODE_A =
+      new Entry(
+          MldpDexHeaderModeAOnnxRunner.MODEL_ID,
+          MldpDexHeaderModeAOnnxRunner.DOMAIN,
+          "models/mldp_dexheader_cascade/mode_a/");
+
+  public static final Entry MLDP_DEXHEADER_CASCADE_MODE_B =
+      new Entry(
+          MldpDexHeaderModeBOnnxRunner.MODEL_ID,
+          MldpDexHeaderModeBOnnxRunner.DOMAIN,
+          "models/mldp_dexheader_cascade/mode_b/");
+
   /** MoMo + thesis ONNX bundles registered in ScanService stages[]. */
   public static final Entry[] REGISTERED_MODELS = {
     LINREGDROID_PERMISSION,
@@ -55,6 +67,8 @@ public final class ModelRegistry {
     MLP_HEADER,
     PATTERN_A_COMBINED,
     PATTERN_B_DUAL_BRANCH,
+    MLDP_DEXHEADER_CASCADE_MODE_A,
+    MLDP_DEXHEADER_CASCADE_MODE_B,
   };
 
   private ModelRegistry() {}

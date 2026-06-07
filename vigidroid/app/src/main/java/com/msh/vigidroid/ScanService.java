@@ -63,6 +63,9 @@ public class ScanService extends JobIntentService {
     private MldpPrunedPermissionExtractor mldpExtractor;
     private BroadcastMldpHybridOnnxRunner broadcastMldpRunner;
     private BroadcastMldpHybridExtractor broadcastMldpExtractor;
+    private MldpDexHeaderExtractor mldpDexHeaderExtractor;
+    private MldpDexHeaderModeAOnnxRunner mldpDexHeaderModeARunner;
+    private MldpDexHeaderModeBOnnxRunner mldpDexHeaderModeBRunner;
     private List<String> featureColumns = new ArrayList<>();
     private Map<String, Integer> featureIndex = new HashMap<>();
 
@@ -142,6 +145,12 @@ public class ScanService extends JobIntentService {
             Log.w(TAG, "Broadcast + MLDP hybrid pipeline not loaded", e);
             sendLog("Broadcast + MLDP hybrid skipped: " + e.getMessage(), null);
         }
+        try {
+            initMldpDexHeaderCascadePipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "MLDP + Dex header cascade pipeline not loaded", e);
+            sendLog("MLDP + Dex cascade skipped: " + e.getMessage(), null);
+        }
     }
 
     @Override
@@ -183,6 +192,8 @@ public class ScanService extends JobIntentService {
             long wallStart = SystemClock.elapsedRealtimeNanos();
             long cpuStart = Debug.threadCpuTimeNanos();
             long memStart = Debug.getNativeHeapAllocatedSize();
+
+            MldpDexHeaderScanSnapshot cascadeSnapshot = runMldpDexHeaderCascade(apk, apkName);
 
             // parse apk (XGBoost pipeline — skip if model not loaded)
             long parseStart = SystemClock.elapsedRealtimeNanos();
@@ -456,6 +467,7 @@ public class ScanService extends JobIntentService {
             File metricsFile = writeScanMetrics(
                     trigger,
                     apk,
+                    cascadeSnapshot,
                     parsingMs, vectorMs, inferenceMs, score,
                     cnnParsingMs, cnnInferenceMs, cnnScore,
                     broadcastMldpParseMs, broadcastMldpVecMs, broadcastMldpInferMs,
@@ -738,6 +750,136 @@ public class ScanService extends JobIntentService {
                 null);
     }
 
+    private static final class MldpDexHeaderScanSnapshot {
+        double modeAParseMs;
+        double modeADexMs;
+        double modeAVecMs;
+        double modeAInferMs;
+        float modeAScore = -1f;
+        long modeAMemDelta;
+        double modeBParseMs;
+        double modeBDexMs;
+        double modeBVecMs;
+        double modeBInferMs;
+        float modeBStage1Score = -1f;
+        float modeBStage2Score = -1f;
+        float modeBScore = -1f;
+        boolean modeBEarlyExit;
+        long modeBMemDelta;
+    }
+
+    private MldpDexHeaderScanSnapshot runMldpDexHeaderCascade(File apk, String apkName) {
+        MldpDexHeaderScanSnapshot snapshot = new MldpDexHeaderScanSnapshot();
+        if (mldpDexHeaderExtractor == null) {
+            return snapshot;
+        }
+
+        if (mldpDexHeaderModeBRunner != null) {
+            long memBefore = Debug.getNativeHeapAllocatedSize();
+            try {
+                MldpDexHeaderExtractor.PermissionBlockResult perm =
+                        mldpDexHeaderExtractor.extractPermissionBlock(apk);
+                snapshot.modeBParseMs = perm.parseMs();
+                snapshot.modeBVecMs = 0.0;
+
+                long inferStart = SystemClock.elapsedRealtimeNanos();
+                float stage1Score = mldpDexHeaderModeBRunner.predictStage1(perm.xS);
+                snapshot.modeBStage1Score = stage1Score;
+                MldpDexHeaderCascadeThresholds thresholds = mldpDexHeaderModeBRunner.getThresholds();
+
+                if (thresholds.isEarlyExitBenign(stage1Score)
+                        || thresholds.isEarlyExitMalware(stage1Score)) {
+                    snapshot.modeBEarlyExit = true;
+                    snapshot.modeBDexMs = 0.0;
+                    snapshot.modeBStage2Score = MldpDexHeaderModeBOnnxRunner.SKIPPED_STAGE2_SCORE;
+                    snapshot.modeBScore = stage1Score;
+                } else {
+                    MldpDexHeaderExtractor.DexBlockResult dex =
+                            mldpDexHeaderExtractor.extractDexBlock(apk);
+                    snapshot.modeBDexMs = dex.dexMs();
+                    float stage2Score = mldpDexHeaderModeBRunner.predictStage2(dex.h);
+                    snapshot.modeBStage2Score = stage2Score;
+                    snapshot.modeBScore = stage2Score;
+                    snapshot.modeBEarlyExit = false;
+                }
+                snapshot.modeBInferMs =
+                        (SystemClock.elapsedRealtimeNanos() - inferStart) / 1_000_000.0;
+            } catch (Exception ex) {
+                Log.w(TAG, "MLDP + Dex cascade Mode B failed for " + apkName, ex);
+                sendLog("MLDP + Dex cascade Mode B error: " + ex.getMessage(), null);
+            }
+            snapshot.modeBMemDelta = Debug.getNativeHeapAllocatedSize() - memBefore;
+            if (snapshot.modeBScore >= 0f) {
+                sendLog(
+                        String.format(
+                                Locale.US,
+                                "MLDP+Dex cascade Mode B: score=%.4f s1=%.4f s2=%.4f early_exit=%s "
+                                        + "parse=%.2fms dex=%.2fms infer=%.2fms mem=%d bytes",
+                                snapshot.modeBScore,
+                                snapshot.modeBStage1Score,
+                                snapshot.modeBStage2Score,
+                                snapshot.modeBEarlyExit,
+                                snapshot.modeBParseMs,
+                                snapshot.modeBDexMs,
+                                snapshot.modeBInferMs,
+                                snapshot.modeBMemDelta),
+                        null);
+            }
+        }
+
+        if (mldpDexHeaderModeARunner != null) {
+            long memBefore = Debug.getNativeHeapAllocatedSize();
+            try {
+                MldpDexHeaderExtractor.ExtractionResult extraction = mldpDexHeaderExtractor.extract(apk);
+                snapshot.modeAParseMs = extraction.parseMs();
+                snapshot.modeADexMs = extraction.dexMs();
+                snapshot.modeAVecMs = extraction.vectorizeMs();
+                long inferStart = SystemClock.elapsedRealtimeNanos();
+                snapshot.modeAScore = mldpDexHeaderModeARunner.predict(extraction.x);
+                snapshot.modeAInferMs =
+                        (SystemClock.elapsedRealtimeNanos() - inferStart) / 1_000_000.0;
+            } catch (Exception ex) {
+                Log.w(TAG, "MLDP + Dex cascade Mode A failed for " + apkName, ex);
+                sendLog("MLDP + Dex cascade Mode A error: " + ex.getMessage(), null);
+            }
+            snapshot.modeAMemDelta = Debug.getNativeHeapAllocatedSize() - memBefore;
+            if (snapshot.modeAScore >= 0f) {
+                sendLog(
+                        String.format(
+                                Locale.US,
+                                "MLDP+Dex cascade Mode A: score=%.4f parse=%.2fms dex=%.2fms "
+                                        + "vec=%.2fms infer=%.2fms mem=%d bytes",
+                                snapshot.modeAScore,
+                                snapshot.modeAParseMs,
+                                snapshot.modeADexMs,
+                                snapshot.modeAVecMs,
+                                snapshot.modeAInferMs,
+                                snapshot.modeAMemDelta),
+                        null);
+            }
+        }
+
+        return snapshot;
+    }
+
+    private void initMldpDexHeaderCascadePipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        mldpDexHeaderExtractor = MldpDexHeaderExtractor.fromAssets(this);
+        mldpDexHeaderModeARunner = MldpDexHeaderModeAOnnxRunner.create(this, ortEnvironment);
+        mldpDexHeaderModeBRunner = MldpDexHeaderModeBOnnxRunner.create(this, ortEnvironment);
+        sendLog(
+                "MLDP+Dex cascade loaded (Mode A="
+                        + ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.modelId
+                        + ", Mode B="
+                        + ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_B.modelId
+                        + ", domain="
+                        + MldpDexHeaderModeAOnnxRunner.DOMAIN
+                        + ")",
+                null);
+    }
+
     private void initBroadcastMldpHybridPipeline() throws Exception {
         if (ortEnvironment == null) {
             ortEnvironment = OrtEnvironment.getEnvironment();
@@ -865,6 +1007,7 @@ public class ScanService extends JobIntentService {
     private File writeScanMetrics(
             String trigger,
             File apk,
+            MldpDexHeaderScanSnapshot cascadeSnapshot,
             double xgbParseMs, double xgbVecMs, double xgbInferMs, float xgbScore,
             double cnnParseMs, double cnnInferMs, float cnnScore,
             double broadcastMldpParseMs, double broadcastMldpVecMs, double broadcastMldpInferMs,
@@ -896,6 +1039,42 @@ public class ScanService extends JobIntentService {
             scan.memDeltaBytes = memDeltaBytes;
             scan.totalDexFilesFound = totalDexFilesFound;
             scan.structuralParsingTimeMs = structuralParsingTimeMs;
+
+            int cascadeInsertAt = 0;
+            if (cascadeSnapshot.modeBScore >= 0f) {
+                scan.stages.add(
+                        cascadeInsertAt++,
+                        MetricsWriter.StageMetrics.cascade(
+                                MldpDexHeaderModeBOnnxRunner.DOMAIN,
+                                ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_B.modelId,
+                                "B",
+                                cascadeSnapshot.modeBParseMs,
+                                cascadeSnapshot.modeBDexMs,
+                                cascadeSnapshot.modeBVecMs,
+                                cascadeSnapshot.modeBInferMs,
+                                cascadeSnapshot.modeBStage1Score,
+                                cascadeSnapshot.modeBStage2Score,
+                                cascadeSnapshot.modeBEarlyExit,
+                                cascadeSnapshot.modeBScore,
+                                cascadeSnapshot.modeBMemDelta));
+            }
+            if (cascadeSnapshot.modeAScore >= 0f) {
+                scan.stages.add(
+                        cascadeInsertAt,
+                        MetricsWriter.StageMetrics.cascade(
+                                MldpDexHeaderModeAOnnxRunner.DOMAIN,
+                                ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.modelId,
+                                "A",
+                                cascadeSnapshot.modeAParseMs,
+                                cascadeSnapshot.modeADexMs,
+                                cascadeSnapshot.modeAVecMs,
+                                cascadeSnapshot.modeAInferMs,
+                                -1f,
+                                -1f,
+                                false,
+                                cascadeSnapshot.modeAScore,
+                                cascadeSnapshot.modeAMemDelta));
+            }
 
             scan.stages.add(new MetricsWriter.StageMetrics(
                     "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, xgbMemDelta));
@@ -1021,6 +1200,12 @@ public class ScanService extends JobIntentService {
         }
         if (broadcastMldpRunner != null) {
             try { broadcastMldpRunner.close(); } catch (Exception ignored) {}
+        }
+        if (mldpDexHeaderModeARunner != null) {
+            try { mldpDexHeaderModeARunner.close(); } catch (Exception ignored) {}
+        }
+        if (mldpDexHeaderModeBRunner != null) {
+            try { mldpDexHeaderModeBRunner.close(); } catch (Exception ignored) {}
         }
         if (ortEnvironment != null) {
             try { ortEnvironment.close(); } catch (Exception ignored) {}

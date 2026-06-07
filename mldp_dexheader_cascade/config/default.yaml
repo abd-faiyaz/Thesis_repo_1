@@ -1,0 +1,101 @@
+model_id: mldp_dexheader_cascade
+domain: manifest_mldp_perm_dex_header
+
+paths:
+  apk_root: /mnt/Files/thesis_full_dataset
+  shared_manifest_csv: ../Shared_pipeline_Files/data/manifests/apk_index.csv
+  deployed_mlp_header_bundle: ../vigidroid/app/src/main/assets/models/mlp_header
+  artifacts: artifacts
+  manifests_dir: artifacts/manifests
+  dataset_index: artifacts/manifests/apk_index.csv
+  splits_dir: artifacts/splits
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  metrics: artifacts/metrics
+  export: artifacts/export/mldp_dexheader_cascade
+  failed_index_log: artifacts/failed_index.log
+  failed_apks_log: artifacts/failed_apks.log
+
+splits:
+  train_years: [2020, 2021]
+  test_years: [2022, 2023]
+  val_fraction_of_train: 0.10
+  random_seed: 42
+  split_policy_note: >
+    Train on 2020-2021 only. Val is a stratified 10% holdout from train years
+    (early stopping + threshold calibration). Test is all 2022+2023 APKs.
+    MLDP set S and dex min/max are built from train only (P2).
+
+indexing:
+  label_mode: parent_folder
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  collect_apk_metadata: true
+
+features:
+  manifest_backend: pyaxmlparser
+  normalize_permission_names: true
+  include_uses_permission_sdk_23: true
+  dex:
+    header_size: 112
+    magic_len: 8
+    feature_dim: 104
+    multidex_mode: sum
+    dex_pattern: "^classes(\\d*)\\.dex$"
+
+mldp:
+  method: prnr_spr_pmar
+  prnr_drop_abs_threshold: 0.05
+  skew_correction: true
+  spr_keep_top: 25
+  pmar_min_support: 0.10
+  pmar_min_confidence: 0.965
+  target_size_hint: 22
+  max_permissions: 30
+  min_permissions: 8
+  fallback_published_list: true
+
+model:
+  mode_a_hidden: 64
+  mode_b_stage1: logistic
+  mode_b_stage1_mlp_hidden: 32
+  stage1_mlp_promote_min_f1_delta: 0.02
+  reuse_deployed_mlp_header: true
+  mode_a_use_deployed_dex_normalization: true
+
+data:
+  batch_size: 256
+  num_workers: 4
+  pin_memory: true
+
+training:
+  batch_size: 256
+  epochs: 60
+  learning_rate: 0.005
+  weight_decay: 0.0001
+  pos_weight: auto
+  early_stop_patience: 6
+  seed: 42
+
+cascade:
+  target_false_omission_rate: 0.02
+  target_false_alarm_at_thigh: 0.02
+
+baseline:
+  paper_svm: true
+  svm_C: 10.0
+  svm_gamma: 0.1
+  svm_kernel: rbf
+  decision_tree: true
+
+export:
+  onnx_opset: 14
+  parity_num_samples: 10
+  parity_max_delta: 1.0e-4
+
+evaluation:
+  threshold: 0.5
+  tune_threshold_on_val: true
+
+preprocess:
+  limit: null

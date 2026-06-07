@@ -108,10 +108,10 @@ public class BroadcastMldpHybridExtractorTest {
       throws Exception {
     Path featuresDir = resolveFeaturesDir();
     return BroadcastMldpHybridExtractor.fromAssetStrings(
-        Files.readString(featuresDir.resolve("mldp_permission_vocab.json"), StandardCharsets.UTF_8),
-        Files.readString(featuresDir.resolve("receiver_action_vocab.json"), StandardCharsets.UTF_8),
-        Files.readString(featuresDir.resolve("system_actions.json"), StandardCharsets.UTF_8),
-        Files.readString(featuresDir.resolve("feature_layout.json"), StandardCharsets.UTF_8));
+        readUtf8(featuresDir.resolve("mldp_permission_vocab.json")),
+        readUtf8(featuresDir.resolve("receiver_action_vocab.json")),
+        readUtf8(featuresDir.resolve("system_actions.json")),
+        readUtf8(featuresDir.resolve("feature_layout.json")));
   }
 
   private static Path resolveFeaturesDir() {
@@ -137,6 +137,10 @@ public class BroadcastMldpHybridExtractorTest {
       values[i] = (float) row.getDouble(i);
     }
     return values;
+  }
+
+  private static String readUtf8(Path path) throws Exception {
+    return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
   }
 
   private static java.util.List<String> jsonToStringList(JSONArray row) throws Exception {

@@ -52,6 +52,10 @@ class PipelineConfig:
         return self.raw.get("model", {})
 
     @property
+    def training(self) -> dict[str, Any]:
+        return self.raw.get("training", {})
+
+    @property
     def evaluation(self) -> dict[str, Any]:
         return self.raw.get("evaluation", {})
 

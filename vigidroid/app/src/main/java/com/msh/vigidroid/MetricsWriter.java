@@ -65,6 +65,12 @@ public final class MetricsWriter {
         public final double inferenceMs;
         public final float score;
         public final long memDeltaBytes;
+        public final boolean cascade;
+        public final String mode;
+        public final double dexMs;
+        public final float stage1Score;
+        public final float stage2Score;
+        public final boolean earlyExit;
 
         public StageMetrics(String domain, double parseMs, double vectorizeMs,
                             double inferenceMs, float score, long memDeltaBytes) {
@@ -80,6 +86,81 @@ public final class MetricsWriter {
             this.inferenceMs = inferenceMs;
             this.score = score;
             this.memDeltaBytes = memDeltaBytes;
+            this.cascade = false;
+            this.mode = null;
+            this.dexMs = 0.0;
+            this.stage1Score = -1f;
+            this.stage2Score = -1f;
+            this.earlyExit = false;
+        }
+
+        public static StageMetrics cascade(
+                String domain,
+                String modelId,
+                String mode,
+                double parseMs,
+                double dexMs,
+                double vectorizeMs,
+                double inferenceMs,
+                float stage1Score,
+                float stage2Score,
+                boolean earlyExit,
+                float score,
+                long memDeltaBytes) {
+            StageMetrics metrics = new StageMetrics(
+                    domain, modelId, parseMs, vectorizeMs, inferenceMs, score, memDeltaBytes);
+            return metrics.withCascade(mode, dexMs, stage1Score, stage2Score, earlyExit);
+        }
+
+        private StageMetrics withCascade(
+                String mode,
+                double dexMs,
+                float stage1Score,
+                float stage2Score,
+                boolean earlyExit) {
+            return new StageMetrics(
+                    domain,
+                    modelId,
+                    parseMs,
+                    vectorizeMs,
+                    inferenceMs,
+                    score,
+                    memDeltaBytes,
+                    true,
+                    mode,
+                    dexMs,
+                    stage1Score,
+                    stage2Score,
+                    earlyExit);
+        }
+
+        private StageMetrics(
+                String domain,
+                String modelId,
+                double parseMs,
+                double vectorizeMs,
+                double inferenceMs,
+                float score,
+                long memDeltaBytes,
+                boolean cascade,
+                String mode,
+                double dexMs,
+                float stage1Score,
+                float stage2Score,
+                boolean earlyExit) {
+            this.domain = domain;
+            this.modelId = modelId;
+            this.parseMs = parseMs;
+            this.vectorizeMs = vectorizeMs;
+            this.inferenceMs = inferenceMs;
+            this.score = score;
+            this.memDeltaBytes = memDeltaBytes;
+            this.cascade = cascade;
+            this.mode = mode;
+            this.dexMs = dexMs;
+            this.stage1Score = stage1Score;
+            this.stage2Score = stage2Score;
+            this.earlyExit = earlyExit;
         }
     }
 
@@ -137,6 +218,17 @@ public final class MetricsWriter {
             stage.put("inference_ms", s.inferenceMs);
             stage.put("score", s.score);
             stage.put("mem_delta_bytes", s.memDeltaBytes);
+            if (s.cascade) {
+                stage.put("mode", s.mode);
+                stage.put("dex_ms", s.dexMs);
+                if (s.stage1Score >= 0f) {
+                    stage.put("stage1_score", s.stage1Score);
+                }
+                if (s.stage2Score >= 0f) {
+                    stage.put("stage2_score", s.stage2Score);
+                }
+                stage.put("early_exit", s.earlyExit);
+            }
             stages.put(stage);
         }
         obj.put("stages", stages);

@@ -1,0 +1,10 @@
+# Heavy / generated outputs
+artifacts/
+output_archives/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pt
+*.pth
+*.joblib
+data/apks/
