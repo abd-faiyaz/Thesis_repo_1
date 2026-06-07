@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ANASTASIA + Manifest BoW Fusion — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+    code { background: #0d1117; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="index.html">← All models</a></nav>
+<h1>ANASTASIA Features + Manifest BoW Fusion</h1>
+<p class="meta">Cross-paper: Fereidooni et al. NTMS 2016 (ANASTASIA 128-d behavioral) + Peng et al. MSFDroid 2022 (manifest BoW I, ASCNN Pattern A)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>APK anatomy:</strong> ZIP containing <code>AndroidManifest.xml</code> (declarations) and <code>classes.dex</code> (Dalvik bytecode). Static analysis reads these without executing the app.</p>
+<h3>Bag-of-words (BoW) on manifest</h3>
+<p>Fix a training vocabulary of \(N\) terms (permissions + intent keywords). For each APK, dimension \(j\) is 1 if term \(j\) appears. MSFDroid uses \(N=4380\) plus one <strong>UNK</strong> bucket → <strong>4381-d</strong> sparse binary vector <strong>I</strong>.</p>
+<h3>ANASTASIA behavioral features</h3>
+<p>~560 binary flags from manifest + Dex (API calls, shell commands, used permissions, intents). <strong>ANASTASIA-lite</strong> keeps top \(K=128\) via Extra Trees. See <a href="anastasia_behavioral_classifier.html">anastasia_behavioral_classifier.html</a>.</p>
+<h3>MSFDroid Pattern A — ASCNN(C)</h3>
+<p>Early fusion: concatenate feature vectors, then one <strong>Adaptive Shrinkage CNN</strong> (3 blocks + AvgPool) compresses high-dimensional sparse input to <strong>128-d</strong> embedding → MLP → sigmoid. Paper Fig. 3 / Fig. 7; replaces Dex header <strong>H</strong> with behavioral <strong>b</strong> in this hybrid.</p>
+<h3>Concatenation</h3>
+<p>\([\mathbf{a} \| \mathbf{b}]\) appends all dimensions of \(\mathbf{b}\) after \(\mathbf{a}\).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — ANASTASIA behavioral (128-d)</li>
+<li>Component B — Manifest BoW (4381-d)</li>
+<li>Component C — ASCNN(C) classifier tower</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine <strong>50,000 APK files</strong> on a phone scanner. <strong>Pattern A</strong> (MSFDroid) concatenates a 104-d Dex <em>header</em> with a ~4381-d manifest BoW and runs ASCNN — strong on declared permissions but blind to what bytecode actually calls. <strong>ANASTASIA</strong> alone captures API abuse and shell commands but misses broad manifest keyword patterns. This hybrid <strong>replaces H with top-128 behavioral bits b</strong>, keeps the same BoW <strong>I</strong>, and feeds <strong>x = [b || I] ∈ ℝ<sup>4509</sup></strong> into the same ASCNN(C) Pattern A tower. One forward pass; medium–high extraction (manifest + Dex string scan); high F1 potential on API-heavy malware.</p>
+</section>
+
+<section>
+<h2>2. Component A — ANASTASIA behavioral vector b (128-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Top-\(K\) subset of the 560-d uniPDroid behavioral profile: intents, <em>used</em> permissions in Dex, system commands (<code>su</code>, <code>chmod</code>), suspicious API strings (<code>sendTextMessage</code>, <code>Runtime.exec</code>), and composite activity flags.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Dex header bytes describe <em>structure</em> (section sizes/offsets); behavioral bits describe <em>capabilities the code exercises</em>. Malware may hide SMS fraud in bytecode without honest manifest declarations — ANASTASIA closes that gap relative to Pattern A's H.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; locate <code>AndroidManifest.xml</code> and all <code>classes*.dex</code>.</li>
+<li>Run uniPDroid-style static scan (Androguard pipeline in original paper): match 560 predefined behavior templates.</li>
+<li>Set \(b_i = 1\) if behavior \(i\) detected, else \(0\) → full \(\mathbf{f} \in \{0,1\}^{560}\).</li>
+<li>Offline on training corpus: Extra Trees feature importance → index set \(\mathcal{K}\), \(|\mathcal{K}|=128\).</li>
+<li>At inference: output only \(\mathbf{b} = \mathbf{f}_{\mathcal{K}} \in \{0,1\}^{128}\) (frozen \(\mathcal{K}\)).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ f_i = \mathbb{1}[\text{behavior}_i \text{ detected}], \quad \mathbf{f} \in \{0,1\}^{560} \]</p>
+<p>\[ b_j = f_{\mathcal{K}_j}, \quad \mathbf{b} \in \{0,1\}^{128} \]</p>
+<ul class="vars"><li><strong>\(f_i\)</strong> — indicator for behavior template \(i\)</li><li><strong>\(\mathcal{K}\)</strong> — selected feature indices (128)</li><li><strong>\(\mathbf{b}\)</strong> — behavioral sub-vector fed to fusion</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► intents, components
+ └─► classes.dex ──► API / command strings
+         │
+         ▼
+    f ∈ {0,1}^560  ──► Extra Trees mask K
+         │
+         ▼
+    b ∈ {0,1}^128   (1×128)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{b}\). Concatenated with manifest BoW \(\mathbf{I}\) before ASCNN: \(\mathbf{x} = [\mathbf{b} \| \mathbf{I}]\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Swaps cheap structural H for richer bytecode-observed behavior while keeping vector width similar (128 vs 104) for fair comparison to Pattern A.</div>
+</section>
+<section>
+<h2>3. Component B — Manifest BoW I (4381-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Sparse binary bag-of-words over <strong>permission names</strong> and <strong>intent-related keywords</strong> from decoded <code>AndroidManifest.xml</code> (MSFDroid §3.5, same lexicon as Pattern A).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Manifest declarations remain the strongest coarse signal for store-visible risk. BoW captures thousands of permission/intent combinations that a 128-d behavioral slice might not encode explicitly.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Decode binary <code>AndroidManifest.xml</code> to readable XML.</li>
+<li>Extract all permission strings and intent keyword strings (actions, categories).</li>
+<li>On training set: collect vocabulary; drop terms with frequency &lt; 2.</li>
+<li>Cap lexicon at \(N = 4380\); reserve index 4381 for UNK (out-of-vocabulary).</li>
+<li>For APK \(t\): \(I_j = 1\) if term \(j\) in manifest, else \(0\); map OOV to UNK bit.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ I_j = \begin{cases} 1 & \text{if term}_j \in \text{Manifest}(t) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{I} \in \{0,1\}^{4381} \]</p>
+<ul class="vars"><li><strong>\(N=4380\)</strong> — dictionary size before UNK</li><li><strong>\(I_j\)</strong> — BoW dimension \(j\)</li><li><strong>UNK</strong> — single bucket for any OOV term at inference</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+  │
+  ├─► permissions ──┐
+  └─► intent keywords ┤
+                      ▼
+              I ∈ {0,1}^4381   (1×4381 sparse)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{I}\). Appended after \(\mathbf{b}\): \(\mathbf{x} = [\mathbf{b} \| \mathbf{I}] \in \{0,1\}^{4509}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from ANASTASIA alone:</strong> BoW uses a 4K+ declaration lexicon; behavioral 128-d is a curated bytecode summary — complementary, not redundant.</div>
+</section>
+<section>
+<h2>4. Component C — ASCNN(C) Pattern A tower</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Single neural tower on fused vector \(\mathbf{x}\): three <strong>Adaptive Shrinkage Convolution</strong> blocks (kernel 3, strides 2,2,1 per MSFDroid Fig. 7) + AvgPool1d → 128-d embedding \(\mathbf{e}\) → MLP head → sigmoid malware probability.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>High-dimensional sparse BoW is noisy. ASCNN applies 1-D convolution plus <strong>soft-thresholding</strong> (adaptive shrinkage) to denoise rare bits before classification — paper Table 5 shows ASCNN beats plain CNN on BoW.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Reshape \(\mathbf{x}\) as 1×4509 sequence (batch × channels × length).</li>
+<li>Block 1: Conv1d → adaptive shrinkage (soft-threshold) → activation; stride 2.</li>
+<li>Block 2–3: repeat with strides 2 and 1 (paper Fig. 7).</li>
+<li>Global AvgPool1d → \(\mathbf{e} \in \mathbb{R}^{128}\).</li>
+<li>MLP: FC + BatchNorm + ReLU blocks → single logit → \(\sigma\) → \(\hat{y}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Shrinkage (conceptual, per channel): \[ y = \mathrm{sign}(x) \cdot \max(|x| - \lambda, 0) \]</p>
+<p>Full tower: \[ \mathbf{e} = \mathrm{AvgPool}(\mathrm{ASCNN}_{3}(\mathbf{x})), \quad \hat{y} = \sigma(\mathrm{MLP}(\mathbf{e})) \]</p>
+<ul class="vars"><li><strong>\(\lambda\)</strong> — learned or adaptive threshold (noise suppression)</li><li><strong>\(\mathbf{e}\)</strong> — 128-d embedding before classifier head</li><li><strong>\(\hat{y}\)</strong> — malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×4509)
+  │
+  ▼
+┌─────────────────────┐
+│ ASCNN block 1       │  stride 2
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ ASCNN block 2       │  stride 2
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ ASCNN block 3       │  stride 1
+└──────────┬──────────┘
+           ▼
+    AvgPool1d
+           │
+           ▼
+    e (128-d) ──► MLP ──► σ ──► P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final \(\hat{y} \in [0,1]\) feeds VigiDroid multistep policy or ensemble with cheaper models (MLDP+header cascade, ByteCNN).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>vs Pattern B:</strong> Early fusion (one tower) is smaller/faster than separate MLP(H)+ASCNN(I) branches — appropriate when both domains are concatenated upfront.</div>
+</section>
+<section>
+<h2>5. Ensemble / fusion mechanism</h2>
+<h3 class="sub">What it analyzes</h3>
+<p><strong>Early fusion</strong> (Pattern A): concatenate behavioral and manifest domains <em>before</em> any neural processing — not late fusion or voting.</p>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{x} = [\mathbf{b} \| \mathbf{I}] \in \mathbb{R}^{4509}, \quad \hat{y} = \sigma(\mathrm{MLP}(\mathrm{ASCNN}(\mathbf{x}))) \]</p>
+<ul class="vars">
+<li><strong>\(\|\)</strong> — vector concatenation (128 + 4381 = 4509)</li>
+<li>Contrast Pattern B: \(\hat{y} = \sigma(\mathbf{w}^T[\mathrm{MLP}(\mathbf{b}) \| \mathrm{ASCNN}(\mathbf{I})])\) with separate towers</li>
+</ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">b (128-d) ──┐
+            ├──► x (4509-d) ──► ASCNN(C) ──► e (128-d) ──► MLP ──► ŷ
+I (4381-d) ─┘</pre>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Cross-paper mix:</strong> ANASTASIA signal + MSFDroid BoW/ASCNN — same fusion recipe as implemented Pattern A, but <em>behavior replaces Dex header</em> for API-centric malware families.</div>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Variant</th><th>Input dims</th><th>Extraction cost</th><th>F1 potential (thesis)</th></tr>
+<tr><td>Pattern A (H + I)</td><td>104 + 4381 ≈ 4485</td><td>Low–medium</td><td>High (MSFDroid ~97% ACC ensemble context)</td></tr>
+<tr><td>ANASTASIA-lite only</td><td>128</td><td>Medium</td><td>Med–high (~0.96–0.97 F1 paper XGBoost)</td></tr>
+<tr><td>ASCNN(I) only (paper)</td><td>4381</td><td>Low–medium</td><td>~89% ACC single stream</td></tr>
+<tr><td class="best"><strong>b + I fusion (this model)</strong></td><td class="best">4509</td><td class="best">Medium–high</td><td class="best"><strong>Highest</strong> among static manifest+code (no raw bytes)</td></tr>
+</table>
+<p><strong>Why improvement over Pattern A is expected:</strong> Header H encodes Dex <em>layout statistics</em>; \(\mathbf{b}\) encodes <em>which APIs and commands appear in code</em>. BoW still covers declaration surface. Together they reduce false negatives where manifest looks benign but bytecode sends SMS or loads dex dynamically.</p>
+<p><strong>Cost trade-off:</strong> Extraction heavier than header-only (Dex string scan) but lighter than FexDroid 3K–5K vocab or full 560-d inference without pruning.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       │
+   ┌───┴────────────────────────────┐
+   ▼                                ▼
+Manifest + Dex scan              Manifest decode
+(uniPDroid templates)            (perms + intents)
+   │                                │
+   ▼                                ▼
+b (1×128)                      I (1×4381)
+   │                                │
+   └────────────┬───────────────────┘
+                ▼
+         x = [b || I]  (1×4509)
+                ▼
+         ASCNN × 3 + AvgPool
+                ▼
+         e (1×128)
+                ▼
+         MLP + sigmoid
+                ▼
+      P(malware) ∈ [0,1]</pre>
+</section>
+
+</body>
+</html>

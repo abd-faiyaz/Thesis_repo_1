@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Architecture Explanations — Complete</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+    code { background: #21262d; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+    /* Index page extras */
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1419; color: #e6edf3; max-width: 760px; margin: 2rem auto; padding: 0 1.5rem 3rem; line-height: 1.65; }
+    h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+    h2 { color: #79c0ff; margin-top: 2rem; font-size: 1.2rem; }
+    a { color: #79c0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    li { margin: 0.55rem 0; }
+    .rec { color: #3fb950; font-weight: 600; }
+    p.meta { color: #8b949e; font-size: 0.9rem; }
+    code { background: #1a2332; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.88em; }
+    ol { padding-left: 1.4rem; }
+    /* Combined document */
+    .section-divider { border: none; border-top: 2px solid var(--border, #30363d); margin: 3.5rem 0; }
+    .doc-section { scroll-margin-top: 1.5rem; }
+    .index-section h1 { font-size: 1.85rem; }
+    nav.top a { color: var(--accent, #58a6ff); }
+    body { max-width: 920px; }
+  </style>
+</head>
+<body>
+<nav class="top" style="position:sticky;top:0;background:var(--bg,#0f1419);padding:0.75rem 0;z-index:10;border-bottom:1px solid var(--border,#30363d);margin:-2rem -1.5rem 1.5rem;padding-left:1.5rem;padding-right:1.5rem;">
+  <a href="#index">↑ Table of contents</a>
+</nav>
+<article id="index" class="doc-section index-section">
+<h1>Model architecture explanations</h1>
+  <p class="meta">Self-contained architecture guides for thesis malware-detection models. Each page follows <code>explanation_instructions.md</code>: prerequisites → table of contents → overview → per-component sections (what / why / steps / math / flowchart / output / novelty) → fusion → experimental results → end-to-end pipeline with dimensions.</p>
+  <p class="meta">Source catalog: <code>more_papers_opus.md</code></p>
+
+  <h2>Recommended starting points</h2>
+  <ul>
+    <li><a href="#broadcast_mldp_hybrid"><span class="rec">Broadcast + MLDP hybrid</span></a> — low cost, strong manifest balance</li>
+    <li><a href="#anastasia_behavioral_classifier"><span class="rec">ANASTASIA behavioral (lite)</span></a> — bytecode behavior, 128-d MLP</li>
+  </ul>
+
+  <h2>All 11 models</h2>
+  <ol>
+    <li><a href="#broadcast_receiver_permission_classifier">Broadcast receiver + permission classifier</a> — Mohsen et al. 2017</li>
+    <li><a href="#mldp_pruned_permission_classifier">MLDP-pruned permission classifier</a> — Permission Extraction Framework 2020</li>
+    <li><a href="#broadcast_mldp_hybrid">Broadcast + MLDP permission hybrid</a> — cross-paper manifest fusion</li>
+    <li><a href="#anastasia_behavioral_classifier">ANASTASIA behavioral classifier (lite)</a> — Fereidooni et al. 2016</li>
+    <li><a href="#linregdroid_permission_classifier">LinRegDroid permission classifier</a> — minimal linear baseline</li>
+    <li><a href="#fexdroid_category_sparse_classifier">FexDroid category-pruned sparse classifier</a> — ICCAI 2018</li>
+    <li><a href="#erbe_permission_intent_mlp">ERBE permission + intent MLP</a> — manifest MLP ~1K-d</li>
+    <li><a href="#dex_header_broadcast_receiver_fusion">Dex header + broadcast receiver fusion</a> — MSFDroid H + Mohsen receivers</li>
+    <li><a href="#anastasia_manifest_bow_fusion">ANASTASIA + manifest BoW fusion</a> — 128-d behavioral + 4381-d BoW, ASCNN Pattern A, concat 4509-d</li>
+    <li><a href="#fexdroid_tail_bytes_dual_branch">FexDroid + raw APK tail dual-branch</a> — 3K–5K sparse + 1DCNN last 1024 bytes, late fusion, 95–97% tail accuracy</li>
+    <li><a href="#mldp_dex_header_cascade">MLDP + Dex header cascade</a> — ~30-d MLDP + 104-d header, fused MLP 150-d or multistep cascade</li>
+  </ol>
+
+  <h2>Already implemented (see repo)</h2>
+  <p class="meta">MSFDroid MLP(H), Pattern A ASCNN(C), Pattern B late fusion, and 1DCNN ByteCNN are documented under <code>already_implemented_models/</code> — not duplicated here.</p>
+
+  <p class="meta">Style rules: <code>explanation_instructions.md</code> · Model list: <code>more_papers_opus.md</code></p>
+</article>
+
+<hr class="section-divider" />
+<article id="broadcast_receiver_permission_classifier" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>Broadcast Receiver + Permission Classifier</h1>
+<p class="meta">Paper: Mohsen et al., CIC 2017 — <em>Detecting Android Malwares By Mining Statically Registered Broadcast Receivers</em></p>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>APK:</strong> A ZIP archive containing <code>AndroidManifest.xml</code> (what the app declares) and <code>classes.dex</code> (compiled code). You can scan APKs <em>without running</em> them — that is <strong>static analysis</strong>.</p>
+<p><strong>Permissions</strong> (<code>&lt;uses-permission&gt;</code>): capabilities such as <code>SEND_SMS</code> or <code>READ_CONTACTS</code>. Each declared permission is visible in the manifest.</p>
+<p><strong>Broadcast receiver:</strong> An Android component that runs code when a <strong>system event</strong> fires — e.g. <code>BOOT_COMPLETED</code> (phone finished booting), <code>SMS_RECEIVED</code> (new text). Malware often registers receivers so it wakes in the background.</p>
+<p><strong>Feature vector:</strong> A fixed-length list of 0/1 values — one bit per permission or intent action in a vocabulary learned from your training set.</p>
+<p><strong>Binary classification:</strong> The model outputs a malware probability; if it exceeds a threshold (usually 0.5), the APK is labeled malware.</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission feature vector</li>
+<li>Component B — Broadcast receiver intent-action vector</li>
+<li>Component C — Fusion and classifier</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine you must screen <strong>50,000 APK files</strong> before they reach users’ phones. Most detectors use only <strong>manifest permissions</strong>, but benign games and banking apps often request <code>INTERNET</code> and <code>READ_PHONE_STATE</code> just like trojans — so permission-only models plateau. Mohsen et al. (CIC 2017) add a second manifest signal: <strong>which broadcast receivers and intent actions</strong> each app registers statically. Malware disproportionately listens for boot, SMS, and connectivity events to persist and intercept data. The architecture has three blocks: (1) a permission binary vector, (2) a receiver-action binary vector, (3) early fusion via concatenation plus an SVM with RBF kernel in the paper (logistic regression or tiny MLP for ONNX deployment). Everything is manifest-only — no Dex decompilation.</p>
+</section>
+
+<section>
+<h2>2. Component A — Permission feature vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Every <code>android:name</code> in <code>&lt;uses-permission&gt;</code> tags inside <code>AndroidManifest.xml</code>.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Permissions are Android’s primary static security declaration: malware that sends premium SMS, steals contacts, or records audio must often declare dangerous permissions visible to users and stores.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip the APK (it is a ZIP archive); locate <code>AndroidManifest.xml</code> (binary XML on disk — decode with AAPT2, Apktool, or an <code>AxmlReader</code>).</li>
+<li>Enumerate all <code>&lt;uses-permission android:name="…"&gt;</code> strings for this APK.</li>
+<li>From the <strong>training corpus only</strong>, build vocabulary \(\mathcal{P} = \{\text{perm}_1,\ldots,\text{perm}_P\}\) (typically \(P \approx 150\)–300 over ~50k APKs).</li>
+<li>For each APK \(i\), set \(p_{i,j}=1\) if \(\text{perm}_j\) appears in its manifest, else \(0\).</li>
+<li>Freeze \(\mathcal{P}\) at inference; permissions not in the vocabulary are ignored or optionally bucketed as “other.”</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ p_{i,j} = \begin{cases} 1 & \text{if } \text{perm}_j \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{p}_i \in \{0,1\}^{P} \]</p>
+<ul class="vars"><li><strong>\(P\)</strong> — permission vocabulary size (number of dimensions)</li><li><strong>\(p_{i,j}\)</strong> — bit for permission \(j\) on APK \(i\)</li><li><strong>\(\mathbf{p}_i\)</strong> — permission feature row for one APK</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Raw APK
+  │
+  └─► AndroidManifest.xml
+         │
+         └─► &lt;uses-permission&gt; tags
+                │
+                ▼
+         Permission vector  (1×P)
+         e.g. 1×200  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{p} \in \{0,1\}^{P}\). This vector is the first half of the fused input \(\mathbf{x}\) before the classifier.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Standard baseline domain; the paper includes it so receiver features can be proven to add value beyond permissions alone.</div>
+</section>
+<section>
+<h2>3. Component B — Broadcast receiver intent-action vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Intent <code>android:name</code> strings under <code>&lt;receiver&gt;&lt;intent-filter&gt;&lt;action&gt;</code> — statically registered broadcast receivers only.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Receivers define <em>when</em> code runs without the user opening the app. Malware uses <code>BOOT_COMPLETED</code> to survive reboots and <code>SMS_RECEIVED</code> to intercept texts. The paper’s manual study (400 APKs) and large-scale experiments show malware registers more receivers and more sensitive actions than benign apps.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse the same <code>AndroidManifest.xml</code> as Component A.</li>
+<li>Find every <code>&lt;receiver&gt;</code> element (exported or not; static registration only).</li>
+<li>For each receiver, collect all <code>&lt;action android:name="…"&gt;</code> inside nested <code>&lt;intent-filter&gt;</code> blocks.</li>
+<li>Build training vocabulary \(\mathcal{A}\) of distinct action strings from the corpus (\(R \approx 50\)–100).</li>
+<li>Set \(r_{i,k}=1\) if action \(k\) appears in any receiver filter for APK \(i\), else \(0\).</li>
+<li>Freeze \(\mathcal{A}\) for inference.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ r_{i,k} = \begin{cases} 1 & \text{if } \text{action}_k \in \text{Receivers}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{r}_i \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(R\)</strong> — receiver-action vocabulary size</li><li><strong>\(r_{i,k}\)</strong> — bit for intent action \(k\)</li><li><strong>\(\mathbf{r}_i\)</strong> — receiver feature vector for APK \(i\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+  │
+  └─► &lt;receiver&gt; → &lt;intent-filter&gt; → &lt;action&gt;
+         │
+         ▼
+   Receiver-action vector  (1×R)
+   e.g. 1×80  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{r} \in \{0,1\}^{R}\). Concatenated with \(\mathbf{p}\) to form the classifier input \(\mathbf{x}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard permission-only detectors:</strong> Drebin-style work rarely treats receiver actions as a dedicated feature block; Mohsen et al. show they improve accuracy when combined with permissions.</div>
+</section>
+<section>
+<h2>4. Component C — Fusion and classifier</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>The concatenated vector \(\mathbf{x} = [\mathbf{p} \| \mathbf{r}]\). Paper: C-SVM with RBF kernel; thesis/ONNX: logistic regression or a 1-hidden-layer MLP.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>After concatenation, the joint space is still sparse and moderate-dimensional; a linear boundary often works, but SVM with RBF handles mild nonlinear interactions (e.g. rare permission + boot receiver together).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Concatenate: \(\mathbf{x} \leftarrow [\mathbf{p}; \mathbf{r}]\) → dimension \(P+R\) (e.g. \(1 \times 280\)).</li>
+<li>Train on labeled APKs (malware = 1, benign = 0) with stratified cross-validation.</li>
+<li>Paper: grid-search SVM hyperparameters \(C\) (margin penalty) and \(\gamma\) (RBF width).</li>
+<li>ONNX path: train \(\mathbf{w}, b\) for logistic regression or small MLP; export to mobile runtime.</li>
+<li>At inference: build \(\mathbf{x}\) for a new APK → score → compare to threshold \(\tau\) (often 0.5).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>SVM decision (paper):</strong></p>
+<p>\[ f(\mathbf{x}) = \mathrm{sign}\left(\sum_{i \in SV} \alpha_i y_i K(\mathbf{x}_i, \mathbf{x}) + b\right) \]</p>
+<p>RBF kernel: \[ K(\mathbf{x}, \mathbf{x}') = \exp\left(-\gamma \|\mathbf{x} - \mathbf{x}'\|_2^2\right) \]</p>
+<p><strong>Logistic regression (ONNX-friendly):</strong></p>
+<p>\[ \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w}^T \mathbf{x} + b)}} \]</p>
+<ul class="vars"><li><strong>\(SV\)</strong> — support vectors (training points that define the SVM boundary)</li><li><strong>\(\alpha_i, y_i\)</strong> — dual coefficients and labels for support vectors</li><li><strong>\(C\)</strong> — SVM regularization (trade-off margin vs misclassification)</li><li><strong>\(\gamma\)</strong> — RBF kernel width</li><li><strong>\(\mathbf{w}, b\)</strong> — logistic weights and bias</li><li><strong>\(\hat{y}\)</strong> — estimated malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Permission p (1×P) ──┐
+                        ├──► Concat  x (1×(P+R))  ──► Classifier  ──► P(malware)
+Receiver r (1×R) ─────┘
+              e.g. (1×200)+(1×80) = (1×280)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final output: malware probability or hard label. In a multistep VigiDroid stack, this score is one domain among others (Dex header, tail bytes, etc.).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Manifest-only parsing; typical extraction &lt; 100 ms; model &lt; 50 KB. Complements structural (Dex header) and raw-byte models without overlapping their feature domains.</div>
+</section>
+<section>
+<h2>5. Ensemble or fusion mechanism</h2>
+<p>This model uses <strong>early fusion</strong> (feature-level concatenation before a single classifier), not late fusion or score voting:</p>
+<p>\[ \mathbf{x} = [\mathbf{p} \| \mathbf{r}], \quad \hat{y} = f(\mathbf{x}) \]</p>
+<ul class="vars">
+<li><strong>\(\|\)</strong> — vector concatenation (append \(\mathbf{r}\) after \(\mathbf{p}\))</li>
+<li><strong>\(f\)</strong> — SVM or logistic/MLP; one joint decision boundary in \((P+R)\)-dimensional space</li>
+<li>There is no separate score per branch averaged at the end — both domains are learned jointly.</li>
+</ul>
+<pre class="flow">p (1×P) ──┐
+          ├──► x (1×(P+R))  e.g. 1×280 ──► f(·) ──► ŷ ∈ [0,1]
+r (1×R) ──┘</pre>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Feature configuration</th><th>Accuracy / role (paper)</th><th>Notes</th></tr>
+<tr><td>Permissions only</td><td>~76% (reported SVM baseline on one split)</td><td>Useful but insufficient alone</td></tr>
+<tr><td>Receivers only</td><td>Weaker than permissions alone</td><td>Still adds complementary signal</td></tr>
+<tr><td class="best">Permissions + receivers</td><td class="best">Best — combined feature set</td><td class="best">Manual study on 400 APKs; large-scale ML on 5,723+5,723 APKs</td></tr>
+</table>
+<p><strong>Why improvement happened:</strong> Permissions capture <em>capability</em> (what the app may do). Receivers capture <em>event-driven behavior</em> (when background code runs). A benign game may declare <code>INTERNET</code> but rarely pairs it with <code>BOOT_COMPLETED</code> and <code>SMS_RECEIVED</code> — a pattern common in banking trojans and SMS fraud malware.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │  (no Dex, no bytecode)
+└──────┬──────────┬───────┘
+       ▼          ▼
+  p (1×P)     r (1×R)     e.g. 1×200 , 1×80
+       │          │
+       └────┬─────┘
+            ▼
+      x (1×(P+R))         e.g. 1×280
+            ▼
+      Classifier (SVM-RBF / Logistic / MLP)
+            ▼
+      P(malware) ∈ [0,1]  →  threshold τ → label</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="mldp_pruned_permission_classifier" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>MLDP-Pruned Permission Classifier</h1>
+<p class="meta">Paper: IJACSA 2020 — <em>Permission Extraction Framework for Android Malware Detection</em> (Multi-Level Data Pruning, MLDP)</p>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>Android permissions:</strong> Listed in <code>AndroidManifest.xml</code> via <code>&lt;uses-permission&gt;</code>. There are ~135 official permission types (plus vendor-specific names). A naive detector uses <em>all</em> of them — many appear equally in benign and malware apps and add noise.</p>
+<p><strong>Feature selection:</strong> Choosing only the most useful inputs <em>before</em> training. Fewer dimensions → faster inference, smaller models, and often <em>higher</em> accuracy because irrelevant bits are removed.</p>
+<p><strong>Association rules:</strong> Patterns like “if apps request both SEND_SMS and RECEIVE_BOOT_COMPLETED, they are usually malware.” Rule mining finds such co-occurrences automatically from labeled data.</p>
+<p><strong>Support:</strong> Fraction of APKs in the dataset that contain a permission (or set). Very rare permissions are dropped so the model generalizes.</p>
+<p><strong>PRNR (Permission Ranking with Negative Rate):</strong> Ranks permissions by how much more often they appear in malware than in benign apps.</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Stage 1 — PRNR ranking</li>
+<li>Stage 2 — Support-based filtering</li>
+<li>Stage 3 — Association-rule mining</li>
+<li>Component — Inference feature vector</li>
+<li>Component — Classifier (SVM / MLP)</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Suppose you train on <strong>50,000 APKs</strong> and represent each app with a binary vector over all ~135+ manifest permissions — many dimensions are almost always zero or equally common in benign and malware sets, which hurts generalization and wastes phone CPU. The IJACSA 2020 <strong>Permission Extraction Framework</strong> applies <strong>Multi-Level Data Pruning (MLDP)</strong>: three offline filters (PRNR → support → association rules) shrink the permission set to roughly <strong>20–40 high-discriminative permissions</strong>, then a simple classifier (linear SVM in the paper; tiny MLP for ONNX) runs on that short vector. No Dex parsing, no broadcast receivers — pure manifest, but semantically different from a 2500-d bag-of-words because every dimension was chosen for separability, not vocabulary coverage.</p>
+</section>
+
+<section>
+<h2>2. Stage 1 — PRNR (Permission Ranking with Negative Rate)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Per-permission counts in malware vs benign training APKs.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Permissions requested equally by both classes carry no class signal. PRNR keeps permissions that skew toward malware (high ‘negative rate’ in benign, or elevated malware prevalence).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>For each permission \(j\), count \(M_j\) = number of malware APKs that declare it; \(B_j\) = number of benign APKs that declare it.</li>
+<li>Compute malware rate \(\rho_j^M = M_j / N_m\) and benign rate \(\rho_j^B = B_j / N_b\) where \(N_m, N_b\) are class totals.</li>
+<li>Define PRNR-style score (paper uses negative-rate ranking): e.g. \(\text{PRNR}_j = \rho_j^M / (\rho_j^B + \epsilon)\).</li>
+<li>Sort permissions by \(\text{PRNR}_j\) descending; keep top tier (e.g. top 50–80 candidates for next stages).</li>
+<li>Drop permissions with near-equal class rates (\(|\rho_j^M - \rho_j^B| &lt; \delta\)).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{PRNR}_j = \frac{M_j / N_m}{B_j / N_b + \epsilon} \]</p>
+<p>Alternative discriminative form used in related work:</p>
+<p>\[ \text{score}_j = \frac{\rho_j^M}{\rho_j^B + \epsilon}, \quad \rho_j^M = \frac{M_j}{N_m},\; \rho_j^B = \frac{B_j}{N_b} \]</p>
+<ul class="vars"><li><strong>\(M_j, B_j\)</strong> — malware/benign counts for permission \(j\)</li><li><strong>\(N_m, N_b\)</strong> — total malware and benign APKs in training</li><li><strong>\(\epsilon\)</strong> — small constant (e.g. \(10^{-6}\)) to avoid division by zero</li><li><strong>\(\text{PRNR}_j\)</strong> — higher means more malware-skewed</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Training corpus (50k APKs, labeled)
+  │
+  └─► Count M_j, B_j per permission j
+         │
+         ▼
+   PRNR scores  (1×135+)
+         │
+         ▼
+   Ranked candidate set  (~50–80 perms)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs a ranked candidate list passed to Stage 2 (support filter). Not used directly at inference.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> First pruning level removes ‘ubiquitous’ permissions (e.g. INTERNET) that appear everywhere and do not separate classes.</div>
+</section>
+<section>
+<h2>3. Stage 2 — Support-based filtering</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Frequency of each permission (and permission sets) in the full training corpus.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>A permission appearing in only 2 APKs cannot generalize; support filtering removes ultra-rare noise while keeping statistically stable dimensions.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>For each permission \(j\) surviving PRNR, compute support: \(\text{supp}_j = \frac{\#\{\text{APKs with perm } j\}}{N}\).</li>
+<li>Set minimum support threshold \(\theta_{\min}\) (e.g. 0.01 = appears in at least 1% of APKs).</li>
+<li>Remove permissions with \(\text{supp}_j &lt; \theta_{\min}\).</li>
+<li>Optionally cap maximum support \(\theta_{\max}\) to drop permissions present in &gt;95% of both classes.</li>
+<li>Pass surviving permissions to association-rule mining.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{supp}(j) = \frac{|\{i : \text{perm}_j \in \text{APK}_i\}|}{N} \]</p>
+<p>For a set \\(X\\) of permissions:</p>
+<p>\[ \text{supp}(X) = \frac{|\{i : X \subseteq \text{Perms}(i)\}|}{N} \]</p>
+<ul class="vars"><li><strong>\(N\)</strong> — total training APKs</li><li><strong>\(\text{supp}(j)\)</strong> — fraction of APKs declaring permission \(j\)</li><li><strong>\(\theta_{\min}\)</strong> — minimum support threshold</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">PRNR candidates
+  │
+  └─► Compute supp(j) for each j
+         │
+         ▼
+   Filter: supp(j) ≥ θ_min
+         │
+         ▼
+   Support-qualified set  (~40–60 perms)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Narrows the candidate pool for Stage 3. Ensures each retained permission has enough observations to learn stable rules.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Bridges statistical frequent-pattern mining with security — rare one-off permissions from packers do not enter the final model.</div>
+</section>
+<section>
+<h2>4. Stage 3 — Association-rule mining</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Co-occurrence of permission sets in malware-labeled APK transactions.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Malware often requests <em>combinations</em> (SMS + boot + install) that benign apps rarely use together; association rules capture these joint patterns beyond single-bit permissions.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Represent each APK as a transaction: set of declared permissions.</li>
+<li>Mine frequent itemsets in malware transactions with minimum support \(\sigma\).</li>
+<li>Generate rules \(X \Rightarrow Y\) where \(X, Y\) are permission subsets; compute confidence \(\text{conf}(X \Rightarrow Y) = \text{supp}(X \cup Y) / \text{supp}(X)\).</li>
+<li>Keep rules with \(\text{conf} \geq \theta_{\text{conf}}\) and lift indicating malware skew.</li>
+<li>Union all permissions appearing in high-confidence malware-associated rules → final set \(\mathcal{S}\), \(|\mathcal{S}| \approx 20\)–40.</li>
+<li>Freeze \(\mathcal{S}\) for all future inference.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{conf}(X \Rightarrow Y) = \frac{\text{supp}(X \cup Y)}{\text{supp}(X)} \]</p>
+<p>\[ \text{lift}(X \Rightarrow Y) = \frac{\text{conf}(X \Rightarrow Y)}{\text{supp}(Y)} \]</p>
+<p>Example rule retained: \(\{\texttt{SEND\_SMS}, \texttt{RECEIVE\_BOOT\_COMPLETED}\} \Rightarrow \text{malware}\) with high confidence.</p>
+<ul class="vars"><li><strong>\(X, Y\)</strong> — antecedent and consequent permission sets (or class label)</li><li><strong>\(\text{conf}\)</strong> — conditional probability that \(Y\) holds given \(X\)</li><li><strong>\(\text{lift}\)</strong> — how much more often \(Y\) occurs with \(X\) than by chance</li><li><strong>\(\mathcal{S}\)</strong> — final pruned permission list</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Malware transactions (permission sets)
+  │
+  └─► Apriori / FP-Growth frequent itemsets
+         │
+         ▼
+   Rules X ⇒ malware  (conf ≥ θ_conf)
+         │
+         ▼
+   Frozen permission set S  (|S| ≈ 20–40)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Produces fixed \(\mathcal{S}\) used to define inference-time vector dimension \(|\mathcal{S}|\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard full-permission vectors:</strong> Dimensions are <em>data-mined</em> for malware co-occurrence, not the full Android permission enum.</div>
+</section>
+<section>
+<h2>5. Component — Inference feature vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Only permissions in the frozen MLDP set \(\mathcal{S}\) for each new APK.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>At inference you never use 135+ dimensions — only the pruned list learned offline from the 50k training corpus.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse <code>AndroidManifest.xml</code> for the target APK.</li>
+<li>For each \(\text{perm}_j \in \mathcal{S}\), set \(x_j = 1\) if declared, else \(0\).</li>
+<li>Result: \(\mathbf{x} \in \{0,1\}^{|\mathcal{S}|}\), typically \(1 \times 20\) to \(1 \times 40\).</li>
+<li>Pass \(\mathbf{x}\) to the classifier.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x_j = \begin{cases} 1 & \text{if } \text{perm}_j \in \mathcal{S} \text{ and declared in APK} \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x} \in \{0,1\}^{|\mathcal{S}|} \]</p>
+<ul class="vars"><li><strong>\(\mathcal{S}\)</strong> — MLDP-selected permission set (frozen after training)</li><li><strong>\(x_j\)</strong> — \(j\)-th dimension of the pruned vector</li><li><strong>\(|\mathcal{S}|\)</strong> — final dimension count (~20–40)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">New APK
+  │
+  └─► Manifest parse
+         │
+         ▼
+   x ∈ {0,1}^|S|   e.g. 1×30
+         │
+         ▼
+   (to classifier)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs compact \(\mathbf{x}\) fed to SVM or MLP. This is the only feature block in this model (no fusion with other domains in the base paper).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Smallest useful manifest-only representation for thesis baselines — every bit is discriminative by construction.</div>
+</section>
+<section>
+<h2>6. Component — Classifier (SVM / tiny MLP)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>The pruned binary vector \(\mathbf{x}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Paper reports strong results with linear SVM on ~20–40 dims; ONNX deployment uses equivalent linear layer or 1-hidden-layer MLP.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Train SVM or MLP on \(\mathbf{x}\) with labels (malware/benign).</li>
+<li>For SVM: solve quadratic program for maximum-margin separator in \(\mathbb{R}^{|\mathcal{S}|}\).</li>
+<li>For MLP: \(\mathbf{h} = \text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1)\), \(\hat{y} = \sigma(\mathbf{w}_2^T \mathbf{h} + b_2)\).</li>
+<li>Export weights to ONNX for on-device inference.</li>
+<li>Threshold \(\hat{y} &gt; 0.5\) → malware.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>Linear SVM:</strong> minimize \(\frac{1}{2}\|\mathbf{w}\|^2 + C \sum_i \xi_i\) subject to \(y_i(\mathbf{w}^T \mathbf{x}_i + b) \geq 1 - \xi_i\).</p>
+<p><strong>Logistic / MLP head:</strong></p>
+<p>\[ \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b) \quad \text{or} \quad \hat{y} = \sigma(\mathbf{w}_2^T \,\text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) + b_2) \]</p>
+<ul class="vars"><li><strong>\(C\)</strong> — SVM regularization constant</li><li><strong>\(\xi_i\)</strong> — slack variables for soft margin</li><li><strong>\(\hat{y}\)</strong> — malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×|S|)  e.g. 1×30
+  │
+  ▼
+SVM or MLP
+  │
+  ▼
+P(malware) ∈ [0,1]</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final malware score for the APK. Can feed a multistep policy or ensemble with other domain models.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Sub-millisecond inference on mid-range phones due to tiny input dimension and linear/semi-linear model size (&lt; 10 KB).</div>
+</section>
+<section>
+<h2>7. Ensemble or fusion mechanism</h2>
+<p>The base MLDP paper uses a <strong>single-domain pipeline</strong> — no multi-branch fusion. The three stages (PRNR, support, rules) are a <strong>sequential filter cascade</strong> on the permission space, not an ensemble of classifiers:</p>
+<p>\[ \mathcal{P}_{	ext{all}} \xrightarrow{	ext{PRNR}} \mathcal{P}_1 \xrightarrow{	ext{supp}} \mathcal{P}_2 \xrightarrow{	ext{rules}} \mathcal{S} \]</p>
+<pre class="flow">Full perm space (135+)
+  │ PRNR
+  ▼ (~50–80)
+  │ Support filter
+  ▼ (~40–60)
+  │ Association rules
+  ▼
+S (20–40) ──► x ──► classifier ──► ŷ</pre>
+<p>Cross-paper hybrids (e.g. Broadcast + MLDP) concatenate MLDP \(\mathbf{x}^{(S)}\) with other manifest vectors — see <code>broadcast_mldp_hybrid.html</code>.</p>
+</section>
+
+<section>
+<h2>8. Experimental results</h2>
+<table>
+<tr><th>Approach</th><th>Dimensions</th><th>Typical outcome (paper / thesis)</th></tr>
+<tr><td>All permissions (unpruned)</td><td>135+</td><td>Noisy; slower; risk of overfitting rare perms</td></tr>
+<tr><td>PRNR only (no rules)</td><td>~50–80</td><td>Better than full but still redundant dims</td></tr>
+<tr><td class="best">Full MLDP-pruned</td><td class="best">20–40</td><td class="best">Often equal or better F1; fastest inference</td></tr>
+</table>
+<p><strong>Why improvement happened:</strong> Removing non-discriminative and ultra-rare permissions focuses the classifier on permissions malware actually abuses (SMS, install, phone state) and on <em>combinations</em> mined by association rules. The model sees a denser, more informative signal per dimension instead of a sparse 135-d vector with hundreds of always-zero bits.</p>
+</section>
+
+<section>
+<h2>9. Full end-to-end pipeline summary</h2>
+<pre class="flow">OFFLINE (once, on ~50k labeled APKs)
+┌──────────────────────────────────────────┐
+│ All APKs → full permission transactions   │
+└──────────────────┬───────────────────────┘
+                   ▼
+         PRNR → Support → Assoc. rules
+                   ▼
+         Frozen set S  (|S| ≈ 20–40)
+
+ON-DEVICE INFERENCE (per APK)
+┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │
+└──────────┬──────────────┘
+           ▼
+     x ∈ {0,1}^|S|     e.g. 1×30
+           ▼
+     SVM / tiny MLP
+           ▼
+     P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="broadcast_mldp_hybrid" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>Broadcast Receiver + MLDP Permission Hybrid</h1>
+<p class="meta">Cross-paper: Mohsen et al. 2017 (broadcast receivers) + IJACSA 2020 Permission Extraction Framework (MLDP)</p>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>MLDP-pruned permissions:</strong> Instead of ~135 permission bits, offline training selects ~20–40 “dangerous” permissions using PRNR, support, and association rules (see <code>mldp_pruned_permission_classifier.html</code>).</p>
+<p><strong>Broadcast receiver actions:</strong> Binary flags for system events the app listens to via <code>&lt;receiver&gt;</code> in the manifest (e.g. <code>BOOT_COMPLETED</code>). See Mohsen et al. 2017.</p>
+<p><strong>Concatenation</strong> <code>[a | b]</code>: Place vector <strong>a</strong> first, then <strong>b</strong>, forming one longer vector — <strong>early fusion</strong> (same as \([\mathbf{a} \| \mathbf{b}]\) in math notation).</p>
+<p><strong>Tiny MLP:</strong> A small neural network (e.g. 80 → 64 → 1) that can learn mild nonlinear combos like “SMS permission AND boot receiver together.”</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — MLDP permission sub-vector</li>
+<li>Component B — Broadcast receiver sub-vector</li>
+<li>Component C — Early fusion</li>
+<li>Component D — Tiny MLP classifier</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>On a corpus of <strong>50,000 APKs</strong>, you want a manifest-only detector that is small enough for mid-range phones yet more expressive than permissions alone. Full permission vectors (~200–400 dims with receivers) are noisy; MLDP-only (~30 dims) misses <em>when</em> the app wakes up; receiver-only models miss curated dangerous permissions. This <strong>cross-paper hybrid</strong> concatenates <strong>~20–40 MLDP-selected permission bits</strong> (IJACSA 2020) with <strong>~30–80 broadcast receiver action bits</strong> (Mohsen 2017) into one vector of roughly <strong>80–120 dimensions</strong>, then classifies with a <strong>tiny MLP</strong> (~80 → 64 → 1) exported to ONNX. No Dex decompilation, no 2500-d bag-of-words — two orthogonal manifest signals in one pass.</p>
+</section>
+
+<section>
+<h2>2. Component A — MLDP permission sub-vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Only permissions in the frozen MLDP set \(\mathcal{S}\) from offline pruning on the training corpus.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Full permission space is redundant; MLDP keeps permissions that skew toward malware and appear in high-confidence association rules — the “what may this app do?” signal in compact form.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Offline on labeled training APKs: run PRNR → support filter → association-rule mining → freeze \(\mathcal{S}\), \(|\mathcal{S}| \approx 20\)–40.</li>
+<li>At inference: parse manifest; for each \(\text{perm}_j \in \mathcal{S}\), set \(x^{(S)}_j = 1\) if declared, else \(0\).</li>
+<li>Output \(\mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|}\), e.g. \(1 \times 30\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x^{(S)}_j = \begin{cases} 1 & \text{if } \text{perm}_j \in \mathcal{S} \land \text{declared} \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|} \]</p>
+<ul class="vars"><li><strong>\(\mathcal{S}\)</strong> — MLDP-frozen permission subset</li><li><strong>\(\mathbf{x}^{(S)}\)</strong> — pruned permission feature block</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Offline: 50k APKs → MLDP → set S
+Inference:
+  Manifest → x^(S)  (1×|S|)  e.g. 1×30</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{x}^{(S)}\). First block of concatenated vector \(\mathbf{x}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Curated permission dimensions — not the full Android enum — reduce noise vs Mohsen’s full-permission branch.</div>
+</section>
+<section>
+<h2>3. Component B — Broadcast receiver sub-vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Intent <code>android:name</code> strings under <code>&lt;receiver&gt;&lt;intent-filter&gt;&lt;action&gt;</code> in the manifest.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Captures event-driven behavior orthogonal to permissions: malware registers boot/SMS/connectivity receivers far more often than benign apps (Mohsen empirical study).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse the same <code>AndroidManifest.xml</code>.</li>
+<li>Collect all <code>&lt;action&gt;</code> names under static <code>&lt;receiver&gt;</code> elements.</li>
+<li>Build receiver vocabulary \(\mathcal{A}\) from training corpus (\(R \approx 30\)–80).</li>
+<li>Set \(x^{(R)}_k = 1\) if action \(k\) present, else \(0\).</li>
+<li>Output \(\mathbf{x}^{(R)} \in \{0,1\}^{R}\), e.g. \(1 \times 50\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x^{(R)}_k = \begin{cases} 1 & \text{if } \text{action}_k \in \text{Receivers}(\text{APK}) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}^{(R)} \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(R\)</strong> — receiver-action vocabulary size</li><li><strong>\(\mathbf{x}^{(R)}\)</strong> — receiver feature block</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Manifest
+  │
+  └─► &lt;receiver&gt; / &lt;action&gt;
+         │
+         ▼
+   x^(R)  (1×R)  e.g. 1×50</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{x}^{(R)}\). Second block appended in fusion.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Receiver domain unchanged from Mohsen — proven complementary to permission signals.</div>
+</section>
+<section>
+<h2>4. Component C — Early fusion (concatenation)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Single manifest feature vector combining MLDP permissions and receiver actions.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Early fusion lets the MLP learn cross-domain interactions (e.g. dangerous permission + boot receiver) in one weight matrix.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Concatenate: \(\mathbf{x} \leftarrow [\mathbf{x}^{(S)} \| \mathbf{x}^{(R)}]\).</li>
+<li>Total dimension \(d = |\mathcal{S}| + R\), typically \(d \approx 80\)–120 (e.g. \(1 \times 100\)).</li>
+<li>Feed \(\mathbf{x}\) to the tiny MLP.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{x} = [\mathbf{x}^{(S)} \| \mathbf{x}^{(R)}] \in \{0,1\}^{|\mathcal{S}| + R} \]</p>
+<ul class="vars"><li><strong>\(\|\)</strong> — concatenation operator</li><li><strong>\(d\)</strong> — fused input dimension (~80–120)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x^(S) (1×|S|) ──┐
+                    ├──► x (1×d)  e.g. 1×100
+x^(R) (1×R)   ────┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs unified \(\mathbf{x}\) for the classifier. No separate scores merged later.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> ~5× smaller than Mohsen full-perm+receiver (~280+) while keeping both signal types.</div>
+</section>
+<section>
+<h2>5. Component D — Tiny MLP classifier</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Fused binary vector \(\mathbf{x} \in \{0,1\}^{d}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Linear models handle most manifest signal, but a single hidden layer captures conjunctions (permission ∧ receiver) without a large DNN or RBF SVM on device.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Hidden layer: \(\mathbf{h} = \text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1)\), \(\mathbf{W}_1 \in \mathbb{R}^{64 \times d}\).</li>
+<li>Output: \(\hat{y} = \sigma(\mathbf{w}_2^T \mathbf{h} + b_2)\).</li>
+<li>Train with binary cross-entropy on labeled APKs; export ONNX.</li>
+<li>Typical architecture: \(d \to 64 \to 1\) (e.g. \(100 \to 64 \to 1\)).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{h} = \max(0, \mathbf{W}_1 \mathbf{x} + \mathbf{b}_1), \quad \hat{y} = \sigma(\mathbf{w}_2^T \mathbf{h} + b_2) \]</p>
+<p>Binary cross-entropy loss for label \(y \in \{0,1\}\):</p>
+<p>\[ \mathcal{L} = - \bigl( y \log \hat{y} + (1-y) \log(1-\hat{y}) \bigr) \]</p>
+<ul class="vars"><li><strong>\(\mathbf{W}_1, \mathbf{b}_1\)</strong> — first-layer weights and bias</li><li><strong>\(\mathbf{w}_2, b_2\)</strong> — output layer</li><li><strong>\(\hat{y}\)</strong> — malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×d)  e.g. 1×100
+  │
+  ▼
+Linear d→64 + ReLU
+  │
+  ▼
+Linear 64→1 + σ
+  │
+  ▼
+P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final domain score for multistep scanning or ensemble with Dex-header / byte models.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Model size often &lt; 20 KB; inference &lt; 1 ms after manifest parse.</div>
+</section>
+<section>
+<h2>6. Ensemble or fusion mechanism</h2>
+<p><strong>Early fusion</strong> at the feature level (not late fusion of two separate classifiers):</p>
+<p>\[ \mathbf{x} = [\mathbf{x}^{(S)} \| \mathbf{x}^{(R)}], \quad \hat{y} = 	ext{MLP}(\mathbf{x}) \]</p>
+<pre class="flow">Manifest parse
+      │
+ ┌────┴────┐
+ ▼         ▼
+x^(S)    x^(R)
+1×|S|    1×R
+ │         │
+ └────┬────┘
+      ▼
+  x (1×d)   d ≈ 80–120
+      ▼
+  Tiny MLP (d→64→1)
+      ▼
+  ŷ ∈ [0,1]</pre>
+<p>Offline, MLDP’s internal cascade (PRNR → support → rules) is separate from receiver vocabulary mining — both freeze before mobile deployment.</p>
+</section>
+
+<section>
+<h2>7. Experimental results</h2>
+<table>
+<tr><th>Model variant</th><th>Approx. dims</th><th>Signals captured</th><th>Expected tradeoff</th></tr>
+<tr><td>MLDP only</td><td>~20–40</td><td>Curated permissions</td><td>Fastest; misses receiver behavior</td></tr>
+<tr><td>Mohsen full (perm + receiver)</td><td>~200–400</td><td>All perms + receivers</td><td>Heavier; noisy permissions</td></tr>
+<tr><td>Broadcast only (no MLDP)</td><td>~30–80</td><td>Receivers</td><td>Misses curated dangerous perms</td></tr>
+<tr><td class="best">Broadcast + MLDP hybrid</td><td class="best">~80–120</td><td class="best">Curated perms + receivers</td><td class="best">Best manifest-only balance (thesis recommendation)</td></tr>
+</table>
+<p><strong>Why this hybrid should win:</strong> MLDP removes permission noise that dilutes linear separators; receivers add behavioral timing signal Mohsen demonstrated empirically. Together you get ~3× fewer dimensions than full Mohsen with two complementary semantics — “dangerous capabilities” plus “sensitive event subscriptions.”</p>
+</section>
+
+<section>
+<h2>8. Full end-to-end pipeline summary</h2>
+<pre class="flow">OFFLINE (50k labeled APKs)
+├─► MLDP: PRNR → Support → Rules  →  frozen S  (|S|≈30)
+└─► Receiver corpus scan           →  frozen A  (R≈50)
+
+PER-APK INFERENCE
+┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │
+└──────┬──────────┬───────┘
+       ▼          ▼
+  x^(S) (1×|S|)  x^(R) (1×R)   e.g. 1×30 , 1×50
+       │          │
+       └────┬─────┘
+            ▼
+      x (1×d)                  e.g. 1×80 … 1×120
+            ▼
+      MLP: d → 64 → 1
+            ▼
+      P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="anastasia_behavioral_classifier" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>ANASTASIA Behavioral Feature Classifier (ANASTASIA-lite)</h1>
+<p class="meta">Paper: Fereidooni et al., NTMS 2016 — <em>ANASTASIA: Android mAlware detection using STAtic analySIs of Applications</em> · Thesis variant: top-128 + MLP-lite</p>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>Static vs dynamic analysis:</strong> Static inspection reads APK files without running them (safe, fast, on-device friendly). Dynamic analysis runs the app in a sandbox (accurate but slow, heavy battery).</p>
+<p><strong>Dalvik / Dex:</strong> App code lives in <code>classes.dex</code>. Static tools scan Dex strings and API references to see what the code <em>actually calls</em>, not only what the manifest declares.</p>
+<p><strong>Declared vs used permissions:</strong> Manifest says what the app <em>may</em> request; Dex analysis finds what code <em>references</em> — malware can hide behavior in bytecode.</p>
+<p><strong>uniPDroid:</strong> Tool used in the paper to extract ~560 binary behavioral features from manifest + Dex.</p>
+<p><strong>Feature selection (Extra Trees):</strong> Train an ensemble of randomized trees, rank feature importances, keep top \(K\) (e.g. 128) for a smaller mobile model.</p>
+<p><strong>XGBoost / MLP:</strong> Paper’s best accuracy uses gradient-boosted trees (~97.3% TPR reported); thesis <strong>ANASTASIA-lite</strong> uses a 2-layer MLP for ONNX size limits.</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component — uniPDroid 560-d extraction (5 categories)</li>
+<li>Component — Offline top-K feature selection</li>
+<li>Component — ANASTASIA-lite MLP classifier</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Given <strong>50,000 APKs</strong> to classify, permission-only manifest models miss fraud that lives in bytecode — sending SMS via API without declaring it, running <code>su</code>, or loading dex dynamically. <strong>ANASTASIA</strong> (Fereidooni et al., NTMS 2016) extracts a fixed <strong>560-dimensional binary behavioral profile</strong> from manifest and Dex using <strong>uniPDroid</strong> (intents, used permissions, shell commands, suspicious APIs, activity flags), then trains XGBoost (paper best: ~97.3% true positive rate, ~2.7% false negative on ~30k apps). For mobile deployment, <strong>ANASTASIA-lite</strong> applies offline Extra Trees selection to keep the <strong>top 128 dimensions</strong> and replaces XGBoost with a small MLP (128 → 128 → 1) exported to ONNX — same semantic categories, smaller model.</p>
+</section>
+
+<section>
+<h2>2. Component — uniPDroid 560-d behavioral extraction</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Manifest + all <code>classes*.dex</code> files: intents, used permissions, system commands, suspicious API calls, malicious-activity boolean flags.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Bytecode captures <em>actual</em> operations; manifest alone under-reports abuse. The paper defines ~560 hand-crafted templates matched by static scanning (no app execution).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; load <code>AndroidManifest.xml</code> and every <code>classes*.dex</code>.</li>
+<li>Disassemble or string-scan Dex (Androguard-style pipeline in paper; lightweight pattern matcher for thesis).</li>
+<li><strong>Category 1 — Intents:</strong> intent actions/filters in manifest and code → set bits for known IPC/event triggers.</li>
+<li><strong>Category 2 — Used permissions:</strong> permissions referenced in Dex (may differ from declared list).</li>
+<li><strong>Category 3 — System commands:</strong> strings like <code>chmod</code>, <code>su</code>, <code>sh</code>, <code>ps</code> in bytecode.</li>
+<li><strong>Category 4 — Suspicious APIs:</strong> e.g. <code>sendTextMessage</code>, <code>Runtime.exec</code>, <code>getDeviceId</code>.</li>
+<li><strong>Category 5 — Activity flags:</strong> booleans for IMEI read, dynamic code load, reflection, network socket, etc.</li>
+<li>For each of 560 predefined behaviors \(i\), set \(f_i = 1\) if detected, else \(0\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{f} \in \{0,1\}^{560}, \quad f_i = \mathbb{1}[\text{behavior}_i \text{ detected in APK}] \]</p>
+<p>Category partition (conceptual):</p>
+<p>\[ \mathbf{f} = [\mathbf{f}^{(\text{intents})} \| \mathbf{f}^{(\text{usedPerm})} \| \mathbf{f}^{(\text{syscmd})} \| \mathbf{f}^{(\text{api})} \| \mathbf{f}^{(\text{flags})}] \]</p>
+<ul class="vars"><li><strong>\(\mathbf{f}\)</strong> — full 560-d behavioral vector</li><li><strong>\(f_i\)</strong> — indicator for behavior template \(i\)</li><li><strong>\(\mathbb{1}[\cdot]\)</strong> — 1 if condition true, else 0</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► intents, components
+ └─► classes.dex ──► strings, APIs, commands
+         │
+         ▼
+   f ∈ {0,1}^560   (1×560)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs full \(\mathbf{f}\). Fed to offline feature selection; at inference only top-\(K\) indices are retained.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Behavioral static features beyond Drebin-style permissions — captures command execution and API abuse paths.</div>
+</section>
+<section>
+<h2>3. Component — Offline top-K feature selection (Extra Trees)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Importance scores of all 560 dimensions on labeled training APKs.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>560 dims is sparse and redundant for mobile; Extra Trees (paper uses impurity-based importance) picks the most discriminative 128 features while preserving category coverage.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Train Extra Trees classifier on \(\mathbf{f}\) with malware/benign labels (paper also tried SVM, RF, XGBoost on full 560-d).</li>
+<li>Compute mean decrease in impurity (or permutation importance) per dimension \(i\).</li>
+<li>Rank features by importance \(s_i\) descending.</li>
+<li>Select index set \(\mathcal{K}\) of top \(K=128\) features (thesis default; paper used full 560 for XGBoost).</li>
+<li>Freeze mask matrix \(\mathbf{M} \in \{0,1\}^{K \times 560}\) mapping \(\mathbf{f} \mapsto \mathbf{x}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{x} = \mathbf{M} \mathbf{f}, \quad \mathbf{M} \in \{0,1\}^{K \times 560}, \quad \|\mathbf{M}\|_0 = K \]</p>
+<p>Equivalent indexing:</p>
+<p>\[ x_k = f_{\mathcal{K}_k}, \quad k = 1,\ldots,K \]</p>
+<ul class="vars"><li><strong>\(s_i\)</strong> — importance score for feature \(i\)</li><li><strong>\(\mathcal{K}\)</strong> — set of selected indices (\(|\mathcal{K}|=128\))</li><li><strong>\(\mathbf{x}\)</strong> — reduced vector for deployment (\(1 \times 128\))</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Training: f (1×560) + labels
+  │
+  ▼
+Extra Trees → importance s_i
+  │
+  ▼
+Top-K indices K  (K=128)
+  │
+  ▼
+Frozen mask M</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{x} \in \{0,1\}^{128}\) (or \(\mathbb{R}^{128}\) after optional scaling). Input to MLP-lite.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty (thesis):</strong> Same 560-d philosophy as paper; ~4× smaller input than full vector with most impurity retained in top 128 dims.</div>
+</section>
+<section>
+<h2>4. Component — ANASTASIA-lite MLP classifier</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Reduced behavioral vector \(\mathbf{x} \in \mathbb{R}^{128}\) (binary 0/1 or float).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Paper’s 6-layer DNN [3200…100] and XGBoost are too heavy for on-device; a 2-hidden-block MLP matches MSFDroid-style deployment while preserving nonlinear decision boundaries.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Layer 1: \(\mathbf{h}_1 = \text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1)\), \(\mathbf{W}_1 \in \mathbb{R}^{128 \times 128}\).</li>
+<li>Layer 2 (optional same width in paper DNN; lite uses one wide hidden): \(\mathbf{h}_2 = \text{ReLU}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)\).</li>
+<li>Output: \(\hat{y} = \sigma(\mathbf{w}_3^T \mathbf{h}_2 + b_3)\) — scalar malware probability.</li>
+<li>Train with Adam + binary cross-entropy; early stopping on validation F1.</li>
+<li>Export ONNX (~50–150 KB depending on width).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{h}_1 = \text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1), \quad \hat{y} = \sigma(\mathbf{w}_2^T \mathbf{h}_1 + b_2) \]</p>
+<p>Two-layer lite stack (thesis): 128 → 128 → 1.</p>
+<p>Compare to paper XGBoost: \\(\\hat{y} = \\sigma\\left(\\sum_{t=1}^{T} \\eta \\, f_t(\\mathbf{x})\\right)\\) with \\(f_t\\) regression trees — higher accuracy, larger model.</p>
+<ul class="vars"><li><strong>\(\mathbf{x}\)</strong> — 128-d selected behavioral input</li><li><strong>\(\hat{y}\)</strong> — malware probability</li><li><strong>\(f_t\)</strong> — XGBoost weak learners (paper only)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×128)
+  │
+  ▼
+Linear 128→128 + ReLU
+  │
+  ▼
+Linear 128→1 + σ
+  │
+  ▼
+P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final score for APK. Use when manifest-only models disagree or as a medium-cost stage in multistep scanning.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Best accuracy potential among new single-pass thesis models while staying ONNX-small (vs paper’s 6-layer DNN).</div>
+</section>
+<section>
+<h2>5. Ensemble or fusion mechanism</h2>
+<p>Base ANASTASIA is a <strong>single pipeline</strong> (extract → classify). The 560 features are already a <strong>concatenation of five semantic categories</strong> inside uniPDroid — not separate classifiers fused late:</p>
+<p>\[ \mathbf{f} = [\mathbf{f}^{(1)} \| \cdots \| \mathbf{f}^{(5)}], \quad \mathbf{x} = \mathbf{M}\mathbf{f}, \quad \hat{y} = 	ext{MLP}(\mathbf{x}) \]</p>
+<pre class="flow">Five category blocks inside uniPDroid
+  │
+  ▼
+f (1×560)
+  │
+  ▼
+Top-128 mask M
+  │
+  ▼
+x (1×128) ──► MLP-lite ──► ŷ</pre>
+<p>Paper ensemble comparison: XGBoost vs RF vs SVM trained on the <em>same</em> \(\mathbf{f}\) — XGBoost wins; no multi-model vote at inference in the deployed lite variant.</p>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Classifier (560-d features, paper)</th><th>F1 (10-fold CV, imbalanced)</th><th>TPR / FNR (reported)</th></tr>
+<tr><td>SVM</td><td>~0.94</td><td>—</td></tr>
+<tr><td>Random Forest</td><td>~0.96</td><td>—</td></tr>
+<tr><td class="best">XGBoost</td><td class="best">~0.96–0.97</td><td class="best">~97.3% TPR, ~2.7% FNR (large set)</td></tr>
+<tr><td>6-layer Deep Learning</td><td>~0.97</td><td>High accuracy, large model</td></tr>
+<tr><td>ANASTASIA-lite (thesis)</td><td>Re-verify on your corpus</td><td>128-d + MLP; target near XGBoost with smaller ONNX</td></tr>
+</table>
+<p><strong>Why XGBoost / behavioral features work:</strong> Dex captures executed capabilities (API calls, shell commands) that manifest omits. Boosted trees exploit sparse 560-d interactions (e.g. “uses SMS API” ∧ “reads IMEI” ∧ “no launcher activity”). <strong>Why lite may trade a little F1 for size:</strong> Top-128 selection drops tail features; MLP approximates tree boundaries with far fewer parameters than hundreds of XGBoost trees.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">OFFLINE (50k labeled APKs)
+├─► uniPDroid on each APK → f (1×560)
+├─► Extra Trees importance → top-K=128 → frozen M
+└─► Train MLP-lite on x = M·f  (128→128→1)
+
+PER-APK INFERENCE
+┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌──────────────────────────────┐
+│ Manifest + Dex static scan   │  (heavier than manifest-only)
+└──────────────┬───────────────┘
+               ▼
+         f (1×560)
+               ▼
+         mask M  (top-128)
+               ▼
+         x (1×128)
+               ▼
+         MLP-lite (128→128→1)
+               ▼
+         P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="linregdroid_permission_classifier" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>LinRegDroid Permission Classifier</h1>
+<p class="meta">Paper: Şahin et al., IEEE Access 2022 — <em>LinRegDroid: Detection of Android Malware Using Multiple Linear Regression Models-Based Classifiers</em></p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>APK &amp; manifest:</strong> An APK is a ZIP archive; <code>AndroidManifest.xml</code> lists declared <code>&lt;uses-permission&gt;</code> names — no code execution needed for this model.</p>
+<p><strong>Linear regression:</strong> Fit a weighted sum of inputs to predict a continuous target. Here the target is a class encoding (benign ≈ 1, malware ≈ 0), so regression acts as a linear classifier.</p>
+<p><strong>Multiple linear regression (MLR):</strong> Many features at once: \(y = \beta_0 + \sum_k \beta_k x_k\). Coefficients \(\beta\) are found by <strong>least squares</strong> (minimize squared error on training labels).</p>
+<p><strong>Bagging:</strong> Train several models on random bootstrap samples of the training set; aggregate predictions by majority vote or averaging — reduces variance.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission feature extraction</li>
+<li>Component B — Multiple linear regression (coefficient learning)</li>
+<li>Component C — LinRegDroid1 (threshold rule)</li>
+<li>Component D — LinRegDroid2 (nearest-class rule)</li>
+<li>Ensemble / bagging mechanism</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine you have <strong>50,000 APK files</strong> and need malware labels before install. Heavy models (deep nets, large SVMs) are accurate but slow on phones and in batch scanners. Şahin et al. ask: for <strong>permission-only</strong> static detection, is a <strong>multiple linear regression</strong> model enough? <strong>LinRegDroid</strong> answers yes: build a binary permission vector from <code>AndroidManifest.xml</code>, learn coefficients \(\boldsymbol{\beta}\) by least squares, map the continuous score to {benign, malware} with <strong>LinRegDroid1</strong> (threshold 0.5) or <strong>LinRegDroid2</strong> (nearest label 0/1). Optional <strong>bagging</strong> over linear models, linear-SVM, or decision trees pushes F-measure to <strong>0.956</strong> on the AMD dataset (paper). The architecture is manifest-only, ~135–400 dimensions, and equivalent to one linear layer + decision rule — ideal as an ultra-minimal baseline in your thesis stack.</p>
+</section>
+
+<section>
+<h2>Component A — Permission feature extraction</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Every <code>android:name</code> in <code>&lt;uses-permission&gt;</code> tags inside <code>AndroidManifest.xml</code> for each APK.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Permissions are the cheapest high-level security signal on Android: malware that sends premium SMS, reads contacts, or installs packages must often declare dangerous permissions visible in the manifest. The paper uses the <strong>full</strong> permission vocabulary (not pruned subsets) to match classic Drebin-style permission detectors.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip the APK; locate <code>AndroidManifest.xml</code> (binary XML — decode with AAPT2, Apktool, or equivalent).</li>
+<li>Enumerate all <code>&lt;uses-permission android:name="…"&gt;</code> strings.</li>
+<li>From the <strong>training corpus only</strong>, build vocabulary \(\mathcal{P} = \{\text{perm}_1,\ldots,\text{perm}_M\}\) (paper reports \(M \approx 135\)–400 depending on dataset).</li>
+<li>For APK \(i\), set \(p_{i,k} = 1\) if \(\text{perm}_k\) appears, else \(0\).</li>
+<li>Freeze \(\mathcal{P}\) at inference; permissions not in vocabulary are ignored.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ p_{i,k} = \begin{cases} 1 & \text{if } \text{perm}_k \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{p}_i \in \{0,1\}^{M} \]</p>
+<p>Stack \(N\) training APKs into design matrix \(\mathbf{X} \in \mathbb{R}^{N \times M}\) (each row \(\mathbf{p}_i^T\)).</p>
+<ul class="vars"><li><strong>\(M\)</strong> — permission vocabulary size (feature dimension)</li><li><strong>\(p_{i,k}\)</strong> — bit for permission \(k\) in APK \(i\)</li><li><strong>\(\mathbf{p}_i\)</strong> — permission feature row fed to regression</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Raw APK
+  │
+  └─► AndroidManifest.xml
+         │
+         └─► &lt;uses-permission&gt; tags
+                │
+                ▼
+         Permission vector  p  (1×M)
+         e.g. M = 1×200  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{p} \in \{0,1\}^{M}\). This vector is the sole input to MLR training and to LinRegDroid1/2 at inference.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Deliberately minimal feature set — no intents, no API calls, no Dex — to prove linear permission models remain competitive with SVM/RF on several benchmarks.</div>
+</section>
+<section>
+<h2>Component B — Multiple linear regression (coefficient learning)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Labeled training pairs \((\mathbf{p}_i, y_i)\) where \(y_i \in \{0,1\}\) encodes class (paper: 0 = malware, 1 = benign).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Linear models train in milliseconds, require no GPU, and yield interpretable \(\beta_k\): positive \(\beta_k\) means permission \(k\) pushes the score toward benign. Least squares has a closed-form solution on moderate \(M\).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Form label vector \(\mathbf{y} \in \mathbb{R}^N\) from training malware/benign flags.</li>
+<li>Build \(\mathbf{X}\) with rows \(\mathbf{p}_i^T\) (add column of ones if using intercept \(\beta_0\)).</li>
+<li>Solve normal equations for coefficients \(\boldsymbol{\beta}\).</li>
+<li>Store \(\beta_0, \beta_1, \ldots, \beta_M\) for deployment (ONNX: single <code>Linear(M,1)</code>).</li>
+<li>At inference, compute continuous score \(\hat{y}_i\) for each new APK.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>Model:</strong> \[ \hat{y}_i = \beta_0 + \sum_{k=1}^{M} \beta_k \, p_{i,k} = \beta_0 + \boldsymbol{\beta}^T \mathbf{p}_i \]</p>
+<p><strong>Training (least squares):</strong> \[ \boldsymbol{\beta}^* = \arg\min_{\boldsymbol{\beta}} \|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2 \quad \Rightarrow \quad \boldsymbol{\beta}^* = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{y} \]</p>
+<ul class="vars"><li><strong>\(\hat{y}_i\)</strong> — continuous predicted score (not yet a class label)</li><li><strong>\(\beta_0\)</strong> — intercept bias term</li><li><strong>\(\boldsymbol{\beta}\)</strong> — weight vector over permissions</li><li><strong>\(\mathbf{X}, \mathbf{y}\)</strong> — training design matrix and labels</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Training APKs (N)
+         │
+         ├─► X  (N×M)  permission matrix
+         └─► y  (N×1)  labels
+                │
+                ▼
+         Least squares  →  β*  (M+1 coeffs)
+                │
+                ▼
+         Deploy:  ŷ = β0 + β^T p</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs learned \(\boldsymbol{\beta}^*\) and produces \(\hat{y}_i \in \mathbb{R}\) per APK. \(\hat{y}_i\) feeds <strong>LinRegDroid1</strong> or <strong>LinRegDroid2</strong> decision rules.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard XGBoost/SVM:</strong> No kernels, no trees — pure linear boundary in permission space; smallest possible model for ablation vs your 2500-d manifest pipeline.</div>
+</section>
+<section>
+<h2>Component C — LinRegDroid1 (threshold classifier, Algorithm 1)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Continuous score \(\hat{y}_i\) from Component B for a single test APK.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Regression outputs real numbers, not probabilities. A fixed threshold at 0.5 (midpoint between encoded labels 0 and 1) is the simplest calibration-free decision rule — same spirit as sigmoid + 0.5 cutoff.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Compute \(\hat{y}_i = \beta_0 + \boldsymbol{\beta}^T \mathbf{p}_i\) for the APK.</li>
+<li>Compare \(\hat{y}_i\) to threshold \(t = 0.5\).</li>
+<li>If \(\hat{y}_i \geq 0.5\), assign <strong>benign</strong>; else <strong>malware</strong>.</li>
+<li>Return hard label (and optionally \(\hat{y}_i\) as confidence proxy).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{class}_i = \begin{cases} \text{benign} & \text{if } \hat{y}_i \geq 0.5 \\ \text{malware} & \text{otherwise} \end{cases} \]</p>
+<ul class="vars"><li><strong>\(t = 0.5\)</strong> — fixed decision threshold (paper Algorithm 1)</li><li><strong>\(\hat{y}_i\)</strong> — regression output before thresholding</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">p  (1×M)  →  ŷ = β0 + β^T p  (scalar)
+                │
+                ▼
+         ŷ ≥ 0.5 ?  ──Yes──► benign
+                │
+               No
+                ▼
+            malware</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs binary class label. In bagging ensembles, each base LinRegDroid1 model contributes one vote.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> One comparison operation at inference — negligible latency after dot product.</div>
+</section>
+<section>
+<h2>Component D — LinRegDroid2 (nearest-class rule, Algorithm 2)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Same continuous \(\hat{y}_i\) as LinRegDroid1; alternative discretization when scores cluster away from 0.5.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>If \(\hat{y}_i = 0.72\), threshold rule says benign; if \(\hat{y}_i = 0.48\), threshold says malware. Nearest-class assigns whichever of {0, 1} is closer in absolute distance — handles scores that drift above 1 or below 0 from linear extrapolation.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Compute \(\hat{y}_i\) as in Component B.</li>
+<li>Consider candidate encodings \(c \in \{0, 1\}\) (malware, benign).</li>
+<li>Pick \(c^* = \arg\min_{c} |\hat{y}_i - c|\).</li>
+<li>Map \(c^*\) back to class name.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \text{class}_i = \arg\min_{c \in \{0,1\}} |\hat{y}_i - c| \]</p>
+<p>Example: \(\hat{y}_i = 0.35\) → distances 0.35 and 0.65 to 0 and 1 → choose 0 (malware).</p>
+<ul class="vars"><li><strong>\(c\)</strong> — encoded class value (0 malware, 1 benign in paper)</li><li><strong>\(|\hat{y}_i - c|\)</strong> — distance used for nearest-label assignment</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">ŷ  (scalar)
+  │
+  ├─► |ŷ − 0|  ──┐
+  └─► |ŷ − 1|  ──┼──► argmin  →  class
+                 ┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs binary label (alternative to LinRegDroid1). Paper compares both; pick one for deployment or ensemble both as diverse voters.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from LinRegDroid1:</strong> Robust when regression scores are not well-calibrated to [0,1] but still ordered — no fixed threshold hyperparameter.</div>
+</section>
+<section>
+<h2>5. Ensemble / bagging mechanism</h2>
+<p>The paper improves LinRegDroid with <strong>bagging</strong> (bootstrap aggregating): train multiple models on random subsets of training APKs, aggregate votes.</p>
+<p><strong>Ensemble-1:</strong> Five multiple linear regression models on bootstrap samples → majority vote on LinRegDroid1/2 labels.</p>
+<p><strong>Ensemble-2:</strong> Mix linear regression, <strong>linear-SVM</strong>, and <strong>decision trees</strong> on subsets → majority vote.</p>
+<p>\[ \hat{y}_{\text{ens}} = \frac{1}{B}\sum_{b=1}^{B} f_b(\mathbf{p}), \quad \text{or} \quad \text{class} = \mathrm{mode}\big(\{f_b(\mathbf{p})\}_{b=1}^{B}\big) \]</p>
+<ul class="vars">
+<li><strong>\(B\)</strong> — number of bagged models (paper uses 5 for linear ensemble)</li>
+<li><strong>\(f_b\)</strong> — base learner trained on bootstrap sample \(b\)</li>
+</ul>
+<pre class="flow">Training set
+     │
+     ├─► bootstrap sample 1 ──► LinReg / SVM / DT  ──► vote 1
+     ├─► bootstrap sample 2 ──► LinReg / SVM / DT  ──► vote 2
+     │         ...
+     └─► bootstrap sample B ──► LinReg / SVM / DT  ──► vote B
+                    │
+                    ▼
+            Majority vote  →  final class</pre>
+<p><strong>Key novelty:</strong> Shows +1–2% F-measure over single linear model without deep learning — diversity from algorithm type (Ensemble-2) matters more than depth.</p>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Method</th><th>Dataset (paper)</th><th>F-measure / metric</th><th>Notes</th></tr>
+<tr><td>LinRegDroid1 / LinRegDroid2 (single MLR)</td><td>AMD, Drebin, etc.</td><td>~0.94–0.95 F-measure</td><td>Competitive with SVM/RF on permissions</td></tr>
+<tr><td>Ensemble-1 (5× LinReg bagging)</td><td>AMD</td><td>~0.95+</td><td>Variance reduction</td></tr>
+<tr><td class="best"><strong>Ensemble-2 / Bagging-DT (mixed learners)</strong></td><td class="best"><strong>AMD</strong></td><td class="best"><strong>0.956 F-measure</strong></td><td class="best"><strong>Best in paper on AMD</strong></td></tr>
+<tr><td>Heavy DL / large feature sets</td><td>Various</td><td>Higher cost</td><td>LinReg trades accuracy for speed/size</td></tr>
+</table>
+<p><strong>Why improvement happened:</strong> Bagging reduces overfitting when some permissions are rare or noisy; mixing SVM and trees captures mild nonlinearity that a single hyperplane misses — while staying orders of magnitude smaller than neural detectors.</p>
+<p><strong>Thesis note:</strong> Overlaps with deployed 2500-d XGBoost manifest model; use LinRegDroid as <strong>ultra-minimal baseline</strong> or with MLDP-pruned permissions to differentiate feature sets.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │
+│ (uses-permission tags)  │
+└──────────┬──────────────┘
+           ▼
+    p  (1×M)   e.g. M ≈ 135–400, binary
+           ▼
+    ŷ = β0 + β^T p   (scalar, MLR)
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+ LinRegDroid1   LinRegDroid2
+  ŷ ≥ 0.5?    nearest {0,1}
+     │           │
+     └─────┬─────┘
+           ▼
+   benign / malware
+           │
+ optional ▼
+   Bagging: B models → majority vote
+           ▼
+   final label  (F ≈ 0.956 AMD, Ensemble-2)</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="fexdroid_category_sparse_classifier" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>FexDroid Category-Pruned Sparse Classifier</h1>
+<p class="meta">Paper: ICCAI 2018 — <em>Effective and Explainable Detection of Android Malware</em> (FexDroid / ProDroid family)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Drebin feature space:</strong> Famous Android malware benchmark. Each APK maps to a <strong>sparse binary vector</strong> — one dimension per unique static string (API, permission, URL, activity, …). Joint vocabulary can exceed <strong>545,333</strong> dimensions.</p>
+<p><strong>Sparse vector:</strong> Almost all entries are 0; only present terms are 1. Storage and dot-products must exploit sparsity.</p>
+<p><strong>Linear SVM (LibLinear):</strong> Finds a hyperplane \(w^T x + b = 0\) that separates classes with margin; efficient on sparse high-D data in the paper.</p>
+<p><strong>Category taxonomy:</strong> FexDroid groups features into <strong>10 semantic buckets</strong> so pruning is interpretable (drop whole noisy categories, not arbitrary indices).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Static multi-source extraction (Drebin-style)</li>
+<li>Component B — Ten-category bucketing</li>
+<li>Component C — Category &amp; frequency pruning</li>
+<li>Component D — FexDroid-lite vocabulary cap (thesis)</li>
+<li>Component E — Linear SVM classifier (paper)</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine <strong>50,000 APK files</strong> and a Drebin-style extractor that could produce a vector with <strong>545K+</strong> dimensions — impossible to train or run on a phone. <strong>ProDroid/FexDroid</strong> (ICCAI 2018) attack this by (1) organizing features into <strong>10 categories</strong> (permissions, API calls, intents, …), (2) <strong>pruning</strong> rare and high-uncertainty categories (URLs, activities), shrinking space toward <strong>~49K</strong>, and (3) training a <strong>linear SVM</strong> for fast sparse classification (~94% TPR reported in the family). Your thesis <strong>FexDroid-lite</strong> caps each category at ~500 top terms → <strong>3K–5K</strong> frozen dimensions + ASCNN or MLP for ONNX. Extraction needs manifest + Dex static analysis — highest cost among single-pass suggestions except full Drebin.</p>
+</section>
+
+<section>
+<h2>Component A — Static multi-source extraction (Drebin-style)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Manifest declarations (permissions, components, intent filters) plus Dex/static strings: API invocations, method call patterns, URLs, provider names, etc.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Drebin proved that joint static features discriminate malware well; FexDroid keeps that expressiveness but structures it for explainability and pruning.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; parse <code>AndroidManifest.xml</code> for permissions, activities, services, receivers, providers, intent filters.</li>
+<li>Disassemble or statically analyze all <code>classes*.dex</code> files (Androguard / equivalent).</li>
+<li>Collect API call signatures, call-graph edges, embedded URL/host strings, hardware <code>uses-feature</code> entries.</li>
+<li>Normalize strings (e.g. permission names to <code>real_permission</code> form).</li>
+<li>For each extracted term, record which <strong>category</strong> it belongs to (next component).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Per-term indicator: \[ f_j = \mathbb{1}[\text{term}_j \in \text{APK}] \]</p>
+<p>Before pruning, dimension index \(j\) runs over full Drebin vocabulary \(|\mathcal{V}| \approx 545{,}333\).</p>
+<ul class="vars"><li><strong>\(f_j\)</strong> — binary feature for term \(j\)</li><li><strong>\(\mathbb{1}[\cdot]\)</strong> — indicator: 1 if term present, else 0</li><li><strong>\(|\mathcal{V}|\)</strong> — full joint vocabulary size before reduction</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► perms, intents, components
+ └─► Dex/static ──► APIs, calls, URLs, strings
+         │
+         ▼
+   Raw term multiset  (→ bucketed next)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs unstructured multiset of labeled static terms. Fed into category bucketing (Component B).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Same information source as Drebin but pipeline designed for <strong>explainable</strong> category-wise analysis, not a flat hash of strings.</div>
+</section>
+<section>
+<h2>Component B — Ten-category bucketing</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>All extracted terms partitioned into fixed semantic categories (see table in paper).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Pruning and explanation work per category — e.g. drop <code>url</code> entirely because domains change daily; keep <code>api_call</code> because malware API sequences are stable.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Assign each term to exactly one category label \(c \in \mathcal{C}\), \(|\mathcal{C}| = 10\).</li>
+<li>Build per-category vocabularies \(\mathcal{V}_c\).</li>
+<li>Concatenate category blocks (order fixed at training) into global index set.</li>
+<li>Maintain category metadata for explainability (which APIs fired, etc.).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Categories \(\mathcal{C}\): \(\{\text{real\_permission}, \text{feature}, \text{api\_call}, \text{call}, \text{permission}, \text{provider}, \text{intent}, \text{service\_receiver}, \text{activity}, \text{url}\}\).</p>
+<p>\[ \mathbf{f} = [\mathbf{f}_{c_1} \| \mathbf{f}_{c_2} \| \cdots \| \mathbf{f}_{c_{10}}] \]</p>
+<ul class="vars"><li><strong>\(\mathcal{C}\)</strong> — set of 10 category names</li><li><strong>\(\mathcal{V}_c\)</strong> — vocabulary for category \(c\)</li><li><strong>\(\mathbf{f}_c\)</strong> — binary sub-vector for category \(c\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Extracted terms
+       │
+       ▼
+┌──────────────────────────────────┐
+│ real_permission │ feature │ api_call │
+│ call │ permission │ provider │ intent │
+│ service_receiver │ activity │ url │
+└──────────────────────────────────┘
+       │
+       ▼
+  f partitioned by category</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs structured sparse vector with category boundaries. Feeds pruning (Component C).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from flat Drebin:</strong> Enables <strong>whole-category removal</strong> (URLs, activities) based on uncertainty analysis — not just global frequency cuts.</div>
+</section>
+<section>
+<h2>Component C — Category & frequency pruning (FexDroid / ProDroid)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Full 545K-dimensional space and per-category statistics: term frequency, class-conditional probability, uncertainty.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Rare terms (≤5 occurrences) add noise and memory; URL/activity categories have high entropy — dropping them shrinks ~545K → ~40K–49K with small accuracy loss (paper).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li><strong>ProDroid step:</strong> Remove features appearing ≤5 times in training corpus.</li>
+<li>Remove features with high uncertainty (weak class separation).</li>
+<li><strong>FexDroid step:</strong> Drop entire categories <code>url</code> and <code>activity</code> (noisy, unstable).</li>
+<li>Rebuild vocabulary \(\mathcal{V}'\) with \(|\mathcal{V}'| \approx 49{,}000\) (paper reduction path).</li>
+<li>Re-index APK features into pruned space.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Pruned dimension: \[ D_{\text{Fex}} \ll 545{,}333, \quad D_{\text{Fex}} \approx 4 \times 10^4 \]</p>
+<p>Retention rule (conceptual): keep term \(j\) if \(\mathrm{freq}(j) > \tau_f\) and \(\mathrm{uncertainty}(j) < \tau_u\), with category-level overrides.</p>
+<ul class="vars"><li><strong>\(\tau_f\)</strong> — minimum frequency threshold (e.g. 5)</li><li><strong>\(D_{\text{Fex}}\)</strong> — dimension after FexDroid pruning</li><li><strong>url / activity</strong> — categories removed wholesale</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_full  (545K+ sparse)
+    │
+    ├─► drop rare (freq ≤ 5)
+    ├─► drop high-uncertainty terms
+    └─► drop url + activity categories
+            │
+            ▼
+    f_pruned  (~49K sparse)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{f}' \in \{0,1\}^{D_{\text{Fex}}}\). For mobile thesis path, passes to lite cap (Component D) before classifier.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> ~10× dimension reduction with explainable rules; ~94% TPR reported in ProDroid/FexDroid line on Drebin-style evaluation.</div>
+</section>
+<section>
+<h2>Component D — FexDroid-lite vocabulary cap (thesis deployment)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Pruned feature space per category after Component C.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>49K is still large for on-device ONNX; capping top 500 terms per category yields **3K–5K** dims — fits ASCNN/MLP and multistep cascade stage 3+.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>For each category \(c\), rank terms by training frequency (or mutual information).</li>
+<li>Keep top \(K_c \approx 500\) terms; map OOV to drop or rare bucket.</li>
+<li>Freeze lexicon for inference.</li>
+<li>Build \(\mathbf{f}_{\text{lite}} \in \{0,1\}^{D}\), \(D \approx 3000\)–5000.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ D_{\text{lite}} = \sum_{c \in \mathcal{C}'} |\mathcal{V}_c^{\text{top-}K}|, \quad \mathcal{C}' = \mathcal{C} \setminus \{\text{url}, \text{activity}\} \]</p>
+<ul class="vars"><li><strong>\(K_c\)</strong> — max terms kept per category (~500)</li><li><strong>\(D_{\text{lite}}\)</strong> — final deployable dimension (~3K–5K)</li><li><strong>\(\mathcal{C}'\)</strong> — categories retained after FexDroid drops</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_pruned (~49K)
+    │
+    ▼
+ per-category top-500 cap
+    │
+    ▼
+ f_lite  (1×3000–5000)  frozen vocab</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{f}_{\text{lite}}\) to classifier (Component E). Used when cheaper models (header, MLDP) are uncertain in cascade.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Thesis novelty:</strong> Same semantic categories as paper, but vocabulary sized for mobile inference — not paper's full 49K LibLinear run.</div>
+</section>
+<section>
+<h2>Component E — Linear SVM classifier (paper) / ASCNN or MLP (thesis)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Sparse binary vector \(\mathbf{f}\) or \(\mathbf{f}_{\text{lite}}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Linear SVM scales to very high sparse dimension with hinge loss; thesis may swap ASCNN from MSFDroid for denoising high-D sparse input before sigmoid.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Train LibLinear SVM on \((\mathbf{f}_i, y_i)\) with labels \(y_i \in \{-1,+1\}\) or \(\{0,1\}\).</li>
+<li>Hyperparameter \(C\) controls margin vs misclassification (grid search in paper).</li>
+<li>Decision: \(\mathrm{sign}(\mathbf{w}^T \mathbf{f} + b)\) or probability via Platt scaling.</li>
+<li>Thesis alternative: \(\hat{y} = \sigma(\mathrm{MLP}(\mathbf{f}_{\text{lite}}))\) or ASCNN embedding → MLP.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>Linear SVM (paper):</strong> \[ \min_{\mathbf{w},b} \frac{1}{2}\|\mathbf{w}\|^2 + C \sum_i \max(0, 1 - y_i(\mathbf{w}^T \mathbf{f}_i + b)) \]</p>
+<p><strong>MLP (thesis ONNX):</strong> \[ \hat{y} = \sigma(\mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1 \mathbf{f}_{\text{lite}} + \mathbf{b}_1) + \mathbf{b}_2) \]</p>
+<ul class="vars"><li><strong>\(\mathbf{w}, b\)</strong> — SVM hyperplane weights and bias</li><li><strong>\(C\)</strong> — regularization constant</li><li><strong>\(\hat{y}\)</strong> — malware probability or score</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_lite  (1×D)
+    │
+    ├─► Paper: Linear SVM  →  sign(w^T f + b)
+    └─► Thesis: ASCNN/MLP  →  σ(·)  →  P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs malware score in \([0,1]\). Feeds ensemble or multistep policy as high-cost high-F1 stage.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Paper SVM is proven on sparse Drebin family; thesis MLP/ASCNN unifies export format with MSFDroid stack.</div>
+</section>
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Method</th><th>Feature dims</th><th>TPR / accuracy</th><th>Inference (paper)</th></tr>
+<tr><td>Full Drebin + SVM</td><td>545,333+</td><td>High</td><td>Very slow train/infer</td></tr>
+<tr><td>ProDroid (frequency prune)</td><td>~40K</td><td>~94% TPR</td><td>~4 s (reported)</td></tr>
+<tr><td>FexDroid (category prune)</td><td>~49K → effective ~40K</td><td>Comparable to ProDroid</td><td>Faster than full Drebin</td></tr>
+<tr><td class="best"><strong>FexDroid-lite (thesis cap)</strong></td><td class="best"><strong>3K–5K</strong></td><td class="best"><strong>Target similar TPR, mobile-feasible</strong></td><td class="best"><strong>ONNX MLP/ASCNN &lt;&lt; 4 s</strong></td></tr>
+</table>
+<p><strong>Why improvement over full Drebin happened:</strong> URLs and activity names dominate vocabulary size but change with repackaging and benign app updates — removing them cuts noise. API calls and permissions remain stable discriminators. Category caps prevent single bucket from exploding dimension.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ├──────────────────────┐
+       ▼                      ▼
+ Manifest parse          Dex/static analysis
+       │                      │
+       └──────────┬───────────┘
+                  ▼
+        Terms → 10 categories
+                  ▼
+     Prune: rare + drop url/activity
+     545K → ~49K (paper)
+                  ▼
+     Lite: top-500/category (thesis)
+                  ▼
+        f  (1×3000–5000)  sparse binary
+                  ▼
+     Linear SVM (paper) / ASCNN|MLP (thesis)
+                  ▼
+           P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="erbe_permission_intent_mlp" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>ERBE Permission + Intent MLP (Base Learner)</h1>
+<p class="meta">Paper: Potha et al., Connection Science 2020 — <em>An extrinsic random-based ensemble approach for android malware detection (ERBE)</em></p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Static manifest features:</strong> Permissions (<code>&lt;uses-permission&gt;</code>) and <strong>intent actions</strong> (<code>&lt;action android:name="…"&gt;</code> in intent filters) — all extractable without running the APK.</p>
+<p><strong>Binary feature vector:</strong> One dimension per distinct permission or intent string in the training corpus; value 1 if present in APK, else 0 (~1K dims on AndroZoo in paper).</p>
+<p><strong>MLP:</strong> Multi-layer perceptron — fully connected layers with ReLU and sigmoid output for malware probability.</p>
+<p><strong>Ensemble vs deployable:</strong> Full <strong>ERBE</strong> runs <strong>15 iterations</strong> with random feature/instance subspaces — best offline, 15× inference cost. Thesis uses <strong>one MLP base learner</strong> on the full vector.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission + intent feature extraction</li>
+<li>Component B — Full ERBE ensemble (paper, reference)</li>
+<li>Component C — Deployable base MLP</li>
+<li>Ensemble mechanism (ERBE vs single MLP)</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>On <strong>AndroZoo-scale</strong> corpora, manifest permissions alone miss behavior declared via <strong>intents</strong> (e.g. <code>BOOT_COMPLETED</code>, <code>SMS_RECEIVED</code>). Potha et al. build a joint binary vector over permissions and intent actions (~<strong>1002</strong> dimensions), then propose <strong>ERBE</strong> (Extrinsic Random-based Ensemble): <strong>15</strong> rounds of training on random feature subspaces and random <strong>external</strong> malware/benign subsets, aggregating base-learner scores (LR, MLP, or SGD). That ensemble beats single classifiers by up to <strong>5%+</strong> accuracy but costs ~<strong>117 minutes</strong> training and 15× inference — unsuitable for per-APK on-device scans. Your thesis deploys <strong>ERBE's feature space + one MLP</strong> (~1K → hidden → 1) for ONNX parity with other manifest-neural models.</p>
+</section>
+
+<section>
+<h2>Component A — Permission + intent feature extraction</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Union of all <code>uses-permission</code> names and <code>intent action</code> strings appearing anywhere in the APK manifest (AndroZoo static pipeline in paper).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Intents capture declared interaction with the OS (views, broadcasts, services) beyond capability flags. Joint vocabulary ~1K is compact yet richer than permissions-only LinRegDroid.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Decompile APK to readable manifest (paper: AndroZoo tooling).</li>
+<li>Collect every distinct permission name across training set → index set \(\mathcal{P}\).</li>
+<li>Collect every distinct intent action string → index set \(\mathcal{I}\).</li>
+<li>Form unified vocabulary of size \(D = |\mathcal{P}| + |\mathcal{I}|\) (paper benchmark \(D \approx 1002\)).</li>
+<li>For APK \(i\): \(x_{i,j} = 1\) if feature \(j\) present, else 0.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x_{i,j} = \begin{cases} 1 & \text{if feature } j \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}_i \in \{0,1\}^{D} \]</p>
+<p>Paper example: App1 uses \(p_1,p_2,i_1\) → \((1,1,0,1,0,0)\); App2 uses \(p_1,p_3,i_2,i_3\) → \((1,0,1,0,1,1)\) over joint \((p_1,p_2,p_3,i_1,i_2,i_3)\).</p>
+<ul class="vars"><li><strong>\(D\)</strong> — total feature dimension (~1002 AndroZoo)</li><li><strong>\(\mathcal{P}, \mathcal{I}\)</strong> — permission and intent vocabularies</li><li><strong>\(x_{i,j}\)</strong> — binary indicator for feature \(j\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK → manifest
+         ├─► permissions  ──┐
+         └─► intent actions ┼─► x  (1×D)  e.g. 1×1002
+                            ┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{x} \in \{0,1\}^{D}\). Feeds ERBE iterations (paper) or single MLP (thesis).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Single unified manifest vector mixing permissions and intents — simpler than TF-IDF weighted 2500-d deployed XGBoost but same semantic domain.</div>
+</section>
+<section>
+<h2>Component B — Full ERBE ensemble (paper, reference only)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Binary vector \(\mathbf{x}\) and labeled training pool; external malware/benign repositories for extrinsic sampling.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>ERBE injects diversity via random subspaces and external samples so each of 15 base models sees different views — reduces correlation of errors vs bagging on identical features.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Set iteration count \(T = 15\).</li>
+<li>For \(t = 1,\ldots,T\): sample random feature subset at rate \(a\) (e.g. 50% of \(D\)).</li>
+<li>Sample random external malware and benign APK subsets (extrinsic data).</li>
+<li>Train base learner (LR, MLP, or SGD) on subspace + subset.</li>
+<li>Score each test APK; append to list \(\mathcal{S}\).</li>
+<li>Aggregate: mean or vote over \(\mathcal{S}\) → final malware score.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \hat{y}_{\text{final}} = \frac{1}{T}\sum_{t=1}^{T} f_t(\mathbf{x}_{\mathcal{F}_t}), \quad \mathcal{F}_t \subset \{1,\ldots,D\},\ |\mathcal{F}_t| \approx a \cdot D \]</p>
+<p>Each \(f_t\) is a base classifier trained on features \(\mathcal{F}_t\) only.</p>
+<ul class="vars"><li><strong>\(T=15\)</strong> — ensemble iterations (paper)</li><li><strong>\(a\)</strong> — feature sampling rate (~0.5)</li><li><strong>\(f_t\)</strong> — base learner at round \(t\) (ERBEMLP, ERBELR, ERBESGD)</li><li><strong>extrinsic samples</strong> — external APKs added per round for diversity</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×D)
+  │
+  ├─► round 1: x|F1, external data → f1 → s1
+  ├─► round 2: x|F2, external data → f2 → s2
+  │      ...
+  └─► round 15: x|F15 → f15 → s15
+              │
+              ▼
+        mean(s1..s15) → ŷ_final</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs aggregated malware score. **Not deployed** on-device — reference for why single MLP is chosen.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard bagging:</strong> Random <strong>feature</strong> subspaces + <strong>extrinsic</strong> instance injection, not only bootstrap rows on full \(\mathbf{x}\).</div>
+</section>
+<section>
+<h2>Component C — Deployable base MLP (thesis)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Full (or slightly reduced) permission+intent vector \(\mathbf{x} \in \{0,1\}^{D}\), all features every forward pass.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>One forward pass, small weight matrices, exportable to ONNX — matches VigiDroid need for a second manifest-neural model alongside XGBoost.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Input layer: \(D\) neurons (binary \(\mathbf{x}\)).</li>
+<li>Hidden layer: e.g. 128 units, ReLU activation.</li>
+<li>Output layer: 1 neuron, sigmoid → \(\hat{y} \in [0,1]\).</li>
+<li>Train with BCE loss on labeled APKs.</li>
+<li>Threshold 0.5 at inference for malware label.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{h} = \mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1), \quad \hat{y} = \sigma(\mathbf{W}_2 \mathbf{h} + \mathbf{b}_2) \]</p>
+<p>\(\sigma(z) = 1/(1+e^{-z})\) — malware probability.</p>
+<ul class="vars"><li><strong>\(\mathbf{W}_1, \mathbf{b}_1\)</strong> — first layer weights ( \(D \times H\) )</li><li><strong>\(H\)</strong> — hidden size (e.g. 128)</li><li><strong>\(\hat{y}\)</strong> — output malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x  (1×1002)
+  │
+  ▼
+ Dense  D→128  ReLU
+  │
+  ▼
+ Dense  128→1  sigmoid
+  │
+  ▼
+ P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\hat{y}\) for ensemble fusion with Dex/header models or multistep cascade. ERBE-style 15× averaging reserved for offline ablation.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Captures mild nonlinearity (permission–intent interactions) that linear ERBE base cannot, at single-pass cost.</div>
+</section>
+<section>
+<h2>5. Ensemble mechanism (ERBE vs single MLP)</h2>
+<table>
+<tr><th>Variant</th><th>Forward passes</th><th>Training time</th><th>Use case</th></tr>
+<tr><td>ERBELR / ERBEMLP / ERBESGD (single)</td><td>1</td><td>Minutes</td><td>Base learners inside ERBE</td></tr>
+<tr><td class="best"><strong>Full ERBE (T=15)</strong></td><td class="best"><strong>15</strong></td><td class="best"><strong>Up to ~117 min (paper)</strong></td><td class="best"><strong>Best offline accuracy</strong></td></tr>
+<tr><td><strong>Thesis MLP (full x)</strong></td><td><strong>1</strong></td><td><strong>Minutes</strong></td><td><strong>On-device / scanner ONNX</strong></td></tr>
+</table>
+<pre class="flow">Paper ERBE:
+  x ──► [15 × (subspace + external train + score)] ──► mean → ŷ
+
+Thesis:
+  x (full 1×D) ──► MLP ──► ŷ   (one pass)</pre>
+<p><strong>Future thesis path:</strong> Learn ERBE-like diversity in <strong>adaptive soft voting</strong> across domains (manifest MLP + header + bytes) instead of 15× same-vector ensemble.</p>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Approach</th><th>Features</th><th>Accuracy gain (paper)</th><th>Inference</th></tr>
+<tr><td>Single LR / MLP / SGD</td><td>~1002 binary</td><td>Baseline</td><td>Low</td></tr>
+<tr><td class="best"><strong>ERBE (15 iterations)</strong></td><td class="best">Random subspaces of ~1002</td><td class="best"><strong>Up to ~5%+ vs single base</strong></td><td class="best"><strong>15× base cost</strong></td></tr>
+<tr><td><strong>Thesis single MLP</strong></td><td>Full ~1K</td><td>Between base and ERBE (expected)</td><td><strong>Low</strong></td></tr>
+</table>
+<p><strong>Why ERBE improved:</strong> Different random feature subsets emphasize different permission/intent combinations; extrinsic samples expose the learner to malware families not in the current minibatch — lowers correlated errors when averaged.</p>
+<p><strong>Why thesis uses one MLP:</strong> Same ~1K semantic signal without 15× latency; ensemble diversity deferred to cross-domain voting (header, bytes, manifest).</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Static manifest parse   │
+│ permissions + intents   │
+└──────────┬──────────────┘
+           ▼
+    x  (1×D)   D ≈ 1002, binary
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+ Paper ERBE    Thesis MLP
+ 15× subspace   D→128→1
+ mean scores    sigmoid
+     │           │
+     └─────┬─────┘
+           ▼
+    P(malware) → threshold → label</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="dex_header_broadcast_receiver_fusion" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>Dex Header + Broadcast Receiver Fusion</h1>
+<p class="meta">Cross-paper: MSFDroid (Dex header H, Peng et al. 2022) + Mohsen et al. 2017 (broadcast receiver intent actions)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Dex header (104 bytes):</strong> After 8-byte magic (<code>dex\n035</code>), bytes 8–111 encode section sizes/offsets (strings, methods, classes). Malware often shows abnormal header statistics without readable manifest changes.</p>
+<p><strong>MSFDroid MLP(H):</strong> Normalize header bytes to \(\mathbf{H} \in [0,1]^{104}\); sum-pool across multidex; small MLP → 128-d embedding.</p>
+<p><strong>Broadcast receivers:</strong> Manifest <code>&lt;receiver&gt;</code> components with <code>&lt;action&gt;</code> tags — which system events wake the app (boot, SMS, connectivity).</p>
+<p><strong>Late fusion (Pattern B):</strong> Separate towers per modality → concat embeddings → final FC + sigmoid (MSFDroid Pattern B style, but BoW replaced by ~50-d receiver vector).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Dex header feature H (104-d)</li>
+<li>Component B — Broadcast receiver actions R (~50-d)</li>
+<li>Component C — MLP(H) tower</li>
+<li>Component D — Receiver tower</li>
+<li>Late fusion mechanism (Pattern B)</li>
+<li>Experimental results (expected / comparative)</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>You need a detector richer than <strong>header-only MLP(H)</strong> (~83.5% ACC alone in MSFDroid Table 6) but lighter than <strong>4380-d manifest BoW</strong> or ANASTASIA bytecode scan. This hybrid fuses <strong>104-d Dex header</strong> (structural signal) with <strong>~30–80-d broadcast receiver intent actions</strong> (event-subscription signal) using <strong>late fusion Pattern B</strong>: two small towers → concat embeddings → sigmoid. No permissions, no API strings, no raw tail bytes — manifest parse is limited to receivers; Dex read is header-only.</p>
+</section>
+
+<section>
+<h2>Component A — Dex header feature H (104-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Bytes 8–111 of each <code>classes*.dex</code> file after magic verification (MSFDroid §3.3).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Header reflects compiler/linker layout; malware packing and multidex anomalies perturb offsets/sizes before any string is read — complements manifest receivers.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; enumerate all <code>classes*.dex</code>.</li>
+<li>Verify first 8 bytes match Dex magic.</li>
+<li>Read bytes 8–111 → raw vector \(\mathbf{h}^{(	ext{dex})}\).</li>
+<li>Encode: \(h_b = 	ext{byte}_b / 255\).</li>
+<li>Min–max normalize each dimension using training corpus stats.</li>
+<li>Multidex: element-wise sum \(\mathbf{H} = \sum_{	ext{dex}} \mathbf{h}^{(	ext{dex})}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ h_b = \frac{\text{byte}_b}{255}, \quad \mathbf{H} = \sum_{d=1}^{N_{\text{dex}}} \mathbf{h}^{(d)} \in [0,1]^{104} \]</p>
+<p>Corpus normalization: \(\tilde{H}_j = \frac{H_j - \min_j}{\max_j - \min_j + \epsilon}\).</p>
+<ul class="vars"><li><strong>\(\mathbf{H}\)</strong> — pooled normalized header (104-d)</li><li><strong>\(N_{\text{dex}}\)</strong> — number of dex files in APK</li><li><strong>\(\epsilon\)</strong> — numerical stability in min–max</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">classes*.dex
+    │
+    ▼
+ bytes [8:112]  (104 values)
+    │
+    ▼
+ ÷255 → min-max norm → sum-pool
+    │
+    ▼
+ H  (1×104)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{H}\). Input to MLP(H) tower (Component C).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> O(1) in Dex file size — only fixed header window, not full entropy scan (MLP(M) dropped in MSFDroid-lite).</div>
+</section>
+<section>
+<h2>Component B — Broadcast receiver actions R (~50-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Intent <code>android:name</code> strings under <code>&lt;receiver&gt;&lt;intent-filter&gt;&lt;action&gt;</code> in manifest (Mohsen et al. 2017).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Receivers capture <em>when</em> code runs without user launch — malware registers BOOT_COMPLETED, SMS_RECEIVED more aggressively than benign apps.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse <code>AndroidManifest.xml</code>.</li>
+<li>Find all <code>&lt;receiver&gt;</code> elements.</li>
+<li>Collect <code>&lt;action android:name="…"&gt;</code> under each receiver's intent-filter.</li>
+<li>Build training vocabulary \(\mathcal{A}\) of distinct actions (\(R pprox 30\)–80).</li>
+<li>Set \(R_k = 1\) if action \(k\) present in APK, else 0.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ R_k = \begin{cases} 1 & \text{if } \text{action}_k \in \text{Receivers}(\text{APK}) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{R} \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(R\)</strong> — receiver-action vocabulary size</li><li><strong>\(R_k\)</strong> — binary bit for action \(k\)</li><li><strong>\(\mathbf{R}\)</strong> — receiver feature vector (~50-d typical)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+    │
+    └─► &lt;receiver&gt; → &lt;action&gt; names
+            │
+            ▼
+      R  (1×R)  binary  e.g. 1×50</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{R}\). Input to receiver tower (Component D).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why different from Pattern A BoW:</strong> ~50 dims vs 4381 — same manifest-parse family as Mohsen but fused with Dex header, not permissions.</div>
+</section>
+<section>
+<h2>Component C — MLP(H) tower (MSFDroid Base Model 1)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Normalized header vector \(\mathbf{H} \in \mathbb{R}^{104}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Two FC+ReLU blocks (paper Fig. 3) map structural layout to 128-d embedding suitable for fusion.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Input \(\mathbf{H}\) shape (1×104).</li>
+<li>Layer 1: Linear(104 → \(h_1\)), ReLU (paper-style FC+BN+ReLU).</li>
+<li>Layer 2: Linear(\(h_1\) → 128), ReLU.</li>
+<li>Output embedding \(\mathbf{z}_H \in \mathbb{R}^{128}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z}_H = \mathrm{ReLU}\big(\mathbf{W}_{H2}\,\mathrm{ReLU}(\mathbf{W}_{H1}\mathbf{H} + \mathbf{b}_{H1}) + \mathbf{b}_{H2}\big), \quad \mathbf{z}_H \in \mathbb{R}^{128} \]</p>
+<ul class="vars"><li><strong>\(\mathbf{z}_H\)</strong> — header branch embedding (128-d)</li><li><strong>\(\mathbf{W}_{H1}, \mathbf{W}_{H2}\)</strong> — learned weight matrices</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">H  (1×104)
+  │
+  ▼
+ FC → ReLU → FC → ReLU
+  │
+  ▼
+ z_H  (1×128)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{z}_H\). Concatenated with \(\mathbf{z}_R\) in fusion (Component late fusion section).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Proven MSFDroid stream — cheap, no manifest lexicon explosion.</div>
+</section>
+<section>
+<h2>Component D — Receiver tower (linear or tiny MLP)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Binary receiver vector \(\mathbf{R} \in \{0,1\}^{R}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Sparse binary inputs need only a shallow map to embedding space before fusion.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Option A: Linear(\(R\) → 64) + ReLU.</li>
+<li>Option B: MLP \(R\) → 32 → 64 with ReLU.</li>
+<li>Output \(\mathbf{z}_R \in \mathbb{R}^{64}\) (typical).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z}_R = \mathrm{ReLU}(\mathbf{W}_R \mathbf{R} + \mathbf{b}_R), \quad \mathbf{z}_R \in \mathbb{R}^{d_R},\ d_R \approx 32\text{–}64 \]</p>
+<ul class="vars"><li><strong>\(\mathbf{z}_R\)</strong> — receiver branch embedding</li><li><strong>\(d_R\)</strong> — receiver embedding dimension</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">R  (1×R)  e.g. 1×50
+  │
+  ▼
+ Linear/MLP  →  ReLU
+  │
+  ▼
+ z_R  (1×64)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{z}_R\). Late-fused with \(\mathbf{z}_H\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Captures event-driven malware behavior Mohsen showed improves over permissions alone — without 4380-d BoW.</div>
+</section>
+<section>
+<h2>6. Late fusion mechanism (Pattern B style)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Embeddings \(\mathbf{z}_H\) (structural) and \(\mathbf{z}_R\) (manifest behavioral) from separate towers.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Late fusion lets each modality use its own inductive bias — header MLP for continuous layout, shallow net for sparse binary actions — before joint decision. Matches MSFDroid Pattern B (separate ASCNN/MLP branches) but swaps manifest BoW for receivers.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps">
+<li>Compute \(\mathbf{H}\) and \(\mathbf{R}\) from APK.</li>
+<li>Forward through MLP(H) → \(\mathbf{z}_H\).</li>
+<li>Forward through receiver tower → \(\mathbf{z}_R\).</li>
+<li>Concatenate \(\mathbf{z} = [\mathbf{z}_H \| \mathbf{z}_R]\).</li>
+<li>Final FC + sigmoid → \(\hat{y}\).</li>
+</ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z} = [\mathbf{z}_H \| \mathbf{z}_R] \in \mathbb{R}^{128 + d_R}, \quad \hat{y} = \sigma(\mathbf{w}^T \mathbf{z} + b) \]</p>
+<ul class="vars">
+<li><strong>\(\mathbf{z}\)</strong> — fused embedding (e.g. 192-d if \(d_R=64\))</li>
+<li><strong>\(\hat{y}\)</strong> — malware probability</li>
+</ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► classes*.dex ──► H (1×104) ──► MLP(H) ──► z_H (1×128)
+ │
+ └─► Manifest receivers ──► R (1×50) ──► Tower ──► z_R (1×64)
+                              │
+                              └─► z = [z_H || z_R]  (1×192)
+                                        │
+                                        ▼
+                                   FC + sigmoid
+                                        │
+                                        ▼
+                                   P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Single malware score for ensemble / multistep policy. Can run as <strong>Step 2</strong> after MLDP+header cascade when uncertain.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>vs Pattern B (MSFDroid):</strong> Replaces 4380-d manifest BoW with ~50-d receivers — ~90% smaller manifest branch, still adds behavioral manifest signal. <strong>vs MLP(H) only:</strong> Adds event-subscription semantics MSFDroid header cannot see.</div>
+</section>
+
+<section>
+<h2>7. Experimental results (comparative / expected)</h2>
+<table>
+<tr><th>Model</th><th>Manifest cost</th><th>Dex cost</th><th>Expected F1 / ACC</th></tr>
+<tr><td>MLP(H) only (MSFDroid)</td><td>None</td><td>Header only</td><td>~83.5% ACC (paper Table 6, alone)</td></tr>
+<tr><td>Mohsen receivers only</td><td>Small</td><td>None</td><td>Weaker alone; informative combined</td></tr>
+<tr><td>Pattern B (H + BoW I)</td><td>Large (4381-d)</td><td>Header</td><td>High (paper fusion)</td></tr>
+<tr><td class="best"><strong>H + R fusion (this model)</strong></td><td class="best"><strong>Small (~50-d)</strong></td><td class="best"><strong>Header only</strong></td><td class="best"><strong>Moderate–high; between H-only and full Pattern B (thesis target)</strong></td></tr>
+</table>
+<p><strong>Why fusion should help:</strong> Header catches structural/packing anomalies; receivers catch persistence/SMS hooks invisible in 104 bytes. Together they approximate part of Pattern B's manifest value at far lower dimension — good when ANASTASIA extraction is too costly.</p>
+</section>
+
+<section>
+<h2>8. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ├────────────────────────┐
+       ▼                        ▼
+ classes*.dex              AndroidManifest
+       │                        │
+       ▼                        ▼
+ H (1×104)                  R (1×R)
+       │                        │
+       ▼                        ▼
+ MLP(H) tower              Receiver tower
+       │                        │
+       ▼                        ▼
+ z_H (1×128)              z_R (1×64)
+       │                        │
+       └──────────┬─────────────┘
+                  ▼
+         z = [z_H || z_R]  (1×192)
+                  ▼
+            FC + sigmoid
+                  ▼
+         P(malware) ∈ [0,1]  →  label</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="anastasia_manifest_bow_fusion" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>ANASTASIA Features + Manifest BoW Fusion</h1>
+<p class="meta">Cross-paper: Fereidooni et al. NTMS 2016 (ANASTASIA 128-d behavioral) + Peng et al. MSFDroid 2022 (manifest BoW I, ASCNN Pattern A)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>APK anatomy:</strong> ZIP containing <code>AndroidManifest.xml</code> (declarations) and <code>classes.dex</code> (Dalvik bytecode). Static analysis reads these without executing the app.</p>
+<h3>Bag-of-words (BoW) on manifest</h3>
+<p>Fix a training vocabulary of \(N\) terms (permissions + intent keywords). For each APK, dimension \(j\) is 1 if term \(j\) appears. MSFDroid uses \(N=4380\) plus one <strong>UNK</strong> bucket → <strong>4381-d</strong> sparse binary vector <strong>I</strong>.</p>
+<h3>ANASTASIA behavioral features</h3>
+<p>~560 binary flags from manifest + Dex (API calls, shell commands, used permissions, intents). <strong>ANASTASIA-lite</strong> keeps top \(K=128\) via Extra Trees. See <a href="#anastasia_behavioral_classifier">anastasia_behavioral_classifier.html</a>.</p>
+<h3>MSFDroid Pattern A — ASCNN(C)</h3>
+<p>Early fusion: concatenate feature vectors, then one <strong>Adaptive Shrinkage CNN</strong> (3 blocks + AvgPool) compresses high-dimensional sparse input to <strong>128-d</strong> embedding → MLP → sigmoid. Paper Fig. 3 / Fig. 7; replaces Dex header <strong>H</strong> with behavioral <strong>b</strong> in this hybrid.</p>
+<h3>Concatenation</h3>
+<p>\([\mathbf{a} \| \mathbf{b}]\) appends all dimensions of \(\mathbf{b}\) after \(\mathbf{a}\).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — ANASTASIA behavioral (128-d)</li>
+<li>Component B — Manifest BoW (4381-d)</li>
+<li>Component C — ASCNN(C) classifier tower</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine <strong>50,000 APK files</strong> on a phone scanner. <strong>Pattern A</strong> (MSFDroid) concatenates a 104-d Dex <em>header</em> with a ~4381-d manifest BoW and runs ASCNN — strong on declared permissions but blind to what bytecode actually calls. <strong>ANASTASIA</strong> alone captures API abuse and shell commands but misses broad manifest keyword patterns. This hybrid <strong>replaces H with top-128 behavioral bits b</strong>, keeps the same BoW <strong>I</strong>, and feeds <strong>x = [b || I] ∈ ℝ<sup>4509</sup></strong> into the same ASCNN(C) Pattern A tower. One forward pass; medium–high extraction (manifest + Dex string scan); high F1 potential on API-heavy malware.</p>
+</section>
+
+<section>
+<h2>2. Component A — ANASTASIA behavioral vector b (128-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Top-\(K\) subset of the 560-d uniPDroid behavioral profile: intents, <em>used</em> permissions in Dex, system commands (<code>su</code>, <code>chmod</code>), suspicious API strings (<code>sendTextMessage</code>, <code>Runtime.exec</code>), and composite activity flags.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Dex header bytes describe <em>structure</em> (section sizes/offsets); behavioral bits describe <em>capabilities the code exercises</em>. Malware may hide SMS fraud in bytecode without honest manifest declarations — ANASTASIA closes that gap relative to Pattern A's H.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; locate <code>AndroidManifest.xml</code> and all <code>classes*.dex</code>.</li>
+<li>Run uniPDroid-style static scan (Androguard pipeline in original paper): match 560 predefined behavior templates.</li>
+<li>Set \(b_i = 1\) if behavior \(i\) detected, else \(0\) → full \(\mathbf{f} \in \{0,1\}^{560}\).</li>
+<li>Offline on training corpus: Extra Trees feature importance → index set \(\mathcal{K}\), \(|\mathcal{K}|=128\).</li>
+<li>At inference: output only \(\mathbf{b} = \mathbf{f}_{\mathcal{K}} \in \{0,1\}^{128}\) (frozen \(\mathcal{K}\)).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ f_i = \mathbb{1}[\text{behavior}_i \text{ detected}], \quad \mathbf{f} \in \{0,1\}^{560} \]</p>
+<p>\[ b_j = f_{\mathcal{K}_j}, \quad \mathbf{b} \in \{0,1\}^{128} \]</p>
+<ul class="vars"><li><strong>\(f_i\)</strong> — indicator for behavior template \(i\)</li><li><strong>\(\mathcal{K}\)</strong> — selected feature indices (128)</li><li><strong>\(\mathbf{b}\)</strong> — behavioral sub-vector fed to fusion</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► intents, components
+ └─► classes.dex ──► API / command strings
+         │
+         ▼
+    f ∈ {0,1}^560  ──► Extra Trees mask K
+         │
+         ▼
+    b ∈ {0,1}^128   (1×128)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{b}\). Concatenated with manifest BoW \(\mathbf{I}\) before ASCNN: \(\mathbf{x} = [\mathbf{b} \| \mathbf{I}]\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Swaps cheap structural H for richer bytecode-observed behavior while keeping vector width similar (128 vs 104) for fair comparison to Pattern A.</div>
+</section>
+<section>
+<h2>3. Component B — Manifest BoW I (4381-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Sparse binary bag-of-words over <strong>permission names</strong> and <strong>intent-related keywords</strong> from decoded <code>AndroidManifest.xml</code> (MSFDroid §3.5, same lexicon as Pattern A).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Manifest declarations remain the strongest coarse signal for store-visible risk. BoW captures thousands of permission/intent combinations that a 128-d behavioral slice might not encode explicitly.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Decode binary <code>AndroidManifest.xml</code> to readable XML.</li>
+<li>Extract all permission strings and intent keyword strings (actions, categories).</li>
+<li>On training set: collect vocabulary; drop terms with frequency &lt; 2.</li>
+<li>Cap lexicon at \(N = 4380\); reserve index 4381 for UNK (out-of-vocabulary).</li>
+<li>For APK \(t\): \(I_j = 1\) if term \(j\) in manifest, else \(0\); map OOV to UNK bit.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ I_j = \begin{cases} 1 & \text{if term}_j \in \text{Manifest}(t) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{I} \in \{0,1\}^{4381} \]</p>
+<ul class="vars"><li><strong>\(N=4380\)</strong> — dictionary size before UNK</li><li><strong>\(I_j\)</strong> — BoW dimension \(j\)</li><li><strong>UNK</strong> — single bucket for any OOV term at inference</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+  │
+  ├─► permissions ──┐
+  └─► intent keywords ┤
+                      ▼
+              I ∈ {0,1}^4381   (1×4381 sparse)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{I}\). Appended after \(\mathbf{b}\): \(\mathbf{x} = [\mathbf{b} \| \mathbf{I}] \in \{0,1\}^{4509}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from ANASTASIA alone:</strong> BoW uses a 4K+ declaration lexicon; behavioral 128-d is a curated bytecode summary — complementary, not redundant.</div>
+</section>
+<section>
+<h2>4. Component C — ASCNN(C) Pattern A tower</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Single neural tower on fused vector \(\mathbf{x}\): three <strong>Adaptive Shrinkage Convolution</strong> blocks (kernel 3, strides 2,2,1 per MSFDroid Fig. 7) + AvgPool1d → 128-d embedding \(\mathbf{e}\) → MLP head → sigmoid malware probability.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>High-dimensional sparse BoW is noisy. ASCNN applies 1-D convolution plus <strong>soft-thresholding</strong> (adaptive shrinkage) to denoise rare bits before classification — paper Table 5 shows ASCNN beats plain CNN on BoW.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Reshape \(\mathbf{x}\) as 1×4509 sequence (batch × channels × length).</li>
+<li>Block 1: Conv1d → adaptive shrinkage (soft-threshold) → activation; stride 2.</li>
+<li>Block 2–3: repeat with strides 2 and 1 (paper Fig. 7).</li>
+<li>Global AvgPool1d → \(\mathbf{e} \in \mathbb{R}^{128}\).</li>
+<li>MLP: FC + BatchNorm + ReLU blocks → single logit → \(\sigma\) → \(\hat{y}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Shrinkage (conceptual, per channel): \[ y = \mathrm{sign}(x) \cdot \max(|x| - \lambda, 0) \]</p>
+<p>Full tower: \[ \mathbf{e} = \mathrm{AvgPool}(\mathrm{ASCNN}_{3}(\mathbf{x})), \quad \hat{y} = \sigma(\mathrm{MLP}(\mathbf{e})) \]</p>
+<ul class="vars"><li><strong>\(\lambda\)</strong> — learned or adaptive threshold (noise suppression)</li><li><strong>\(\mathbf{e}\)</strong> — 128-d embedding before classifier head</li><li><strong>\(\hat{y}\)</strong> — malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×4509)
+  │
+  ▼
+┌─────────────────────┐
+│ ASCNN block 1       │  stride 2
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ ASCNN block 2       │  stride 2
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ ASCNN block 3       │  stride 1
+└──────────┬──────────┘
+           ▼
+    AvgPool1d
+           │
+           ▼
+    e (128-d) ──► MLP ──► σ ──► P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final \(\hat{y} \in [0,1]\) feeds VigiDroid multistep policy or ensemble with cheaper models (MLDP+header cascade, ByteCNN).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>vs Pattern B:</strong> Early fusion (one tower) is smaller/faster than separate MLP(H)+ASCNN(I) branches — appropriate when both domains are concatenated upfront.</div>
+</section>
+<section>
+<h2>5. Ensemble / fusion mechanism</h2>
+<h3 class="sub">What it analyzes</h3>
+<p><strong>Early fusion</strong> (Pattern A): concatenate behavioral and manifest domains <em>before</em> any neural processing — not late fusion or voting.</p>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{x} = [\mathbf{b} \| \mathbf{I}] \in \mathbb{R}^{4509}, \quad \hat{y} = \sigma(\mathrm{MLP}(\mathrm{ASCNN}(\mathbf{x}))) \]</p>
+<ul class="vars">
+<li><strong>\(\|\)</strong> — vector concatenation (128 + 4381 = 4509)</li>
+<li>Contrast Pattern B: \(\hat{y} = \sigma(\mathbf{w}^T[\mathrm{MLP}(\mathbf{b}) \| \mathrm{ASCNN}(\mathbf{I})])\) with separate towers</li>
+</ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">b (128-d) ──┐
+            ├──► x (4509-d) ──► ASCNN(C) ──► e (128-d) ──► MLP ──► ŷ
+I (4381-d) ─┘</pre>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Cross-paper mix:</strong> ANASTASIA signal + MSFDroid BoW/ASCNN — same fusion recipe as implemented Pattern A, but <em>behavior replaces Dex header</em> for API-centric malware families.</div>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Variant</th><th>Input dims</th><th>Extraction cost</th><th>F1 potential (thesis)</th></tr>
+<tr><td>Pattern A (H + I)</td><td>104 + 4381 ≈ 4485</td><td>Low–medium</td><td>High (MSFDroid ~97% ACC ensemble context)</td></tr>
+<tr><td>ANASTASIA-lite only</td><td>128</td><td>Medium</td><td>Med–high (~0.96–0.97 F1 paper XGBoost)</td></tr>
+<tr><td>ASCNN(I) only (paper)</td><td>4381</td><td>Low–medium</td><td>~89% ACC single stream</td></tr>
+<tr><td class="best"><strong>b + I fusion (this model)</strong></td><td class="best">4509</td><td class="best">Medium–high</td><td class="best"><strong>Highest</strong> among static manifest+code (no raw bytes)</td></tr>
+</table>
+<p><strong>Why improvement over Pattern A is expected:</strong> Header H encodes Dex <em>layout statistics</em>; \(\mathbf{b}\) encodes <em>which APIs and commands appear in code</em>. BoW still covers declaration surface. Together they reduce false negatives where manifest looks benign but bytecode sends SMS or loads dex dynamically.</p>
+<p><strong>Cost trade-off:</strong> Extraction heavier than header-only (Dex string scan) but lighter than FexDroid 3K–5K vocab or full 560-d inference without pruning.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       │
+   ┌───┴────────────────────────────┐
+   ▼                                ▼
+Manifest + Dex scan              Manifest decode
+(uniPDroid templates)            (perms + intents)
+   │                                │
+   ▼                                ▼
+b (1×128)                      I (1×4381)
+   │                                │
+   └────────────┬───────────────────┘
+                ▼
+         x = [b || I]  (1×4509)
+                ▼
+         ASCNN × 3 + AvgPool
+                ▼
+         e (1×128)
+                ▼
+         MLP + sigmoid
+                ▼
+      P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="fexdroid_tail_bytes_dual_branch" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>FexDroid Sparse + Raw APK Tail Dual-Branch</h1>
+<p class="meta">Cross-paper: ICCAI 2018 FexDroid (category-pruned sparse ~3K–5K) + Hasegawa &amp; Iyatomi 2018 (1D-CNN on last 1024 APK bytes)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<h3>FexDroid / Drebin-style sparse features</h3>
+<p>Binary indicators for named artifacts: permissions, API calls, intents, components — grouped into <strong>10 categories</strong>. Full Drebin &gt;500K dims; FexDroid prunes to ~49K; thesis <strong>FexDroid-lite</strong> caps ~500 terms/category → <strong>3K–5K</strong>. See <a href="#fexdroid_category_sparse_classifier">fexdroid_category_sparse_classifier.html</a>.</p>
+<h3>Raw APK tail bytes (ByteCNN / 1DCNN)</h3>
+<p>Read the <strong>last 1024 bytes</strong> of the APK file as integers 0–255. No unzip, no parsing. Packing, zip comment, and dex placement artifacts show up here. Your deployed 1DCNN model uses this domain.</p>
+<h3>Late fusion (Pattern B style)</h3>
+<p>Each branch has its own network → embedding vectors → concatenate → final FC layer. Branches see different input modalities.</p>
+<h3>Dual-branch vs early concat</h3>
+<p>Early concat would force one tower to mix 3K sparse bits with 1024 raw bytes — poor inductive bias. Late fusion keeps semantic ASCNN/MLP separate from convolutional byte learning.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — FexDroid-lite sparse f</li>
+<li>Component B — APK tail byte sequence b</li>
+<li>Component C — 1DCNN byte tower</li>
+<li>Component D — Late fusion head</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p><strong>Problem:</strong> Semantic-only detectors (permissions, API names) miss obfuscated packing and zip-level tricks; byte-only 1DCNN models (<strong>95–97% accuracy</strong> on Drebin/AMD in the tail-bytes paper) miss interpretable “calls sendTextMessage” signals. <strong>Solution:</strong> <strong>Branch 1</strong> = FexDroid-lite \(\mathbf{f} \in \{0,1\}^{D_f}\), \(D_f pprox 3000	ext{–}5000\), through ASCNN or MLP → \(\mathbf{z}_f \in \mathbb{R}^{128}\). <strong>Branch 2</strong> = last 1024 bytes \(\mathbf{b}\) through 1DCNN → \(\mathbf{z}_b \in \mathbb{R}^{64	ext{–}128}\). <strong>Late fusion:</strong> \(\mathbf{z} = [\mathbf{z}_f \| \mathbf{z}_b]\) → FC → sigmoid. Reserve for multistep Stage 3+ when cheap models are uncertain — highest combined extraction cost in the thesis catalog.</p>
+</section>
+
+<section>
+<h2>2. Component A — FexDroid-lite sparse vector f</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Category-capped Drebin-style binary vector: permissions, API calls, intents, services, receivers, etc., from manifest + Dex static analysis (10 categories; drop noisy URL/activity buckets per FexDroid paper).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Named features are explainable and strong on known families; cap per category keeps mobile deployment feasible vs 500K-d full Drebin.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; parse manifest and disassemble/string-scan Dex.</li>
+<li>For each category \(c\), match APK against frozen vocabulary \(V_c\) (top ~500 terms per category offline).</li>
+<li>Set \(f_j = 1\) if feature \(j\) present in APK.</li>
+<li>Concatenate category blocks → \(\mathbf{f} \in \{0,1\}^{D_f}\), \(D_f pprox 3000	ext{–}5000\).</li>
+<li>Optional: drop categories with high uncertainty (FexDroid category pruning).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ f_j = \mathbb{1}[\text{feature}_j \in \text{APK}], \quad \mathbf{f} \in \{0,1\}^{D_f}, \; D_f \approx 3\text{K–}5\text{K} \]</p>
+<ul class="vars"><li><strong>\(D_f\)</strong> — total sparse dimension after capping</li><li><strong>\(V_c\)</strong> — frozen vocabulary per category</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► category vocab matches
+ └─► Dex strings ──► API / intent features
+         │
+         ▼
+    f ∈ {0,1}^(3K–5K)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Fed to semantic tower: \(\mathbf{z}_f = g_f(\mathbf{f})\) (ASCNN or 2-layer MLP).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Thesis-scale FexDroid — not full 49K paper vector — paired with bytes for orthogonal evidence.</div>
+</section>
+<section>
+<h2>3. Component B — Raw APK tail bytes b (1024-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>The last \(N=1024\) byte values of the APK file on disk, read as unsigned integers 0–255, in file order (end of ZIP container).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Tail region often contains zip central directory, comments, and padding — patterns correlated with packers and malware tooling without parsing APK structure.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Open APK path as binary file (treat as opaque byte stream).</li>
+<li>Seek to end; read \(N=1024\) bytes (pad with zeros if file shorter than 1024).</li>
+<li>Form sequence \(\mathbf{b} = (b_1, \ldots, b_{1024})\), \(b_i \in \{0,\ldots,255\}\).</li>
+<li>Normalize for network: e.g. \(b_i / 255\) or embed as integer channel (match trained 1DCNN).</li>
+<li>No decompression, manifest, or Dex required for this branch alone.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ b_i = \mathrm{byte}_{|F|-1024+i}, \quad \mathbf{b} \in \mathbb{Z}^{1024}, \quad b_i \in [0,255] \]</p>
+<ul class="vars"><li><strong>\(|F|\)</strong> — APK file size in bytes</li><li><strong>\(b_i\)</strong> — \(i\)-th tail byte</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Raw APK file on disk
+  │
+  └─► read last 1024 bytes
+         │
+         ▼
+    b (1×1024)  values 0–255</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Input to 1DCNN tower only; parallel to semantic branch (no shared layers until fusion).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why different from Dex header:</strong> Tail is <em>container/file</em> bytes, not parsed DexHeader struct — catches packers parsers skip.</div>
+</section>
+<section>
+<h2>4. Component C — 1DCNN byte tower</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>1-D convolutional network over sequence \(\mathbf{b}\): multiple Conv1d → BatchNorm → ReLU blocks, MaxPool, fully connected layers (Hasegawa & Iyatomi 2018 / your ByteCNN).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>CNNs learn local byte n-grams (packer signatures, alignment patterns) without hand-crafted features.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Input tensor shape (batch, 1, 1024) after normalization.</li>
+<li>Stack 4× Conv1d(kernel≈5, filters 32→128) + BN + ReLU.</li>
+<li>MaxPool along sequence length to reduce temporal dimension.</li>
+<li>Flatten / FC → embedding \(\mathbf{z}_b \in \mathbb{R}^{64	ext{–}128}\).</li>
+<li>Train with BCE or cross-entropy on malware label; freeze for fusion stage if staged training.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Conv1d: \[ h^{(l+1)} = \mathrm{ReLU}(\mathrm{BN}(W^{(l)} * h^{(l)} + b^{(l)})) \]</p>
+<p>\[ \mathbf{z}_b = \mathrm{FC}(\mathrm{Pool}(h^{(L)})) \in \mathbb{R}^{d_b} \]</p>
+<ul class="vars"><li><strong>\(*\)</strong> — 1-D convolution along byte index</li><li><strong>\(\mathbf{z}_b\)</strong> — byte-branch embedding (\(d_b pprox 64	ext{–}128\))</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">b (1×1024)
+  │
+  ▼
+Conv1d(5,32) → BN → ReLU  (×4 blocks)
+  │
+  ▼
+MaxPool(5)
+  │
+  ▼
+FC layers
+  │
+  ▼
+z_b (64–128-d)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{z}_b\). Concatenated with \(\mathbf{z}_f\) at fusion layer.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Paper result:</strong> Tail-only 1DCNN reported <strong>95–97% accuracy</strong> on Drebin/AMD — strong single-branch baseline.</div>
+</section>
+<section>
+<h2>5. Component D — Late fusion head</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Concatenated embeddings from semantic and byte towers; small fully connected classifier produces final malware probability.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Each modality needs different inductive bias (sparse high-d vs dense local patterns); fusion layer learns when to trust semantics vs tail artifacts.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Compute \(\mathbf{z}_f = g_f(\mathbf{f})\) and \(\mathbf{z}_b = g_b(\mathbf{b})\) (forward both branches).</li>
+<li>Concatenate: \(\mathbf{z} = [\mathbf{z}_f \| \mathbf{z}_b]\).</li>
+<li>Apply \(\hat{y} = \sigma(\mathbf{W}_z \mathbf{z} + \mathbf{b}_z)\) or 1-hidden-layer MLP on \(\mathbf{z}\).</li>
+<li>Train end-to-end or fine-tune fusion after freezing branch weights.</li>
+<li>At inference: run both extractions; if either branch unavailable, abstain or fall back to single branch (document policy).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z} = [\mathbf{z}_f \| \mathbf{z}_b] \in \mathbb{R}^{d_f + d_b}, \quad \hat{y} = \sigma(\mathbf{W}\mathbf{z} + \mathbf{b}) \]</p>
+<ul class="vars"><li><strong>\(d_f pprox 128\)</strong> — semantic embedding size</li><li><strong>\(d_b pprox 64	ext{–}128\)</strong> — byte embedding size</li><li><strong>\(\hat{y}\)</strong> — final malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">z_f (128-d) ──┐
+                    ├──► z (192–256-d) ──► FC/MLP ──► σ ──► P(malware)
+z_b (64–128-d) ─┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final score for multistep pipeline Stage 3+ or offline high-confidence path.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Orthogonal errors — semantic misses novel packing; bytes miss semantic intent — fusion reduces both failure modes.</div>
+</section>
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Branch / model</th><th>What it sees</th><th>Reported performance</th><th>Extraction</th></tr>
+<tr><td>FexDroid (paper)</td><td>~49K pruned sparse</td><td>~94% TPR, ~4 s inference (paper)</td><td>High</td></tr>
+<tr><td>1DCNN tail only</td><td>Last 1024 bytes</td><td><strong>95–97% accuracy</strong> (Drebin/AMD)</td><td>Very low</td></tr>
+<tr><td>FexDroid-lite only</td><td>3K–5K sparse</td><td>Target high F1, smaller ONNX</td><td>High</td></tr>
+<tr><td class="best"><strong>Dual-branch fusion</strong></td><td class="best">Sparse + tail bytes</td><td class="best"><strong>Best potential</strong> (thesis: ablate on your split)</td><td class="best">Highest combined</td></tr>
+</table>
+<p><strong>Why fusion helps:</strong> Packers change zip layout (tail) while leaving some API strings visible (sparse), or obfuscate strings while tail signature remains — joint decision boundary in \((\mathbf{z}_f, \mathbf{z}_b)\) space catches samples either branch misses alone.</p>
+<p><strong>Deployment note:</strong> Not for every APK — use after MLDP+header cascade and Pattern A disagree or score near threshold.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       │
+   ┌───┴────────────────────┐
+   ▼                        ▼
+Static parse            Raw file I/O
+(manifest + Dex)        (no unzip)
+   │                        │
+   ▼                        ▼
+f (1×3K–5K)            b (1×1024)
+   │                        │
+   ▼                        ▼
+ASCNN / MLP              1DCNN
+   │                        │
+   ▼                        ▼
+z_f (128-d)            z_b (64–128-d)
+   │                        │
+   └──────────┬─────────────┘
+              ▼
+       z = [z_f || z_b]
+              ▼
+         FC + sigmoid
+              ▼
+      P(malware) ∈ [0,1]</pre>
+</section>
+</article>
+
+<hr class="section-divider" />
+<article id="mldp_dex_header_cascade" class="doc-section model-section">
+<nav class="top"><a href="#index">← All models</a></nav>
+<h1>MLDP Permissions + Dex Header Cascade Filter</h1>
+<p class="meta">Cross-paper: IJACSA 2020 Permission Extraction Framework (MLDP ~30-d) + MSFDroid 2022 (Dex header H 104-d, MLP)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<h3>MLDP-pruned permissions</h3>
+<p>Three-stage filter (PRNR → support → association rules) reduces ~135 permissions to <strong>~20–40 high-risk bits</strong>. See <a href="#mldp_pruned_permission_classifier">mldp_pruned_permission_classifier.html</a>.</p>
+<h3>Dex header H (104-d)</h3>
+<p>Bytes 8–111 of each <code>classes.dex</code> header (after magic), scaled to [0,1], min–max normalized, sum-pooled across multidex. Structural metadata only — no bytecode scan. Same as deployed <strong>MLP(H)</strong>.</p>
+<h3>Cascade / multistep detection</h3>
+<p>Run cheapest models first; <strong>early exit</strong> if \(s &lt; t_{\mathrm{low}}\) (benign) or \(s &gt; t_{\mathrm{high}}\) (malware); else escalate to expensive models (thesis Task 2).</p>
+<h3>Fused single-pass variant</h3>
+<p>Alternatively concatenate \(\mathbf{x}^{(S)}\) and \(\mathbf{H}\) → one tiny MLP (\(\sim 150 	o 64 	o 1\)) — still &lt;1 ms on mid-range phones.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — MLDP permission subset</li>
+<li>Component B — Dex header vector H</li>
+<li>Component C — Fused MLP (Mode A)</li>
+<li>Component D — Two-stage cascade (Mode B)</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p><strong>Problem:</strong> Running ByteCNN, ASCNN(C), and XGBoost on every APK wastes battery. <strong>Solution:</strong> Combine the two <strong>cheapest</strong> static domains in the thesis: (1) <strong>MLDP-pruned permissions</strong> \(\mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|}\), \(|\mathcal{S}| pprox 30\); (2) <strong>Dex header</strong> \(\mathbf{H} \in [0,1]^{104}\). Deploy as <strong>Mode A</strong> fused vector \(\mathbf{x} \in \mathbb{R}^{150}\) through tiny MLP, or <strong>Mode B</strong> cascade (MLDP linear → optional MLP(H) → expensive stack). Goal: filter ~70% of APKs in one pass before manifest BoW or raw bytes.</p>
+</section>
+
+<section>
+<h2>2. Component A — MLDP permission vector x^(S)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Binary vector over frozen permission subset \(\mathcal{S}\) selected by Multi-Level Data Pruning on the training corpus — only high-risk, malware-skewed permissions.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Full permission lists are noisy; MLDP removes permissions common in both classes. Manifest-only parse — no Dex — fastest semantic signal.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Offline: run MLDP (PRNR → support filter → association rules) on labeled training APKs → set \(\mathcal{S}\), \(|\mathcal{S}| pprox 20	ext{–}40\).</li>
+<li>Freeze \(\mathcal{S}\) for deployment.</li>
+<li>At inference: decode manifest; list declared permissions.</li>
+<li>Set \(x^{(S)}_j = 1\) if permission \(j \in \mathcal{S}\) appears, else \(0\).</li>
+<li>Output \(\mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|}\) (typically ~30-d).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x^{(S)}_j = \mathbb{1}[\mathrm{perm}_j \in \mathrm{Manifest} \cap \mathcal{S}], \quad \mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|} \]</p>
+<ul class="vars"><li><strong>\(\mathcal{S}\)</strong> — MLDP-selected permission index set</li><li><strong>\(x^{(S)}_j\)</strong> — \(j\)-th pruned permission bit</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Training corpus (offline)
+  │
+  ▼
+MLDP → S (|S|≈30)
+  │
+Inference: Manifest → x^(S) (1×30)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Mode A: concatenate with \(\mathbf{H}\). Mode B: feed to Stage-1 linear scorer \(s_1\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Curated manifest risk in ~30 dims vs 2500-d deployed XGBoost — ideal cascade front-end.</div>
+</section>
+<section>
+<h2>3. Component B — Dex header vector H (104-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Normalized bytes 8–111 from each `classes.dex` header: section sizes, offsets, map_off, link_size, etc. (MSFDroid §3.3).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Malware often has abnormal Dex layout (oversized string pools, odd offsets) even when manifest is minimal. Header read is O(1) in file size — no string scan.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; enumerate all `classes*.dex`.</li>
+<li>Verify 8-byte magic (`dex\n035` or variant).</li>
+<li>Read bytes 8–111; encode \(h_b = \mathrm{byte}_b / 255\).</li>
+<li>Apply per-dimension min–max normalization from training statistics.</li>
+<li>Multidex: element-wise sum-pool \(\mathbf{H} = \sum_{\mathrm{dex}} \mathbf{h}^{(\mathrm{dex})}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ h_b = \frac{\mathrm{byte}_b}{255}, \quad \mathbf{H} = \sum_{d=1}^{D_{\mathrm{dex}}} \mathbf{h}^{(d)} \in [0,1]^{104} \]</p>
+<ul class="vars"><li><strong>\(D_{\mathrm{dex}}\)</strong> — number of dex files in APK</li><li><strong>\(\mathbf{H}\)</strong> — pooled header feature vector</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">classes.dex
+  │
+  └─► bytes [8:112] → normalize
+         │
+         ▼
+    H (1×104)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Mode A: \(\mathbf{x} = [\mathbf{x}^{(S)} \| \mathbf{H}]\). Mode B: MLP(H) when Stage 1 uncertain.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why with MLDP:</strong> Permissions = declared risk; header = structural risk — orthogonal cheap signals.</div>
+</section>
+<section>
+<h2>4. Component C — Fused tiny MLP (Mode A, 150-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Single forward pass on concatenated MLDP + header vector; 2-layer MLP with sigmoid output.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>When latency budget allows one network call but not two-stage logic, fusion is simpler to deploy in ONNX than cascade thresholds.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Concatenate \(\mathbf{x} = [\mathbf{x}^{(S)} \| \mathbf{H}] \in \mathbb{R}^{|\mathcal{S}|+104}\) (~134–150-d).</li>
+<li>MLP layer 1: \(\mathbf{h} = \mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1)\), hidden dim 64.</li>
+<li>Output: \(\hat{y} = \sigma(\mathbf{w}_2^T \mathbf{h} + b_2)\).</li>
+<li>Calibrate thresholds \(t_{\mathrm{low}}, t_{\mathrm{high}}\) on validation for early exit to rest of stack.</li>
+<li>Export ONNX; target model size &lt; 20 KB.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{x} = [\mathbf{x}^{(S)} \| \mathbf{H}] \in \mathbb{R}^{150}, \quad \hat{y} = \sigma(\mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) + \mathbf{b}_2) \]</p>
+<ul class="vars"><li><strong>150</strong> — typical fused dimension (\(30 + 104 + bias terms\))</li><li><strong>\(\hat{y}\)</strong> — malware probability from single pass</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x^(S) (30-d) ──┐
+                     ├──► x (150-d) ──► MLP(150→64→1) ──► ŷ
+H (104-d) ───────┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>\(\hat{y}\) may trigger early benign/malware exit or escalate if \(t_{\mathrm{low}} < \hat{y} < t_{\mathrm{high}}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> One ONNX graph, one manifest + header read — simplest integration for Step 1 filter.</div>
+</section>
+<section>
+<h2>5. Component D — Two-stage cascade (Mode B)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Stage 1: logistic/linear on MLDP only (fastest). Stage 2: MLP(H) only if Stage 1 score in uncertain band.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Splits manifest-only and dex-header costs — skip header read for confident Stage-1 decisions (optional optimization).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Stage 1: \(s_1 = \sigma(\mathbf{w}_1^T \mathbf{x}^{(S)} + b_1)\).</li>
+<li>If \(s_1 < t_{\mathrm{low}}\) → label benign, STOP.</li>
+<li>If \(s_1 > t_{\mathrm{high}}\) → label malware, STOP.</li>
+<li>Else Stage 2: \(s_2 = \sigma(\mathrm{MLP}(\mathbf{H}))\).</li>
+<li>If still uncertain → pass to D2 ByteCNN, D4 Pattern A, ANASTASIA+BoW, etc.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Stage 1: \[ s_1 = \sigma(\mathbf{w}_1^T \mathbf{x}^{(S)} + b_1) \]</p>
+<p>Stage 2: \[ s_2 = \sigma(\mathrm{MLP}(\mathbf{H})) \]</p>
+<ul class="vars"><li><strong>\(t_{\mathrm{low}}, t_{\mathrm{high}}\)</strong> — cascade thresholds tuned on validation</li><li><strong>STOP</strong> — early exit saves average latency</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK → x^(S) → s1
+              │
+              ├─ s1 < t_low  ──► BENIGN (done)
+              ├─ s1 > t_high ──► MALWARE (done)
+              └─ else → H → MLP → s2
+                      │
+                      ├─ confident → done
+                      └─ else → expensive models...</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Stage outputs gate multistep pipeline; ~70% APKs may exit after Step 1 when well tuned (thesis estimate).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why different from Mode A:</strong> Interpretable staging — permission risk first, structural confirm second.</div>
+</section>
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Model</th><th>Dims</th><th>Manifest</th><th>Dex header</th><th>Typical role</th></tr>
+<tr><td>MLP(H) only</td><td>104</td><td>No</td><td>Yes</td><td>Deployed base</td></tr>
+<tr><td>MLDP only</td><td>~30</td><td>Yes</td><td>No</td><td>Fastest semantic</td></tr>
+<tr><td>LinRegDroid</td><td>~135</td><td>Yes (full)</td><td>No</td><td>Baseline</td></tr>
+<tr><td class="best"><strong>MLDP + H (this model)</strong></td><td class="best">~150</td><td class="best">Yes</td><td class="best">Yes</td><td class="best"><strong>Step 1 cascade / filter</strong></td></tr>
+</table>
+<p><strong>Why combine:</strong> MLDP catches permission-heavy trojans; header catches structurally anomalous dex without any permission signal. Together they approximate a large fraction of MSFDroid's cheap signal at ~1/30th the dimension of BoW models.</p>
+<p><strong>Expected F1:</strong> Moderate alone — purpose is <em>latency and exit rate</em>, not maximum accuracy. Pair with high-F1 models downstream for full stack performance.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">Mode A (single-pass):
+  APK → Manifest → x^(S) (30-d)
+     → classes.dex → H (104-d)
+     → x = [x^(S) || H] (150-d) → MLP → ŷ → exit or escalate
+
+Mode B (cascade):
+  APK → x^(S) → s1 ──► confident? → DONE
+              │
+              └─ uncertain → H → MLP → s2 ──► confident? → DONE
+                                    │
+                                    └─ uncertain → ByteCNN / ASCNN / XGBoost ...</pre>
+</section>
+</article>
+</body>
+</html>

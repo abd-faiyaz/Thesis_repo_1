@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ERBE Permission + Intent MLP — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="index.html">← All models</a></nav>
+<h1>ERBE Permission + Intent MLP (Base Learner)</h1>
+<p class="meta">Paper: Potha et al., Connection Science 2020 — <em>An extrinsic random-based ensemble approach for android malware detection (ERBE)</em></p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Static manifest features:</strong> Permissions (<code>&lt;uses-permission&gt;</code>) and <strong>intent actions</strong> (<code>&lt;action android:name="…"&gt;</code> in intent filters) — all extractable without running the APK.</p>
+<p><strong>Binary feature vector:</strong> One dimension per distinct permission or intent string in the training corpus; value 1 if present in APK, else 0 (~1K dims on AndroZoo in paper).</p>
+<p><strong>MLP:</strong> Multi-layer perceptron — fully connected layers with ReLU and sigmoid output for malware probability.</p>
+<p><strong>Ensemble vs deployable:</strong> Full <strong>ERBE</strong> runs <strong>15 iterations</strong> with random feature/instance subspaces — best offline, 15× inference cost. Thesis uses <strong>one MLP base learner</strong> on the full vector.</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission + intent feature extraction</li>
+<li>Component B — Full ERBE ensemble (paper, reference)</li>
+<li>Component C — Deployable base MLP</li>
+<li>Ensemble mechanism (ERBE vs single MLP)</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>On <strong>AndroZoo-scale</strong> corpora, manifest permissions alone miss behavior declared via <strong>intents</strong> (e.g. <code>BOOT_COMPLETED</code>, <code>SMS_RECEIVED</code>). Potha et al. build a joint binary vector over permissions and intent actions (~<strong>1002</strong> dimensions), then propose <strong>ERBE</strong> (Extrinsic Random-based Ensemble): <strong>15</strong> rounds of training on random feature subspaces and random <strong>external</strong> malware/benign subsets, aggregating base-learner scores (LR, MLP, or SGD). That ensemble beats single classifiers by up to <strong>5%+</strong> accuracy but costs ~<strong>117 minutes</strong> training and 15× inference — unsuitable for per-APK on-device scans. Your thesis deploys <strong>ERBE's feature space + one MLP</strong> (~1K → hidden → 1) for ONNX parity with other manifest-neural models.</p>
+</section>
+
+<section>
+<h2>Component A — Permission + intent feature extraction</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Union of all <code>uses-permission</code> names and <code>intent action</code> strings appearing anywhere in the APK manifest (AndroZoo static pipeline in paper).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Intents capture declared interaction with the OS (views, broadcasts, services) beyond capability flags. Joint vocabulary ~1K is compact yet richer than permissions-only LinRegDroid.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Decompile APK to readable manifest (paper: AndroZoo tooling).</li>
+<li>Collect every distinct permission name across training set → index set \(\mathcal{P}\).</li>
+<li>Collect every distinct intent action string → index set \(\mathcal{I}\).</li>
+<li>Form unified vocabulary of size \(D = |\mathcal{P}| + |\mathcal{I}|\) (paper benchmark \(D \approx 1002\)).</li>
+<li>For APK \(i\): \(x_{i,j} = 1\) if feature \(j\) present, else 0.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ x_{i,j} = \begin{cases} 1 & \text{if feature } j \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}_i \in \{0,1\}^{D} \]</p>
+<p>Paper example: App1 uses \(p_1,p_2,i_1\) → \((1,1,0,1,0,0)\); App2 uses \(p_1,p_3,i_2,i_3\) → \((1,0,1,0,1,1)\) over joint \((p_1,p_2,p_3,i_1,i_2,i_3)\).</p>
+<ul class="vars"><li><strong>\(D\)</strong> — total feature dimension (~1002 AndroZoo)</li><li><strong>\(\mathcal{P}, \mathcal{I}\)</strong> — permission and intent vocabularies</li><li><strong>\(x_{i,j}\)</strong> — binary indicator for feature \(j\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK → manifest
+         ├─► permissions  ──┐
+         └─► intent actions ┼─► x  (1×D)  e.g. 1×1002
+                            ┘</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{x} \in \{0,1\}^{D}\). Feeds ERBE iterations (paper) or single MLP (thesis).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Single unified manifest vector mixing permissions and intents — simpler than TF-IDF weighted 2500-d deployed XGBoost but same semantic domain.</div>
+</section>
+<section>
+<h2>Component B — Full ERBE ensemble (paper, reference only)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Binary vector \(\mathbf{x}\) and labeled training pool; external malware/benign repositories for extrinsic sampling.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>ERBE injects diversity via random subspaces and external samples so each of 15 base models sees different views — reduces correlation of errors vs bagging on identical features.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Set iteration count \(T = 15\).</li>
+<li>For \(t = 1,\ldots,T\): sample random feature subset at rate \(a\) (e.g. 50% of \(D\)).</li>
+<li>Sample random external malware and benign APK subsets (extrinsic data).</li>
+<li>Train base learner (LR, MLP, or SGD) on subspace + subset.</li>
+<li>Score each test APK; append to list \(\mathcal{S}\).</li>
+<li>Aggregate: mean or vote over \(\mathcal{S}\) → final malware score.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \hat{y}_{\text{final}} = \frac{1}{T}\sum_{t=1}^{T} f_t(\mathbf{x}_{\mathcal{F}_t}), \quad \mathcal{F}_t \subset \{1,\ldots,D\},\ |\mathcal{F}_t| \approx a \cdot D \]</p>
+<p>Each \(f_t\) is a base classifier trained on features \(\mathcal{F}_t\) only.</p>
+<ul class="vars"><li><strong>\(T=15\)</strong> — ensemble iterations (paper)</li><li><strong>\(a\)</strong> — feature sampling rate (~0.5)</li><li><strong>\(f_t\)</strong> — base learner at round \(t\) (ERBEMLP, ERBELR, ERBESGD)</li><li><strong>extrinsic samples</strong> — external APKs added per round for diversity</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x (1×D)
+  │
+  ├─► round 1: x|F1, external data → f1 → s1
+  ├─► round 2: x|F2, external data → f2 → s2
+  │      ...
+  └─► round 15: x|F15 → f15 → s15
+              │
+              ▼
+        mean(s1..s15) → ŷ_final</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs aggregated malware score. **Not deployed** on-device — reference for why single MLP is chosen.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard bagging:</strong> Random <strong>feature</strong> subspaces + <strong>extrinsic</strong> instance injection, not only bootstrap rows on full \(\mathbf{x}\).</div>
+</section>
+<section>
+<h2>Component C — Deployable base MLP (thesis)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Full (or slightly reduced) permission+intent vector \(\mathbf{x} \in \{0,1\}^{D}\), all features every forward pass.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>One forward pass, small weight matrices, exportable to ONNX — matches VigiDroid need for a second manifest-neural model alongside XGBoost.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Input layer: \(D\) neurons (binary \(\mathbf{x}\)).</li>
+<li>Hidden layer: e.g. 128 units, ReLU activation.</li>
+<li>Output layer: 1 neuron, sigmoid → \(\hat{y} \in [0,1]\).</li>
+<li>Train with BCE loss on labeled APKs.</li>
+<li>Threshold 0.5 at inference for malware label.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{h} = \mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1), \quad \hat{y} = \sigma(\mathbf{W}_2 \mathbf{h} + \mathbf{b}_2) \]</p>
+<p>\(\sigma(z) = 1/(1+e^{-z})\) — malware probability.</p>
+<ul class="vars"><li><strong>\(\mathbf{W}_1, \mathbf{b}_1\)</strong> — first layer weights ( \(D \times H\) )</li><li><strong>\(H\)</strong> — hidden size (e.g. 128)</li><li><strong>\(\hat{y}\)</strong> — output malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">x  (1×1002)
+  │
+  ▼
+ Dense  D→128  ReLU
+  │
+  ▼
+ Dense  128→1  sigmoid
+  │
+  ▼
+ P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\hat{y}\) for ensemble fusion with Dex/header models or multistep cascade. ERBE-style 15× averaging reserved for offline ablation.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Captures mild nonlinearity (permission–intent interactions) that linear ERBE base cannot, at single-pass cost.</div>
+</section>
+<section>
+<h2>5. Ensemble mechanism (ERBE vs single MLP)</h2>
+<table>
+<tr><th>Variant</th><th>Forward passes</th><th>Training time</th><th>Use case</th></tr>
+<tr><td>ERBELR / ERBEMLP / ERBESGD (single)</td><td>1</td><td>Minutes</td><td>Base learners inside ERBE</td></tr>
+<tr><td class="best"><strong>Full ERBE (T=15)</strong></td><td class="best"><strong>15</strong></td><td class="best"><strong>Up to ~117 min (paper)</strong></td><td class="best"><strong>Best offline accuracy</strong></td></tr>
+<tr><td><strong>Thesis MLP (full x)</strong></td><td><strong>1</strong></td><td><strong>Minutes</strong></td><td><strong>On-device / scanner ONNX</strong></td></tr>
+</table>
+<pre class="flow">Paper ERBE:
+  x ──► [15 × (subspace + external train + score)] ──► mean → ŷ
+
+Thesis:
+  x (full 1×D) ──► MLP ──► ŷ   (one pass)</pre>
+<p><strong>Future thesis path:</strong> Learn ERBE-like diversity in <strong>adaptive soft voting</strong> across domains (manifest MLP + header + bytes) instead of 15× same-vector ensemble.</p>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Approach</th><th>Features</th><th>Accuracy gain (paper)</th><th>Inference</th></tr>
+<tr><td>Single LR / MLP / SGD</td><td>~1002 binary</td><td>Baseline</td><td>Low</td></tr>
+<tr><td class="best"><strong>ERBE (15 iterations)</strong></td><td class="best">Random subspaces of ~1002</td><td class="best"><strong>Up to ~5%+ vs single base</strong></td><td class="best"><strong>15× base cost</strong></td></tr>
+<tr><td><strong>Thesis single MLP</strong></td><td>Full ~1K</td><td>Between base and ERBE (expected)</td><td><strong>Low</strong></td></tr>
+</table>
+<p><strong>Why ERBE improved:</strong> Different random feature subsets emphasize different permission/intent combinations; extrinsic samples expose the learner to malware families not in the current minibatch — lowers correlated errors when averaged.</p>
+<p><strong>Why thesis uses one MLP:</strong> Same ~1K semantic signal without 15× latency; ensemble diversity deferred to cross-domain voting (header, bytes, manifest).</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Static manifest parse   │
+│ permissions + intents   │
+└──────────┬──────────────┘
+           ▼
+    x  (1×D)   D ≈ 1002, binary
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+ Paper ERBE    Thesis MLP
+ 15× subspace   D→128→1
+ mean scores    sigmoid
+     │           │
+     └─────┬─────┘
+           ▼
+    P(malware) → threshold → label</pre>
+</section>
+
+</body>
+</html>

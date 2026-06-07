@@ -1,0 +1,164 @@
+"""DataLoader builders for HybridManifestDataset."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+import torch
+from torch.utils.data import DataLoader
+
+from src.config import PipelineConfig
+from src.data.dataset import HybridManifestDataset
+from src.data.store import FeatureShard, load_split_shards
+
+
+def split_class_balance(y: torch.Tensor) -> dict[str, int | float]:
+    """Return benign/malware counts and malware fraction for a label tensor."""
+    labels = y.long()
+    n = int(labels.numel())
+    malware = int((labels == 1).sum().item())
+    benign = n - malware
+    return {
+        "total": n,
+        "benign": benign,
+        "malware": malware,
+        "malware_fraction": (malware / n) if n else 0.0,
+    }
+
+
+def compute_pos_weight(y: torch.Tensor) -> float:
+    """BCE pos_weight = N_neg / N_pos on the train split (M7)."""
+    stats = split_class_balance(y)
+    pos = int(stats["malware"])
+    neg = int(stats["benign"])
+    if pos == 0:
+        raise ValueError("Cannot compute pos_weight: no positive (malware) samples")
+    return float(neg / pos)
+
+
+def print_split_balance(shards: Mapping[str, FeatureShard]) -> dict[str, dict[str, int | float]]:
+    """Print per-split class balance; return stats dict for pos_weight wiring."""
+    stats: dict[str, dict[str, int | float]] = {}
+    print("Split class balance:")
+    for split in ("train", "val", "test"):
+        shard = shards.get(split)
+        if shard is None:
+            continue
+        split_stats = split_class_balance(shard.y)
+        stats[split] = split_stats
+        print(
+            f"  {split:5s}: n={split_stats['total']:5d}  "
+            f"benign={split_stats['benign']:5d}  malware={split_stats['malware']:5d}  "
+            f"malware_frac={split_stats['malware_fraction']:.3f}"
+        )
+    if "train" in stats:
+        pos_weight = compute_pos_weight(shards["train"].y)
+        print(f"  pos_weight (N_neg/N_pos on train): {pos_weight:.4f}")
+        stats["pos_weight"] = {"value": pos_weight}
+    return stats
+
+
+def _loader_settings(cfg: PipelineConfig) -> tuple[int, int, bool]:
+    training = cfg.training
+    data = cfg.raw.get("data", {})
+    batch_size = int(data.get("batch_size", training.get("batch_size", 256)))
+    num_workers = int(data.get("num_workers", 4))
+    pin_memory = bool(data.get("pin_memory", torch.cuda.is_available()))
+    return batch_size, num_workers, pin_memory
+
+
+def build_train_loader(
+    dataset: HybridManifestDataset,
+    *,
+    batch_size: int,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+) -> DataLoader:
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+
+
+def build_eval_loader(
+    dataset: HybridManifestDataset,
+    *,
+    batch_size: int,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+) -> DataLoader:
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+
+
+def build_dataloaders(
+    cfg: PipelineConfig,
+) -> tuple[DataLoader, DataLoader, DataLoader, int, dict[str, dict[str, int | float]]]:
+    """
+    Build train, val, and test loaders from P2 feature shards.
+
+    Returns (train_loader, val_loader, test_loader, feature_dim, balance_stats).
+    """
+    shards = load_split_shards(cfg)
+    balance_stats = print_split_balance(shards)
+
+    batch_size, num_workers, pin_memory = _loader_settings(cfg)
+
+    train_ds = HybridManifestDataset.from_shard(shards["train"])
+    feature_dim = train_ds.feature_dim
+
+    val_shard = shards.get("val")
+    if val_shard is None:
+        raise FileNotFoundError(
+            f"Missing val shard under {cfg.paths.processed}; re-run P2 preprocess"
+        )
+    val_ds = HybridManifestDataset.from_shard(val_shard)
+
+    test_shard = shards.get("test")
+    if test_shard is None:
+        raise FileNotFoundError(
+            f"Missing test shard under {cfg.paths.processed}; re-run P2 preprocess"
+        )
+    test_ds = HybridManifestDataset.from_shard(test_shard)
+
+    for name, ds in (("train", train_ds), ("val", val_ds), ("test", test_ds)):
+        if ds.feature_dim != feature_dim:
+            raise ValueError(
+                f"{name} feature_dim={ds.feature_dim} != train feature_dim={feature_dim}"
+            )
+
+    train_loader = build_train_loader(
+        train_ds,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    val_loader = build_eval_loader(
+        val_ds,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    test_loader = build_eval_loader(
+        test_ds,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    return train_loader, val_loader, test_loader, feature_dim, balance_stats
+
+
+def build_dataloaders_from_config(
+    cfg: PipelineConfig,
+) -> tuple[DataLoader, DataLoader, DataLoader, int]:
+    """Convenience wrapper returning loaders and feature_dim only."""
+    train_loader, val_loader, test_loader, feature_dim, _ = build_dataloaders(cfg)
+    return train_loader, val_loader, test_loader, feature_dim

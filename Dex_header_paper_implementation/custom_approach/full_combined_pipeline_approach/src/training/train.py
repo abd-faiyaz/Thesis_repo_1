@@ -132,7 +132,35 @@ def run_training(
                 ),
             )
 
+        try:
+            from src.thesis_archive import log_epoch
+
+            log_epoch(
+                epoch=epoch + 1,
+                total_epochs=total_epochs,
+                train_loss=train_loss,
+                val_loss=val_loss,
+                learning_rate=float(lr),
+            )
+        except ImportError:
+            pass
+
     print(f"Training complete.\n  latest: {latest_path}\n  best:   {best_path}")
+    try:
+        from src.thesis_archive import after_train
+
+        after_train(
+            best_path,
+            {
+                "train_samples": len(train_loader.dataset),
+                "val_samples": len(val_loader.dataset),
+                "total_epochs": total_epochs,
+                "header_dim": header_dim,
+                "bow_dim": bow_dim,
+            },
+        )
+    except ImportError:
+        pass
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

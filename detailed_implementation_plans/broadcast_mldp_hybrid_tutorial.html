@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broadcast + MLDP Hybrid — Visual Tutorial</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root{
+    --bg:#0d1117; --card:#161b22; --card2:#1c2230; --text:#e6edf3; --muted:#8b949e;
+    --accent:#58a6ff; --green:#3fb950; --amber:#f0b429; --pink:#db61a2; --purple:#bc8cff;
+    --border:#30363d;
+    --permc:#1f6feb; --recc:#238636; --fusec:#9e6a03; --clsc:#8957e5;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);
+    line-height:1.7;max-width:1040px;margin:0 auto;padding:0 1.4rem 5rem;}
+  header.hero{background:linear-gradient(135deg,#15324f 0%,#0d1117 65%);border-bottom:1px solid var(--border);
+    margin:0 -1.4rem 1.5rem;padding:2.4rem 1.6rem 2rem;}
+  header.hero h1{margin:0 0 .4rem;color:#fff;font-size:1.9rem;}
+  header.hero p{margin:.2rem 0;color:#c9d6e5;max-width:48rem;}
+  .pill{display:inline-block;font-size:.74rem;font-weight:700;padding:.18rem .6rem;border-radius:999px;margin:.25rem .3rem 0 0;}
+  .pill.p7{background:var(--permc);color:#fff;}
+  .pill.p12{background:var(--recc);color:#fff;}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);margin:0 -1.4rem 1.6rem;padding:.6rem 1.4rem;overflow-x:auto;white-space:nowrap;}
+  nav.toc a{color:var(--accent);text-decoration:none;font-size:.85rem;margin-right:1.1rem;}
+  nav.toc a:hover{text-decoration:underline;}
+  h2{color:var(--accent);font-size:1.45rem;border-bottom:1px solid var(--border);padding-bottom:.4rem;margin-top:2.6rem;}
+  h3{color:#a5d6ff;font-size:1.1rem;margin-top:1.6rem;}
+  section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.3rem 1.5rem;margin:1.1rem 0;}
+  p{margin:.6rem 0;}
+  code{background:#21262d;padding:.1rem .35rem;border-radius:4px;font-size:.88em;}
+  .eli5{border-left:4px solid var(--green);background:#11231a;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .eli5 b{color:var(--green);}
+  .note{border-left:4px solid var(--amber);background:#241d10;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .note b{color:var(--amber);}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem;}
+  th,td{border:1px solid var(--border);padding:.5rem .7rem;text-align:left;vertical-align:top;}
+  th{background:#21262d;}
+
+  /* ---------- flowchart primitives ---------- */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:1.4rem 0;}
+  .row{display:flex;gap:1.1rem;justify-content:center;flex-wrap:wrap;align-items:stretch;}
+  .node{border-radius:10px;padding:.7rem 1rem;text-align:center;font-size:.86rem;font-weight:600;
+    border:1px solid var(--border);background:var(--card2);min-width:120px;box-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .node .sub{display:block;font-weight:400;font-size:.74rem;color:var(--muted);margin-top:.2rem;}
+  .node.apk{background:#30363d;color:#fff;}
+  .node.perm{border-color:var(--permc);background:#10243f;}
+  .node.rec{border-color:var(--recc);background:#0f2417;}
+  .node.fuse{border-color:var(--fusec);background:#2a2110;}
+  .node.cls{border-color:var(--clsc);background:#221733;}
+  .node.out{border-color:var(--green);background:#10241a;color:#aff5c2;}
+  .node.mini{min-width:92px;font-size:.78rem;padding:.5rem .6rem;}
+  .arrow{width:2px;height:24px;background:var(--muted);position:relative;margin:.15rem 0;}
+  .arrow::after{content:"";position:absolute;bottom:-2px;left:-4px;border:5px solid transparent;border-top-color:var(--muted);}
+  .arrow.h{width:30px;height:2px;align-self:center;}
+  .arrow.h::after{bottom:auto;top:-4px;right:-2px;left:auto;border:5px solid transparent;border-left-color:var(--muted);}
+  .lbl{font-size:.72rem;color:var(--muted);margin:.1rem 0;}
+  .bracket{display:flex;align-items:center;gap:.5rem;}
+  /* vector strip */
+  .vec{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:.3rem 0;font-family:monospace;font-size:.8rem;}
+  .vec span{padding:.28rem .5rem;border-right:1px solid var(--border);}
+  .vec span:last-child{border-right:none;}
+  .vec .on{background:#1f6feb;color:#fff;}
+  .vec .onr{background:#238636;color:#fff;}
+  .vec .off{background:#161b22;color:var(--muted);}
+  .legend{display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:.5rem 0;}
+  .legend span::before{content:"";display:inline-block;width:.8rem;height:.8rem;border-radius:3px;margin-right:.35rem;vertical-align:-1px;}
+  .legend .lp::before{background:var(--permc);}
+  .legend .lr::before{background:var(--recc);}
+  .stepnum{counter-reset:s;list-style:none;padding-left:0;}
+  .stepnum>li{position:relative;padding-left:2.3rem;margin:.7rem 0;}
+  .stepnum>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;
+    width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent);color:#0d1117;font-weight:700;
+    text-align:center;line-height:1.7rem;font-size:.82rem;}
+  .funnel{display:flex;flex-direction:column;align-items:center;gap:.2rem;margin:1rem 0;}
+  .funnel .bar{border-radius:6px;padding:.5rem 1rem;text-align:center;font-size:.84rem;font-weight:600;color:#fff;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr;}}
+  .tagx{font-size:.7rem;font-weight:700;padding:.08rem .4rem;border-radius:4px;background:var(--amber);color:#3a2a05;margin-left:.4rem;}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Broadcast&nbsp;+&nbsp;MLDP&nbsp;Hybrid — Visual Tutorial</h1>
+  <p>A friendly, picture-first walkthrough of how this manifest-only Android malware detector works, the math behind each block, and how it becomes an app on your phone.</p>
+  <div>
+    <span class="pill p7">Paper #7 — MLDP permission pruning (IJACSA 2020)</span>
+    <span class="pill p12">Paper #12 — Broadcast receivers (IEEE CIC 2017)</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#big">Big picture</a>
+  <a href="#pre">Prerequisites</a>
+  <a href="#a">① MLDP permissions</a>
+  <a href="#b">② Receiver actions</a>
+  <a href="#c">③ Fusion</a>
+  <a href="#d">④ Classifier</a>
+  <a href="#math">Math in one place</a>
+  <a href="#pipe">Build pipeline P1–A4</a>
+  <a href="#why">Why it works</a>
+</nav>
+
+<section id="big">
+<h2>The big picture in one diagram</h2>
+<p>The model reads <b>only one file</b> inside the APK — <code>AndroidManifest.xml</code> — turns it into a row of 0s and 1s, and a tiny network outputs a malware probability.</p>
+
+<div class="flow">
+  <div class="node apk">📦 Raw APK<span class="sub">a .apk = a ZIP file</span></div>
+  <div class="arrow"></div>
+  <div class="node">📄 AndroidManifest.xml<span class="sub">decode binary XML</span></div>
+  <div class="arrow"></div>
+  <div class="lbl">split into two signals</div>
+  <div class="row">
+    <div class="node perm">① MLDP permissions<span class="sub">x<sub>S</sub> — what the app <i>can do</i></span></div>
+    <div class="node rec">② Receiver actions<span class="sub">x<sub>R</sub> — what events <i>wake it up</i></span></div>
+  </div>
+  <div class="row"><div class="arrow"></div><div class="arrow"></div></div>
+  <div class="node fuse">③ Concatenate → one vector x<span class="sub">[ x<sub>S</sub> ‖ x<sub>R</sub> ]   length d ≈ 50–100</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">④ Tiny MLP   d → 64 → 1<span class="sub">offline twin: RBF-SVM</span></div>
+  <div class="arrow"></div>
+  <div class="node out">P(malware) ∈ [0, 1]</div>
+</div>
+
+<div class="eli5"><b>ELI5:</b> Imagine a security guard who only looks at an app's "permission slip" (what doors it asked for) and its "alarm subscriptions" (which building events it wants to be paged about). Malware tends to ask for suspicious doors <i>and</i> page itself on sneaky events like "phone just booted." We tick checkboxes for both lists, glue them into one row, and a small calculator says how suspicious it looks.</div>
+</section>
+
+<section id="pre">
+<h2>Prerequisites — plain-English concepts</h2>
+
+<h3>What is the AndroidManifest?</h3>
+<p>Every Android app ships a manifest: a declaration of permissions it wants, components it has (activities, services, <b>receivers</b>), and more. We never run the app — we just read this declaration. That is <b>static analysis</b>: cheap, fast, safe.</p>
+
+<h3>What is a "permission"?</h3>
+<div class="eli5"><b>ELI5:</b> A permission is a door key the app requests, e.g. <code>SEND_SMS</code> (send texts) or <code>CAMERA</code>. More dangerous keys = more risk if the app is bad.</div>
+
+<h3>What is a "broadcast receiver (system action)"?</h3>
+<p>Android constantly broadcasts events: "phone finished booting", "an SMS arrived", "screen unlocked". An app can register a <b>statically registered receiver</b> in the manifest to be launched <b>even when it is not running</b>. The specific event it listens for is the <b>action</b> (e.g. <code>android.intent.action.BOOT_COMPLETED</code>).</p>
+<div class="note"><b>Key paper-faithful detail:</b> Paper #12 only counts <b>system actions</b> (a fixed Android list), not random custom strings. Malware loves <code>BOOT_COMPLETED</code>, <code>USER_PRESENT</code>, <code>SMS_RECEIVED</code> because they let it run silently.</div>
+
+<h3>What is a binary feature vector?</h3>
+<p>A row of 0/1 checkboxes. Position <i>j</i> = 1 means "this app has feature <i>j</i>". Example with 4 permission slots + 3 receiver slots:</p>
+<div class="vec">
+  <span class="on">SEND_SMS·1</span><span class="off">CAMERA·0</span><span class="on">READ_SMS·1</span><span class="off">CONTACTS·0</span>
+  <span class="onr">BOOT·1</span><span class="off">SMS_RX·0</span><span class="onr">USER_PRESENT·1</span>
+</div>
+<div class="legend"><span class="lp">permission bits (x<sub>S</sub>)</span><span class="lr">receiver-action bits (x<sub>R</sub>)</span></div>
+
+<h3>What is "MLDP"?</h3>
+<div class="eli5"><b>ELI5:</b> Android has ~135 permissions. Most are useless for spotting malware (almost everyone asks for <code>INTERNET</code>). MLDP = <b>Multi-Level Data Pruning</b>: a filtering funnel that throws away the useless permissions and keeps ~22 that actually separate good from bad apps.</div>
+
+<h3>What is a tiny MLP?</h3>
+<p>A <b>Multi-Layer Perceptron</b>: a mini neural network. Ours is <code>d → 64 → 1</code> — one hidden layer of 64 neurons, then a single output squashed to a probability. It is small enough (&lt;20 KB) to run on a phone in under a millisecond.</p>
+</section>
+
+<!-- ===================== COMPONENT A ===================== -->
+<section id="a">
+<h2>① MLDP permission sub-vector <span style="font-size:.8rem;color:var(--muted)">(from Paper #7)</span></h2>
+<p>Goal: turn the manifest's permissions into a short, clean checkbox row using only the ~22 permissions that matter. The "which 22?" is decided <b>once, offline</b>, on the training apps, then frozen.</p>
+
+<h3>The pruning funnel (Variant 1: PRNR → SPR → PMAR)</h3>
+<div class="funnel">
+  <div class="bar" style="background:#1f6feb;width:100%;">135 permissions — everything Android offers</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#2563c9;width:74%;">≈ 95 — after <b>PRNR</b> (drop the ones used equally by good &amp; bad apps)</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#2f5fb0;width:42%;">≈ 25 — after <b>SPR</b> (keep the most frequently-used survivors)</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#3a5a9c;width:30%;">≈ 22 — after <b>PMAR</b> (merge permissions that always travel together)</div>
+</div>
+
+<h3>Step 1 — PRNR (Permission Ranking with Negative Rate)</h3>
+<p>For each permission we measure how "lopsided" it is between malware and benign apps. Let \(S_M(P_j)\) and \(S_B(P_j)\) be the fraction of malware / benign apps that declare permission \(P_j\) (after correcting for class-size imbalance). Then:</p>
+<p>\[ R(P_j)=\frac{S_M(P_j)-S_B(P_j)}{S_M(P_j)+S_B(P_j)}\in[-1,1] \]</p>
+<div class="row" style="margin:.8rem 0;">
+  <div class="node mini" style="border-color:var(--pink);background:#2a1320;">R → +1<span class="sub">malware-only<br>e.g. SEND_SMS</span></div>
+  <div class="node mini">R ≈ 0<span class="sub">used by both<br>→ DROP</span></div>
+  <div class="node mini" style="border-color:var(--green);background:#102417;">R → −1<span class="sub">benign-only</span></div>
+</div>
+<div class="note"><b>Correction we made (M4):</b> the original rough plan said PRNR "keeps malware-skewed permissions". Actually it keeps <b>both</b> ends (\(R\to+1\) and \(R\to-1\)) because a strongly-benign permission is just as useful for telling the two apart. Only the middle (\(R\approx 0\)) is dropped.</div>
+
+<h3>Step 2 — SPR (Support-based Permission Ranking)</h3>
+<p>Among the survivors, keep the ones that appear often enough to be statistically reliable (drop ultra-rare permissions). ~95 → ~25.</p>
+
+<h3>Step 3 — PMAR (Permission Mining with Association Rules)</h3>
+<p>Some permissions are redundant twins — e.g. <code>WRITE_SMS</code> nearly always appears with <code>READ_SMS</code>. Using the <b>Apriori</b> algorithm (confidence ≥ 96.5%, support ≥ 10%), we collapse such pairs to one. ~25 → <b>~22</b>. This frozen set is \(\mathcal S\).</p>
+
+<h3>At inference (per new app)</h3>
+<p>\[ x^{(S)}_j=\begin{cases}1 & \text{if }P_j\in\mathcal S\text{ and declared}\\ 0&\text{otherwise}\end{cases},\qquad \mathbf x^{(S)}\in\{0,1\}^{|\mathcal S|},\ |\mathcal S|\approx 22 \]</p>
+<div class="note"><b>Correction (M1 / M2):</b> the size is <b>~16–25 (≈22)</b>, not "20–40". And we use the deterministic PRNR→SPR→PMAR funnel (paper Table I = 22 perms) rather than the harder-to-reproduce PCA/Kaiser variant the paper also describes.</div>
+</section>
+
+<!-- ===================== COMPONENT B ===================== -->
+<section id="b">
+<h2>② Broadcast receiver sub-vector <span style="font-size:.8rem;color:var(--muted)">(from Paper #12)</span></h2>
+<p>Goal: a checkbox row of which Android <b>system events</b> the app statically subscribes to.</p>
+
+<div class="flow">
+  <div class="node">📄 Manifest</div>
+  <div class="arrow"></div>
+  <div class="node rec">find every &lt;receiver&gt;<br>&lt;intent-filter&gt;&lt;action&gt;</div>
+  <div class="arrow"></div>
+  <div class="node fuse">keep only actions in the<br><b>system-action allow-list</b> <span class="tagx">M3</span></div>
+  <div class="arrow"></div>
+  <div class="node rec">x<sub>R</sub> ∈ {0,1}<sup>R</sup>   (R ≈ 30–80)</div>
+</div>
+
+<div class="note"><b>Correction (M3):</b> the original plan collected <i>all</i> action strings. Paper #12 is explicit — only <b>system actions</b> (a compiled Android list) count. We ship that exact list (<code>system_actions.json</code>) to both the Python trainer and the Android app so they always agree.</div>
+
+<h3>The math</h3>
+<p>\[ x^{(R)}_k=\begin{cases}1 & \text{if action}_k\in\mathcal A\ \cap\ \text{StaticReceivers(APK)}\\ 0 & \text{otherwise}\end{cases} \]</p>
+<p>where \(\mathcal A\) is the system-action vocabulary frozen from training apps.</p>
+
+<div class="eli5"><b>Why this helps:</b> In paper #12, 70% of malware vs 46% of benign apps registered a receiver for a system event. Malware wants to wake up on <code>BOOT_COMPLETED</code> (survive reboots) or <code>SMS_RECEIVED</code> (intercept texts). That timing behavior is invisible to permissions alone.</div>
+</section>
+
+<!-- ===================== COMPONENT C ===================== -->
+<section id="c">
+<h2>③ Early fusion — glue the two rows together</h2>
+<p>We simply place the receiver row right after the permission row to make one longer row. This is called <b>early fusion</b> (fuse the <i>features</i>, then classify once) — the opposite of <b>late fusion</b> (classify twice, then average).</p>
+
+<div class="flow">
+  <div class="row" style="align-items:center;">
+    <div class="bracket">
+      <div class="vec"><span class="on">1</span><span class="off">0</span><span class="on">1</span><span class="off">0</span></div>
+    </div>
+    <div class="lbl">+</div>
+    <div class="bracket">
+      <div class="vec"><span class="onr">1</span><span class="off">0</span><span class="onr">1</span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="vec"><span class="on">1</span><span class="off">0</span><span class="on">1</span><span class="off">0</span><span class="onr">1</span><span class="off">0</span><span class="onr">1</span></div>
+  <div class="lbl">x = [ x<sub>S</sub> ‖ x<sub>R</sub> ]   →   length d = |S| + R</div>
+</div>
+
+<p>\[ \mathbf x=[\,\mathbf x^{(S)}\ \|\ \mathbf x^{(R)}\,]\in\{0,1\}^{|\mathcal S|+R},\qquad d=|\mathcal S|+R\approx 50\text{–}100 \]</p>
+<div class="note"><b>Correction (M5):</b> with \(|\mathcal S|\approx22\) and \(R\approx30\text{–}80\), the fused width is \(d\approx52\text{–}102\) — round to <b>50–100</b>, not "80–120".</div>
+<div class="eli5"><b>Why early fusion?</b> A single classifier can now learn a combo rule like "<code>SEND_SMS</code> permission <i>AND</i> <code>SMS_RECEIVED</code> receiver = very suspicious" inside one set of weights. Paper #12's best result came exactly from this combined vector.</div>
+</section>
+
+<!-- ===================== COMPONENT D ===================== -->
+<section id="d">
+<h2>④ Classifier — the tiny MLP</h2>
+
+<div class="flow">
+  <div class="node fuse">x  (1 × d)<span class="sub">e.g. 1 × 72</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">Linear d → 64<span class="sub">W₁ x + b₁</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">ReLU<span class="sub">max(0, ·)  — adds nonlinearity</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">Linear 64 → 1<span class="sub">w₂ᵀh + b₂</span></div>
+  <div class="arrow"></div>
+  <div class="node out">σ (sigmoid) → P(malware)</div>
+</div>
+
+<h3>The math</h3>
+<p>\[ \mathbf h=\max(0,\ \mathbf W_1\mathbf x+\mathbf b_1),\qquad \hat y=\sigma(\mathbf w_2^\top\mathbf h+b_2),\qquad \sigma(z)=\frac{1}{1+e^{-z}} \]</p>
+<p>Training minimizes <b>weighted binary cross-entropy</b> (the weight \(w_+\) fixes the fact that there are usually far more benign apps than malware):</p>
+<p>\[ \mathcal L=-\big[\,w_+\,y\log\hat y+(1-y)\log(1-\hat y)\,\big],\qquad w_+=\frac{N_\text{neg}}{N_\text{pos}} \]</p>
+<div class="note"><b>Correction (M7):</b> the rough plan never mentioned imbalance. Both papers handle it — Mohsen subsampled benign apps to a 50/50 mix; #7 rescaled supports. We use the <code>pos_weight</code> term above.</div>
+
+<h3>The paper-faithful baseline you should also run <span class="tagx">M6</span></h3>
+<p>Both papers actually used a <b>Support Vector Machine with an RBF kernel</b>, not a neural net:</p>
+<p>\[ f(\mathbf x)=\operatorname{sign}\!\Big(\sum_{i\in SV}\alpha_i y_i\,K(\mathbf x_i,\mathbf x)+b\Big),\qquad K(\mathbf x,\mathbf x')=e^{-\gamma\|\mathbf x-\mathbf x'\|^2} \]</p>
+<div class="eli5"><b>ELI5 of the kernel:</b> an RBF kernel measures "how similar are two apps' checkbox rows?" and draws a curvy boundary between good and bad. Paper #12 found the best settings at \(\gamma=0.1,\ C=10\). We keep this as an offline yardstick, but ship the MLP because it converts cleanly to ONNX for the phone.</div>
+</section>
+
+<!-- ===================== MATH SUMMARY ===================== -->
+<section id="math">
+<h2>All the math on one page</h2>
+<table>
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td>\(S_M(P_j),\ S_B(P_j)\)</td><td>support (fraction) of permission \(P_j\) in malware / benign apps</td></tr>
+<tr><td>\(R(P_j)=\dfrac{S_M-S_B}{S_M+S_B}\)</td><td>PRNR score \(\in[-1,1]\); drop if \(\approx 0\)</td></tr>
+<tr><td>\(\mathcal S\) (\(|\mathcal S|\approx 22\))</td><td>frozen MLDP permission set after PRNR→SPR→PMAR</td></tr>
+<tr><td>\(\mathcal A\) (\(R\approx 30\text{–}80\))</td><td>frozen system-action vocabulary</td></tr>
+<tr><td>\(x^{(S)}_j,\ x^{(R)}_k\in\{0,1\}\)</td><td>presence bits for permission \(j\) / action \(k\)</td></tr>
+<tr><td>\(\mathbf x=[\mathbf x^{(S)}\|\mathbf x^{(R)}]\)</td><td>fused vector, length \(d=|\mathcal S|+R\)</td></tr>
+<tr><td>\(\mathbf h=\max(0,\mathbf W_1\mathbf x+\mathbf b_1)\)</td><td>hidden layer (64 units, ReLU)</td></tr>
+<tr><td>\(\hat y=\sigma(\mathbf w_2^\top\mathbf h+b_2)\)</td><td>malware probability</td></tr>
+<tr><td>\(\mathcal L=-[w_+ y\log\hat y+(1-y)\log(1-\hat y)]\)</td><td>weighted BCE loss</td></tr>
+</table>
+</section>
+
+<!-- ===================== PIPELINE ===================== -->
+<section id="pipe">
+<h2>From paper to phone — the build pipeline (P1 → A4)</h2>
+<p>Two code bases cooperate: a <b>Python project</b> trains and exports; the <b>Android app</b> scans on-device. They must agree on features exactly (that's what the parity checks guard).</p>
+
+<div class="grid2">
+  <div>
+    <h3 style="color:var(--accent)">Offline — Python (P1–P8)</h3>
+    <ol class="stepnum">
+      <li><b>P1 Index</b> — list every APK with label, year; split train=2020–21, test=2022–23.</li>
+      <li><b>P2 Features</b> — parse manifests; run MLDP funnel → freeze \(\mathcal S\); build system-action vocab \(\mathcal A\); write 0/1 tensors. <span class="tagx">owns M1–M4</span></li>
+      <li><b>P3 DataLoaders</b> — feed tensors in batches.</li>
+      <li><b>P4 Model</b> — define tiny MLP (+ SVM baseline).</li>
+      <li><b>P5 Train</b> — fit on train split with <code>pos_weight</code>; run 3 ablations (perm-only / receiver-only / fused).</li>
+      <li><b>P6 Evaluate</b> — accuracy/F1/AUC on the 2022–23 test set only.</li>
+      <li><b>P7 Export</b> — write <code>model.onnx</code> + vocabs + <code>system_actions.json</code> bundle.</li>
+      <li><b>P8 Parity</b> — PyTorch vs ONNX scores agree within 1e-4.</li>
+    </ol>
+  </div>
+  <div>
+    <h3 style="color:var(--green)">On-device — Android (A1–A4)</h3>
+    <ol class="stepnum">
+      <li><b>A1 Extractor</b> — Java reads the manifest and builds the same 0/1 vector, using the same shipped vocab + system-action list.</li>
+      <li><b>A2 Inference</b> — ONNX Runtime runs <code>model.onnx</code>, reads <code>malware_prob</code>, applies threshold.</li>
+      <li><b>A3 Orchestration</b> — log parse/vectorize/inference time + score per scan.</li>
+      <li><b>A4 Parity test</b> — device scores match the Python reference within 1e-4 before release.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="flow" style="margin-top:1.4rem;">
+  <div class="node" style="border-color:var(--accent);">🖥️ Python: train + export ONNX</div>
+  <div class="arrow"></div>
+  <div class="node fuse">📦 export bundle<span class="sub">model.onnx · vocabs · system_actions.json · parity_samples</span></div>
+  <div class="arrow"></div>
+  <div class="node out" style="color:#aff5c2;">📱 Android app: scan APKs on-device</div>
+</div>
+<div class="note"><b>Golden rule:</b> if the Java feature vector differs from Python's by even one bit, the accuracy you reported offline is meaningless. The shared <code>system_actions.json</code> + frozen vocab order + float32 0/1 encoding + parity tests (P8/A4) exist to prevent that.</div>
+</section>
+
+<!-- ===================== WHY ===================== -->
+<section id="why">
+<h2>Why this hybrid is worth building</h2>
+<table>
+<tr><th>Variant</th><th>Dims</th><th>What it sees</th><th>Reality check</th></tr>
+<tr><td>MLDP permissions only</td><td>~16–25</td><td>capabilities</td><td>#7: F ≈ 94–97% on their corpus; misses event timing</td></tr>
+<tr><td>Receiver actions only</td><td>~30–80</td><td>wake-up events</td><td>#12: ~71–79%; weak alone but boosts sensitivity</td></tr>
+<tr><td>#12 full (all perms + receivers)</td><td>~200–300</td><td>everything</td><td>97% on repeat configs, but ~76–77% on newer data; noisy</td></tr>
+<tr style="background:#10241a;"><td><b>MLDP + receivers (this model)</b></td><td><b>~50–100</b></td><td><b>clean caps + events</b></td><td><b>best manifest-only balance per parameter</b></td></tr>
+</table>
+
+<div class="note"><b>Be honest in the thesis (M9):</b> Paper #12's famous "97%" is on <i>duplicate</i> configurations where train and test share identical rows. On a fresh, newer dataset it dropped to ~76–77%. Our temporal 2022–23 test is the "fresh data" case, so expect realistic numbers (~75–90%), and sell the model on its <b>tiny size + strong size-to-accuracy ratio</b>, not a headline 97%.</div>
+
+<div class="eli5"><b>One-sentence takeaway:</b> keep the few permissions that actually matter (MLDP), add the sneaky wake-up events malware loves (system-action receivers), glue them, and let a sub-20-KB network decide — fast enough for any phone, faithful to both source papers.</div>
+</section>
+
+<p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:2rem;border-top:1px solid var(--border);padding-top:1rem;">
+Companion files: <code>broadcast_mldp_hybrid_opus.html</code> (verified rough plan) ·
+<code>broadcast_mldp_hybrid_full_impl_opus.md</code> (full P1–A4 plan) ·
+sources: paper #7 (IJACSA 2020), paper #12 (IEEE CIC 2017).
+</p>
+
+</body>
+</html>

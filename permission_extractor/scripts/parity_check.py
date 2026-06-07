@@ -16,7 +16,7 @@ from src.models.tiny_mlp import LinearSigmoidModule, TinyMlpModule
 TOLERANCE = 1e-4
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--export-dir", type=Path, default=ROOT / "artifacts/export/mldp_pruned_permission")
@@ -65,6 +65,12 @@ def main() -> int:
     out_path = cfg.paths.artifacts / "metrics" / "parity_report.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    try:
+        from src.thesis_archive import after_parity
+
+        after_parity(out_path)
+    except ImportError:
+        pass
     print(json.dumps(report, indent=2))
     return 0 if passed else 1
 

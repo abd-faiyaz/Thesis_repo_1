@@ -16,7 +16,7 @@ echo "=== 2/4 build_lexicon (train) ==="
 echo "=== 3/4 fit_header_norm (train) ==="
 "$PYTHON" -m src.preprocessing.fit_header_norm "$@"
 
-echo "=== 4/4 extract_to_cache (train + val) ==="
+echo "=== 4/4 extract_to_cache (train + val + test) ==="
 "$PYTHON" -m src.preprocessing.extract_to_cache "$@"
 
 echo "Preprocessing complete."

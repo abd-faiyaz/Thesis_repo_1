@@ -59,6 +59,7 @@ public final class MetricsWriter {
 
     public static final class StageMetrics {
         public final String domain;
+        public final String modelId;
         public final double parseMs;
         public final double vectorizeMs;
         public final double inferenceMs;
@@ -67,7 +68,13 @@ public final class MetricsWriter {
 
         public StageMetrics(String domain, double parseMs, double vectorizeMs,
                             double inferenceMs, float score, long memDeltaBytes) {
+            this(domain, null, parseMs, vectorizeMs, inferenceMs, score, memDeltaBytes);
+        }
+
+        public StageMetrics(String domain, String modelId, double parseMs, double vectorizeMs,
+                            double inferenceMs, float score, long memDeltaBytes) {
             this.domain = domain;
+            this.modelId = modelId;
             this.parseMs = parseMs;
             this.vectorizeMs = vectorizeMs;
             this.inferenceMs = inferenceMs;
@@ -122,6 +129,9 @@ public final class MetricsWriter {
         for (StageMetrics s : scan.stages) {
             JSONObject stage = new JSONObject();
             stage.put("domain", s.domain);
+            if (s.modelId != null && !s.modelId.isEmpty()) {
+                stage.put("model_id", s.modelId);
+            }
             stage.put("parse_ms", s.parseMs);
             stage.put("vectorize_ms", s.vectorizeMs);
             stage.put("inference_ms", s.inferenceMs);

@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-06-06T19:40:47.897741+00:00",
+  "run_id": "run_20260607_val_test_fix",
+  "archive_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/output_archives/run_20260607_val_test_fix",
+  "figures": [
+    {
+      "file": "loss_curves.png",
+      "path": "figures/loss_curves.png",
+      "caption": "Training and validation BCE loss across 50 epochs.",
+      "source": "output_archives/run_20260607_val_test_fix/metrics/epochs.jsonl"
+    },
+    {
+      "file": "metrics_vs_epoch.png",
+      "path": "figures/metrics_vs_epoch.png",
+      "caption": "Validation accuracy, F1, and ROC-AUC recorded at each epoch.",
+      "source": "output_archives/run_20260607_val_test_fix/metrics/epochs.jsonl"
+    },
+    {
+      "file": "label_distribution.png",
+      "path": "figures/label_distribution.png",
+      "caption": "Benign vs malware APK counts in the preprocessed corpus.",
+      "source": "corpus_stats/label_distribution.json"
+    },
+    {
+      "file": "dex_count_histogram.png",
+      "path": "figures/dex_count_histogram.png",
+      "caption": "Histogram of APKs binned by number of DEX files.",
+      "source": "corpus_stats/dex_file_counts.json"
+    },
+    {
+      "file": "roc_curve_val.png",
+      "path": "figures/roc_curve_val.png",
+      "caption": "Validation ROC curve (AUC = 0.9867) from checkpoint inference.",
+      "source": "artifacts/checkpoints/latest_checkpoint.pth"
+    },
+    {
+      "file": "confusion_matrix_val.png",
+      "path": "figures/confusion_matrix_val.png",
+      "caption": "Validation confusion matrix at threshold 0.5.",
+      "source": "artifacts/checkpoints/latest_checkpoint.pth"
+    }
+  ]
+}

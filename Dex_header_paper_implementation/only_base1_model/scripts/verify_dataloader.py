@@ -53,7 +53,7 @@ def main() -> int:
             bundle,
             split_mode=split["split_mode"],
             train_years=split["train_years"],
-            val_years=split["val_years"],
+            test_years=split["test_years"],
             val_fraction=split["val_fraction"],
             seed=split["seed"],
             batch_size=int(cfg.data.get("batch_size", 16)),

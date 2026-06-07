@@ -1,0 +1,188 @@
+{
+  "run_id": "run_20260607_val_test_fix",
+  "model_id": "mlp_header",
+  "domain": "dex_header_d3",
+  "created_at": "2026-06-06T19:40:40.126470+00:00",
+  "git_commit": "0fc5152a7b84d6a7d9377668b9f6301a54917091",
+  "apk_root": "/mnt/Files/FromLaptop/thesis_full_dataset",
+  "preprocessing": {
+    "timestamp": "2026-06-06T19:36:14.775212+00:00",
+    "run_id": "run_20260607_val_test_fix",
+    "apk_root": "/mnt/Files/thesis_full_dataset",
+    "total_apks": 13528,
+    "successful": 13528,
+    "failed": 0,
+    "feature_dim": 104,
+    "multidex_mode": "sum",
+    "cache_version": 2,
+    "dex_file_counts": {
+      "1": 9743,
+      "2": 2250,
+      "3": 571,
+      "4": 416,
+      "5": 402,
+      "6": 58,
+      "7": 9,
+      "8": 4,
+      "9": 9,
+      "10": 9,
+      "11": 18,
+      "12": 8,
+      "13": 7,
+      "17": 2,
+      "18": 4,
+      "19": 2,
+      "22": 1,
+      "23": 2,
+      "24": 8,
+      "26": 1,
+      "27": 1,
+      "29": 1,
+      "54": 1,
+      "118": 1
+    },
+    "output": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/processed/dex_header_features.pt"
+  },
+  "training": {
+    "timestamp": "2026-06-06T19:36:21.996979+00:00",
+    "run_id": "run_20260607_val_test_fix",
+    "model_id": "mlp_header",
+    "domain": "dex_header_d3",
+    "train_samples": 10800,
+    "val_samples": 1200,
+    "feature_dim": 104,
+    "hidden_dim": 128,
+    "start_epoch": 0,
+    "total_epochs": 50,
+    "fresh_start": true,
+    "device": "cuda",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3060 Ti",
+    "apk_root": "/mnt/Files/thesis_full_dataset",
+    "batch_size": 16,
+    "split_mode": "temporal_year",
+    "train_years": [
+      2020,
+      2021
+    ],
+    "test_years": [
+      2022,
+      2023
+    ],
+    "val_fraction": 0.1,
+    "seed": 42,
+    "splits_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/splits"
+  },
+  "final_test_metrics": {
+    "accuracy": 0.9659685863874345,
+    "f1": 0.9444444444444444,
+    "roc_auc": 0.9631350866706514
+  },
+  "final_test_loss": 0.20798307347043496,
+  "n_test_samples": 1528,
+  "checkpoint_summary": {
+    "timestamp": "2026-06-06T19:40:40.126043+00:00",
+    "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
+    "next_epoch": 50,
+    "train_loss": 0.0908734564183073,
+    "val_loss": 0.10124955121427774,
+    "val_metrics": {
+      "accuracy": 0.97,
+      "f1": 0.9389830508474576,
+      "roc_auc": 0.9866814814814814
+    },
+    "feature_dim": 104,
+    "hidden_dim": 128
+  },
+  "artifact_paths": {
+    "features_pt": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/processed/dex_header_features.pt",
+    "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
+    "normalization": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/normalization.json",
+    "metrics_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/metrics"
+  },
+  "canonical_apk_root": "/mnt/Files/FromLaptop/thesis_full_dataset",
+  "apk_root_at_train_time": "/mnt/Files/thesis_full_dataset",
+  "verify_checksums": "cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model && sha256sum -c output_archives/run_20260607_val_test_fix/RUN_MANIFEST.sha256",
+  "archive_phase1": {
+    "completed_at": "2026-06-06T20:44:53.775351+00:00",
+    "checksum_file": "RUN_MANIFEST.sha256",
+    "artifact_index": {
+      "processed_features": {
+        "path": "artifacts/processed/dex_header_features.pt",
+        "sha256": "bd575e3221c5145ffec433e616eb367e0223320c96a3d038cbefc57c52ab216c"
+      },
+      "checkpoint": {
+        "path": "artifacts/checkpoints/latest_checkpoint.pth",
+        "sha256": "3caab8f330947346e6a9169be59109d83197df05bccd892e6313bc67738d8c64"
+      },
+      "normalization": {
+        "path": "artifacts/normalization.json",
+        "sha256": "9c095f6b0dd15af9cc8e7376b15a2fa4ff4659d0910fd1586541623fb4de215e"
+      },
+      "metrics/epochs.jsonl": {
+        "path": "artifacts/metrics/epochs.jsonl",
+        "sha256": "58ba42168247dbfc93b4857cb33dc93708940713dfdaf99970a4bfb055cfa32c"
+      },
+      "metrics/test_results.json": {
+        "path": "artifacts/metrics/test_results.json",
+        "sha256": "d8f916d3df5926775a9bfd79a077b51a9fb49e36d3d2375f32c177388bb0d7be"
+      },
+      "metrics/preprocess_summary.json": {
+        "path": "artifacts/metrics/preprocess_summary.json",
+        "sha256": "c6860c31437f60cd98e5d9e3e06efe5fb1bf5effa33b5aca24416db7eb3ed4f6"
+      },
+      "metrics/training_run_info.json": {
+        "path": "artifacts/metrics/training_run_info.json",
+        "sha256": "4dcbd831c9bfa39fe5de74eb294a05243837e4cd9f07338d0a4cc8ab47fb7b3b"
+      },
+      "metrics/checkpoint_summary.json": {
+        "path": "artifacts/metrics/checkpoint_summary.json",
+        "sha256": "a222fd4186b4d7bac486e95edcddb7b04312698803b63aff7dcdd23ae5344b10"
+      },
+      "metrics/corpus_stats.json": {
+        "path": "artifacts/metrics/corpus_stats.json",
+        "sha256": "f7975b354f73bd8d3644bd5f775f3a6639e6e190af1dd92939b42cba6bdf47e5"
+      },
+      "archive/metrics/epochs.jsonl": {
+        "path": "output_archives/run_20260607_val_test_fix/metrics/epochs.jsonl",
+        "sha256": "58ba42168247dbfc93b4857cb33dc93708940713dfdaf99970a4bfb055cfa32c"
+      },
+      "archive/metrics/preprocess_summary.json": {
+        "path": "output_archives/run_20260607_val_test_fix/metrics/preprocess_summary.json",
+        "sha256": "c6860c31437f60cd98e5d9e3e06efe5fb1bf5effa33b5aca24416db7eb3ed4f6"
+      },
+      "archive/metrics/training_run_info.json": {
+        "path": "output_archives/run_20260607_val_test_fix/metrics/training_run_info.json",
+        "sha256": "4dcbd831c9bfa39fe5de74eb294a05243837e4cd9f07338d0a4cc8ab47fb7b3b"
+      },
+      "archive/metrics/checkpoint_summary.json": {
+        "path": "output_archives/run_20260607_val_test_fix/metrics/checkpoint_summary.json",
+        "sha256": "a222fd4186b4d7bac486e95edcddb7b04312698803b63aff7dcdd23ae5344b10"
+      },
+      "archive/metrics/normalization.json": {
+        "path": "output_archives/run_20260607_val_test_fix/metrics/normalization.json",
+        "sha256": "9c095f6b0dd15af9cc8e7376b15a2fa4ff4659d0910fd1586541623fb4de215e"
+      },
+      "archive/logs/pipeline_full.log": {
+        "path": "output_archives/run_20260607_val_test_fix/logs/pipeline_full.log",
+        "sha256": "523b366fdada73e06d03b61a51cbeeadf5ef3df20839c7ffdafb2ebfe3b737a1"
+      },
+      "archive/config/default.yaml.snapshot": {
+        "path": "output_archives/run_20260607_val_test_fix/config/default.yaml.snapshot",
+        "sha256": "7d3e940d1f29ebe092a635c520c8d9824fd6b79226ec8d390beb55c2acd30a31"
+      },
+      "archive/corpus_stats/label_distribution.json": {
+        "path": "output_archives/run_20260607_val_test_fix/corpus_stats/label_distribution.json",
+        "sha256": "6d1dc839cada1ad0903bf20d310f3d17661acfd549c8db96cdeeb4fbe67995c2"
+      },
+      "archive/corpus_stats/dex_file_counts.json": {
+        "path": "output_archives/run_20260607_val_test_fix/corpus_stats/dex_file_counts.json",
+        "sha256": "1a07eb94125fcbe661a09f88e2dac33a6c9982458035e5f2a99ada1fd726bada"
+      },
+      "archive/corpus_stats/year_folder_counts.json": {
+        "path": "output_archives/run_20260607_val_test_fix/corpus_stats/year_folder_counts.json",
+        "sha256": "447ffd393d7434938fc4221cc23d2fac58df275cb828872a45a5bce758575575"
+      }
+    }
+  }
+}

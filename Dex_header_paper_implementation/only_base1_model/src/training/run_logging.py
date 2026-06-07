@@ -283,12 +283,12 @@ def finalize_run_manifest(cfg: PipelineConfig) -> Path | None:
     if train_info_path.is_file():
         manifest["training"] = json.loads(train_info_path.read_text(encoding="utf-8"))
 
-    val_metrics_path = metrics_dir(cfg) / "metrics_val.json"
-    if val_metrics_path.is_file():
-        val_data = json.loads(val_metrics_path.read_text(encoding="utf-8"))
-        manifest["final_val_metrics"] = val_data.get("metrics")
-        manifest["final_val_loss"] = val_data.get("loss")
-        manifest["n_val_samples"] = val_data.get("n_samples")
+    test_metrics_path = metrics_dir(cfg) / "test_results.json"
+    if test_metrics_path.is_file():
+        test_data = json.loads(test_metrics_path.read_text(encoding="utf-8"))
+        manifest["final_test_metrics"] = test_data.get("metrics")
+        manifest["final_test_loss"] = test_data.get("loss")
+        manifest["n_test_samples"] = test_data.get("n_samples")
 
     ckpt_path = metrics_dir(cfg) / "checkpoint_summary.json"
     if ckpt_path.is_file():

@@ -74,5 +74,23 @@ def linregdroid2_predict(raw_scores: np.ndarray) -> np.ndarray:
     return np.where(paper_class == 1, 0, 1).astype(np.int64)
 
 
+def predict_variant(
+    model: LinearRegression,
+    X: np.ndarray,
+    *,
+    variant: str = "linregdroid1",
+    threshold: float = 0.5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Apply LinRegDroid1 (threshold on clamped score) or LinRegDroid2 (nearest-class on raw ŷ).
+    Returns (y_pred, scores_for_auc) with thesis labels 0=benign, 1=malware.
+    """
+    raw = raw_linear_scores(model, X)
+    if variant == "linregdroid2":
+        return linregdroid2_predict(raw), raw
+    malware_prob = np.clip(raw, 0.0, 1.0)
+    return linregdroid1_predict(malware_prob, threshold=threshold), malware_prob
+
+
 def raw_linear_scores(model: LinearRegression, X: np.ndarray) -> np.ndarray:
     return model.predict(X).reshape(-1)

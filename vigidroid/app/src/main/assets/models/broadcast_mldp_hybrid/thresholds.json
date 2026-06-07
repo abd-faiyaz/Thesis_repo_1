@@ -1,0 +1,6 @@
+{
+  "default": 0.5,
+  "tuned_val": 0.65,
+  "model_type": "tiny_mlp",
+  "description": "Predict malware when malware_prob >= tuned_val (val-tuned threshold)"
+}

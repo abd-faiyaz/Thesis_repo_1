@@ -15,6 +15,18 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _load_eval_metrics(archive_dir: Path) -> dict:
+    """Prefer temporal test holdout metrics; fall back to legacy val metrics."""
+    for name in ("test_results.json", "metrics_test.json", "metrics_val.json"):
+        path = archive_dir / "metrics" / name
+        if path.is_file():
+            return _load(path)
+    raise FileNotFoundError(
+        f"No eval metrics in {archive_dir / 'metrics'} "
+        "(expected test_results.json or metrics_test.json)"
+    )
+
+
 def generate_snippet(archive_dir: Path) -> str:
     archive_dir = archive_dir.resolve()
     manifest_path = archive_dir / "RUN_MANIFEST.json"
@@ -23,9 +35,10 @@ def generate_snippet(archive_dir: Path) -> str:
 
     manifest = _load(manifest_path)
     labels = _load(archive_dir / "corpus_stats" / "label_distribution.json")
-    val_metrics = _load(archive_dir / "metrics" / "metrics_val.json")
-    metrics = val_metrics.get("metrics", {})
-    cm = val_metrics.get("confusion_matrix", [[0, 0], [0, 0]])
+    eval_metrics = _load_eval_metrics(archive_dir)
+    metrics = eval_metrics.get("metrics", {})
+    cm = eval_metrics.get("confusion_matrix", [[0, 0], [0, 0]])
+    eval_split = eval_metrics.get("split", "test")
 
     pre = manifest.get("preprocessing", {})
     train = manifest.get("training", {})
@@ -82,7 +95,7 @@ def generate_snippet(archive_dir: Path) -> str:
 |------|-----------|
 {year_rows or "| — | — |"}
 
-**Caveats:** Corpus size is **13,528** APKs, not the full ~40k MSFDroid-scale set cited in the paper. Results apply to this corpus only. Train/val split matches Pattern A/B: **temporal year holdout** (train 2020–2021, test 2022–2023).
+**Caveats:** Corpus size is **13,528** APKs, not the full ~40k MSFDroid-scale set cited in the paper. Results apply to this corpus only. Split matches Pattern A/B: **train 2020–2021**, **val holdout (~10% from 2020–2021)**, **test 2022–2023** (reported metrics are on test only).
 
 ---
 
@@ -131,16 +144,16 @@ Full config snapshot: `output_archives/{run_id}/config/default.yaml.snapshot`.
 
 ---
 
-## 5. Validation results (held-out 20%)
+## 5. Test results ({eval_split} split — 2022–2023 holdout)
 
 | Metric | Value |
 |--------|-------|
 | Accuracy | {metrics.get('accuracy', 0):.4f} |
 | F1 (malware) | {metrics.get('f1', 0):.4f} |
 | ROC-AUC | {metrics.get('roc_auc', 0):.4f} |
-| BCE loss | {val_metrics.get('loss', 0):.4f} |
-| Decision threshold | {val_metrics.get('threshold', 0.5)} |
-| Val samples | {val_metrics.get('n_samples', 0):,} |
+| BCE loss | {eval_metrics.get('loss', 0):.4f} |
+| Decision threshold | {eval_metrics.get('threshold', 0.5)} |
+| Test samples | {eval_metrics.get('n_samples', 0):,} |
 
 **Confusion matrix** (rows=true, cols=predicted; benign first):
 
@@ -164,7 +177,7 @@ Figures: `output_archives/{run_id}/figures/` (`loss_curves.png`, `metrics_vs_epo
 
 ## 7. Limitations & honesty notes
 
-- **Split policy:** Random 80/20 on preprocessed APKs; no held-out years or families.
+- **Split policy:** Temporal train 2020–2021; val ~10% stratified from train years; test 2022–2023 (never used for training or checkpoint selection).
 - **Class imbalance:** ~74% benign; F1 and threshold 0.5 should be reported together.
 - **Corpus scope:** 13.5k APKs; do not claim full-dataset paper numbers without retraining.
 - **Failed APKs:** {pre.get('failed', 0)} in this run (`artifacts/failed_apks.log` if any).
@@ -195,7 +208,7 @@ The authoritative reproducibility record for this run is:
 
 **`output_archives/{run_id}/RUN_MANIFEST.json`**
 
-It links preprocessing counts, training hyperparameters, final val metrics, artifact paths, and (after Phase 1) SHA-256 checksums. Verify integrity:
+It links preprocessing counts, training hyperparameters, final test metrics, artifact paths, and (after Phase 1) SHA-256 checksums. Verify integrity:
 
 ```bash
 cd Dex_header_paper_implementation/only_base1_model

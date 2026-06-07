@@ -37,6 +37,10 @@ class PathsConfig:
         return self.processed_dir / "shards" / "val"
 
     @property
+    def shards_test_dir(self) -> Path:
+        return self.processed_dir / "shards" / "test"
+
+    @property
     def processed_ids_log(self) -> Path:
         return self.processed_dir / "processed_ids.txt"
 
@@ -47,6 +51,10 @@ class PathsConfig:
     @property
     def manifest_val(self) -> Path:
         return self.processed_dir / "manifest_val.json"
+
+    @property
+    def manifest_test(self) -> Path:
+        return self.processed_dir / "manifest_test.json"
 
 
 @dataclass(frozen=True)
@@ -119,6 +127,7 @@ def ensure_artifact_dirs(cfg: PipelineConfig) -> None:
     cfg.paths.processed_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.shards_train_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.shards_val_dir.mkdir(parents=True, exist_ok=True)
+    cfg.paths.shards_test_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.splits_dir.mkdir(parents=True, exist_ok=True)
     cfg.paths.failed_apks_log.parent.mkdir(parents=True, exist_ok=True)

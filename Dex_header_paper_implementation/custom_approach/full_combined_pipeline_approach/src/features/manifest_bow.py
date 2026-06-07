@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +14,31 @@ from pyaxmlparser import APK
 
 from src.constants import DEFAULT_LEXICON_SIZE
 
+_PYAXML_LOGGERS = (
+    "pyaxmlparser",
+    "pyaxmlparser.axmlparser",
+    "pyaxmlparser.axmlprinter",
+    "pyaxmlparser.core",
+)
+
 
 class ManifestBoWError(ValueError):
     """Manifest could not be parsed or encoded."""
+
+
+@contextmanager
+def _quiet_pyaxmlparser():
+    """Suppress pyaxmlparser warnings for packed/obfuscated manifests during batch runs."""
+    saved: list[tuple[logging.Logger, int]] = []
+    for name in _PYAXML_LOGGERS:
+        logger = logging.getLogger(name)
+        saved.append((logger, logger.level))
+        logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        for logger, level in saved:
+            logger.setLevel(level)
 
 
 def extract_manifest_tokens(apk_path: Path) -> list[str]:
@@ -23,7 +47,8 @@ def extract_manifest_tokens(apk_path: Path) -> list[str]:
     Uses pyaxmlparser (Python 3–compatible; replaces legacy axmlparserpy).
     """
     try:
-        apk = APK(str(apk_path))
+        with _quiet_pyaxmlparser():
+            apk = APK(str(apk_path))
     except Exception as exc:
         raise ManifestBoWError(f"Failed to parse APK manifest: {apk_path}") from exc
 
@@ -38,12 +63,13 @@ def extract_manifest_tokens(apk_path: Path) -> list[str]:
             seen.add(v)
             tokens.append(v)
 
-    for perm in apk.get_permissions():
-        add(perm)
+    with _quiet_pyaxmlparser():
+        for perm in apk.get_permissions():
+            add(perm)
 
-    for tag_name in ("action", "category"):
-        for tag in apk.find_tags(tag_name):
-            add(apk.get_value_from_tag(tag, "name"))
+        for tag_name in ("action", "category"):
+            for tag in apk.find_tags(tag_name):
+                add(apk.get_value_from_tag(tag, "name"))
 
     if not tokens:
         raise ManifestBoWError(f"No manifest tokens found: {apk_path}")

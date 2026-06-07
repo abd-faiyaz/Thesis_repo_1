@@ -1,0 +1,45 @@
+export APK_ROOT=/mnt/Files/thesis_vigidroid/../thesis_full_dataset
+export DATE_TAG=$(date +%Y%m%d)
+REPO=/mnt/Files/thesis_vigidroid
+
+# 1 BM1
+cd "$REPO/Dex_header_paper_implementation/only_base1_model"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/export artifacts/parity artifacts/splits
+rm -f artifacts/normalization.json artifacts/failed_apks.log output_archives
+export BM1_ARCHIVE=1 BM1_RUN_ID="run_${DATE_TAG}_bm1"
+FRESH_TRAIN=1 ./run_base_model_1.sh
+
+# 2 Pattern A
+cd "$REPO/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/export artifacts/parity artifacts/splits output_archives
+rm -f artifacts/dataset_index.csv artifacts/vocab.json artifacts/normalization_header.json artifacts/class_balance.json artifacts/dex_stats.json artifacts/failed_apks.log artifacts/pipeline.log
+export PA_ARCHIVE=1 PA_RUN_ID="run_${DATE_TAG}_pa"
+FRESH_TRAIN=1 ./run_pattern_a.sh
+
+# 3 Pattern B
+cd "$REPO/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/export artifacts/parity artifacts/splits output_archives
+rm -f artifacts/dataset_index.csv artifacts/vocab.json artifacts/normalization_header.json artifacts/class_balance.json artifacts/failed_apks.log artifacts/pipeline.log
+export PB_ARCHIVE=1 PB_RUN_ID="run_${DATE_TAG}_pb"
+FRESH_TRAIN=1 ./run_pattern_b.sh
+
+# 4 LinRegDroid
+cd "$REPO/linear"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/export/linregdroid_permission artifacts/splits output_archives
+rm -f artifacts/dataset_index.csv artifacts/permission_vocab.json artifacts/failed_apks.log
+export LR_ARCHIVE=1 LR_RUN_ID="run_${DATE_TAG}_lr"
+FRESH_TRAIN=1 ./run_linregdroid.sh
+
+# 5 MLDP
+cd "$REPO/permission_extractor"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/mldp artifacts/transactions artifacts/export/mldp_pruned_permission artifacts/splits output_archives
+rm -f artifacts/dataset_index.csv artifacts/failed_apks.log
+export MLDP_ARCHIVE=1 MLDP_RUN_ID="run_${DATE_TAG}_mldp"
+FRESH_TRAIN=1 ./run_mldp.sh
+
+# 6 Broadcast hybrid
+cd "$REPO/broadcast_mldp_hybrid"
+rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/export/broadcast_mldp_hybrid artifacts/splits artifacts/manifests output_archives
+rm -f artifacts/failed_index.log artifacts/failed_apks.log
+export BMH_ARCHIVE=1 BMH_RUN_ID="run_${DATE_TAG}_bmh"
+FRESH_TRAIN=1 ./run_broadcast_mldp_hybrid.sh

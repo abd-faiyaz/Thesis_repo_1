@@ -54,6 +54,7 @@ def finalize_archive(
     for name in (
         "epochs.jsonl",
         "metrics_val.json",
+        "test_results.json",
         "preprocess_summary.json",
         "training_run_info.json",
         "checkpoint_summary.json",
@@ -62,6 +63,7 @@ def finalize_archive(
         add(f"metrics/{name}", metrics_dir / name)
 
     for name in (
+        "metrics/test_results.json",
         "metrics/metrics_val.json",
         "metrics/epochs.jsonl",
         "metrics/preprocess_summary.json",

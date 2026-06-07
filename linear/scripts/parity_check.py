@@ -73,6 +73,13 @@ def main(argv: list[str] | None = None) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
+    try:
+        from src.thesis_archive import after_parity
+
+        after_parity(out_path)
+    except ImportError:
+        pass
+
     print(json.dumps(report, indent=2))
     return 0 if ok else 1
 

@@ -81,3 +81,23 @@ def build_dataloaders_from_config(
         num_workers=int(data.get("num_workers", 4)),
         pin_memory=bool(data.get("pin_memory", True)),
     )
+
+
+def build_test_loader_from_config(
+    cfg: PipelineConfig,
+) -> tuple[DataLoader, int, int]:
+    """Build a sequential test loader for the temporal holdout split."""
+    data = cfg.data
+    if not cfg.paths.manifest_test.is_file():
+        raise FileNotFoundError(
+            f"Test manifest not found: {cfg.paths.manifest_test}. "
+            "Run preprocessing with temporal_year split and extract --split all."
+        )
+    test_ds = CombinedPipelineDataset.from_manifest(cfg.paths.manifest_test)
+    loader = build_eval_loader(
+        test_ds,
+        batch_size=int(data.get("batch_size", 16)),
+        num_workers=int(data.get("num_workers", 4)),
+        pin_memory=bool(data.get("pin_memory", True)),
+    )
+    return loader, test_ds.header_dim, test_ds.bow_dim

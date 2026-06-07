@@ -23,10 +23,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR"
+REPO_ROOT="$(cd "$ROOT/../../.." && pwd)"
 cd "$ROOT"
 
 # shellcheck source=/dev/null
 source "$ROOT/scripts/activate_thesis_env.sh"
+
+ARCHIVE_PY="$REPO_ROOT/scripts/thesis_run_archive.py"
+PROFILE="pattern_a_combined"
 
 APK_ROOT="${APK_ROOT:-$ROOT/data/apks}"
 CONFIG="${CONFIG:-$ROOT/config/default.yaml}"
@@ -38,11 +42,15 @@ SKIP_DEX_STATS="${SKIP_DEX_STATS:-0}"
 SKIP_TRAIN="${SKIP_TRAIN:-0}"
 SKIP_EVAL="${SKIP_EVAL:-0}"
 SKIP_PACKAGE="${SKIP_PACKAGE:-0}"
+SKIP_PLOTS="${SKIP_PLOTS:-0}"
 FRESH_TRAIN="${FRESH_TRAIN:-0}"
 PREPROCESS_LIMIT="${PREPROCESS_LIMIT:-}"
 EXTRACT_LIMIT="${EXTRACT_LIMIT:-}"
 DEX_STATS_LIMIT="${DEX_STATS_LIMIT:-}"
 PIPELINE_LOG="${PIPELINE_LOG:-$ROOT/artifacts/pipeline.log}"
+
+PA_ARCHIVE="${PA_ARCHIVE:-0}"
+PA_RUN_ID="${PA_RUN_ID:-}"
 
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -53,8 +61,23 @@ section() {
   echo "============================================================================="
 }
 
-mkdir -p "$(dirname "$PIPELINE_LOG")"
-exec > >(tee -a "$PIPELINE_LOG") 2>&1
+if [[ "$PA_ARCHIVE" == "1" ]]; then
+  if [[ -z "$PA_RUN_ID" ]]; then
+    PA_RUN_ID="run_$(date +%Y%m%d_%H%M%S)_pa"
+  fi
+  export PA_RUN_ID
+  ARCHIVE_DIR="$ROOT/output_archives/$PA_RUN_ID"
+  "$PYTHON" "$ARCHIVE_PY" bootstrap \
+    --profile "$PROFILE" \
+    --root "$ROOT" \
+    --run-id "$PA_RUN_ID" \
+    --config "$CONFIG" \
+    ${APK_ROOT:+--apk-root "$APK_ROOT"}
+  exec > >(tee -a "$ARCHIVE_DIR/logs/pipeline_full.log") 2>&1
+else
+  mkdir -p "$(dirname "$PIPELINE_LOG")"
+  exec > >(tee -a "$PIPELINE_LOG") 2>&1
+fi
 
 section "Pattern A (Full Combined Pipeline) — configuration"
 echo "ROOT:             $ROOT"
@@ -68,6 +91,8 @@ echo "SKIP_TRAIN:       $SKIP_TRAIN"
 echo "SKIP_EVAL:        $SKIP_EVAL"
 echo "SKIP_PACKAGE:     $SKIP_PACKAGE"
 echo "FRESH_TRAIN:      $FRESH_TRAIN"
+echo "PA_ARCHIVE:       $PA_ARCHIVE"
+echo "PA_RUN_ID:        ${PA_RUN_ID:-<auto when PA_ARCHIVE=1>}"
 echo "PIPELINE_LOG:     $PIPELINE_LOG"
 
 if [[ "$INSTALL_DEPS" == "1" ]]; then
@@ -102,7 +127,7 @@ if [[ "$SKIP_PREPROCESS" != "1" ]]; then
   [[ -n "$CONFIG" ]] && NORM_ARGS+=(--config "$CONFIG")
   "$PYTHON" -m src.preprocessing.fit_header_norm "${NORM_ARGS[@]}"
 
-  EXTRACT_ARGS=(--split both)
+  EXTRACT_ARGS=(--split all)
   [[ -n "$CONFIG" ]] && EXTRACT_ARGS+=(--config "$CONFIG")
   [[ -n "$EXTRACT_LIMIT" ]] && EXTRACT_ARGS+=(--limit "$EXTRACT_LIMIT")
   "$PYTHON" -m src.preprocessing.extract_to_cache "${EXTRACT_ARGS[@]}"
@@ -112,10 +137,16 @@ fi
 
 MANIFEST_TRAIN="$ROOT/artifacts/processed/manifest_train.json"
 MANIFEST_VAL="$ROOT/artifacts/processed/manifest_val.json"
-if [[ ! -f "$MANIFEST_TRAIN" ]] || [[ ! -f "$MANIFEST_VAL" ]]; then
-  echo "ERROR: Missing manifests. Run preprocessing first."
+MANIFEST_TEST="$ROOT/artifacts/processed/manifest_test.json"
+if [[ ! -f "$MANIFEST_TRAIN" ]] || [[ ! -f "$MANIFEST_VAL" ]] || [[ ! -f "$MANIFEST_TEST" ]]; then
+  echo "ERROR: Missing manifests (train, val, test). Run preprocessing first."
   exit 1
 fi
+
+"$PYTHON" "$ARCHIVE_PY" export-corpus-stats \
+  --profile "$PROFILE" \
+  --root "$ROOT" \
+  ${PA_RUN_ID:+--run-id "$PA_RUN_ID"}
 
 if [[ "$SKIP_DEX_STATS" != "1" ]]; then
   section "Dex file count histogram (train split)"
@@ -152,7 +183,7 @@ fi
 
 if [[ "$SKIP_EVAL" != "1" ]]; then
   section "Evaluate (ACC, F1, AUC)"
-  EVAL_ARGS=(--split val)
+  EVAL_ARGS=(--split test)
   [[ -n "$CONFIG" ]] && EVAL_ARGS+=(--config "$CONFIG")
   [[ -f "$BEST_CKPT" ]] && EVAL_ARGS+=(--checkpoint "$BEST_CKPT")
   "$PYTHON" -m src.training.evaluate "${EVAL_ARGS[@]}"
@@ -166,13 +197,28 @@ if [[ "$SKIP_PACKAGE" != "1" ]]; then
   BUNDLE="$BUNDLE" CONFIG="$CONFIG" "$ROOT/scripts/package_artifacts.sh"
 fi
 
+if [[ "$PA_ARCHIVE" == "1" ]]; then
+  if [[ "$SKIP_PLOTS" != "1" ]]; then
+    section "Thesis figures"
+    "$PYTHON" "$ARCHIVE_PY" plot --profile "$PROFILE" --root "$ROOT" --run-id "$PA_RUN_ID"
+  fi
+  section "Finalize run archive"
+  "$ROOT/scripts/archive_run.sh" "$PA_RUN_ID"
+  section "Thesis snippet"
+  "$PYTHON" "$ARCHIVE_PY" snippet --profile "$PROFILE" --root "$ROOT" --run-id "$PA_RUN_ID"
+fi
+
 section "Pattern A pipeline finished"
 echo "Manifests:  $MANIFEST_TRAIN"
 echo "Best ckpt:  $BEST_CKPT"
 echo "Latest:     $LATEST_CKPT"
-echo "Metrics:    $ROOT/artifacts/checkpoints/metrics_val.json"
+echo "Metrics:    $ROOT/artifacts/checkpoints/test_results.json"
 echo "Dex stats:  $ROOT/artifacts/dex_stats.json"
 echo "Failed log: $ROOT/artifacts/failed_apks.log"
-echo "Log:        $PIPELINE_LOG"
+echo "Log:        ${PIPELINE_LOG}"
+if [[ "$PA_ARCHIVE" == "1" ]]; then
+  echo "Run archive: $ROOT/output_archives/$PA_RUN_ID"
+  echo "  THESIS_SNIPPET: $ROOT/output_archives/$PA_RUN_ID/THESIS_SNIPPET.md"
+fi
 echo ""
 echo "Done."

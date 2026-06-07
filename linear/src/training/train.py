@@ -65,11 +65,23 @@ def train_model(cfg, *, config_path: Path | None = None) -> Path:
         "n_train": int(X_train.shape[0]),
         "M": fit.feature_dim,
         "trained_at": _utc_now(),
+        "variant": cfg.model.get("variant", "linregdroid1"),
+        "label_encoding": cfg.model.get("label_encoding", "thesis_0_benign_1_malware"),
+        "decision_rules": {
+            "linregdroid1": "predict malware if clamp(ŷ,0,1) >= threshold",
+            "linregdroid2": "nearest-class on raw ŷ (paper rule)",
+        },
         "config": str(config_path or (cfg.root / "config" / "default.yaml")),
     }
     (checkpoint_dir / "training_meta.json").write_text(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
     )
+    try:
+        from src.thesis_archive import after_train
+
+        after_train(ckpt_path, meta)
+    except ImportError:
+        pass
     return ckpt_path
 
 

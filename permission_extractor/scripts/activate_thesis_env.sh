@@ -1,10 +1,14 @@
-#!/usr/bin/env bash
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$ROOT/.." && pwd)"
-if [[ -f "$REPO_ROOT/thesis_venv/bin/activate" ]]; then
-  # shellcheck source=/dev/null
-  source "$REPO_ROOT/thesis_venv/bin/activate"
-fi
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+# Activate shared thesis_venv for this pipeline. Source after ROOT is set.
+: "${ROOT:?ROOT must be set before sourcing activate_thesis_env.sh}"
+_d="$ROOT"
+while [[ "$_d" != "/" ]]; do
+  if [[ -f "$_d/scripts/source_thesis_python.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_d/scripts/source_thesis_python.sh"
+    return 0 2>/dev/null || exit 0
+  fi
+  _d="$(dirname "$_d")"
+done
+PYTHON="${PYTHON:-python3}"
+export PYTHON
+return 1 2>/dev/null || exit 1

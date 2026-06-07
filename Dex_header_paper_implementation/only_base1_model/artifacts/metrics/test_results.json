@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-06-06T19:40:40.124317+00:00",
+  "run_id": "run_20260607_val_test_fix",
+  "model_id": "mlp_header",
+  "domain": "dex_header_d3",
+  "split": "test",
+  "n_samples": 1528,
+  "loss": 0.20798307347043496,
+  "metrics": {
+    "accuracy": 0.9659685863874345,
+    "f1": 0.9444444444444444,
+    "roc_auc": 0.9631350866706514
+  },
+  "threshold": 0.5,
+  "confusion_matrix": [
+    [
+      1034,
+      16
+    ],
+    [
+      36,
+      442
+    ]
+  ],
+  "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
+  "hardware": {
+    "device": "cuda",
+    "batch_size": 16,
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3060 Ti"
+  },
+  "apk_root": "/mnt/Files/thesis_full_dataset",
+  "split_mode": "temporal_year",
+  "train_years": [
+    2020,
+    2021
+  ],
+  "test_years": [
+    2022,
+    2023
+  ],
+  "val_fraction": 0.1,
+  "seed": 42,
+  "splits_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/splits",
+  "class_counts": {
+    "benign": 1050,
+    "malware": 478
+  }
+}

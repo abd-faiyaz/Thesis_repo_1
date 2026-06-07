@@ -1,4 +1,9 @@
-"""Walk apk_root, assign splits, write dataset index."""
+"""Walk apk_root, assign splits, write dataset index.
+
+Optional P1 metadata (apk_size_bytes, num_dex_files): use repo helper
+Shared_pipeline_Files/tools/build_apk_manifest.py for centralized corpus stats;
+this scanner writes path/label/year/apk_id only.
+"""
 
 from __future__ import annotations
 
@@ -32,9 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     ensure_artifact_dirs(cfg)
 
     apk_root = Path(args.apk_root or cfg.paths.apk_root)
-    rows = scan_apk_rows(cfg, apk_root)
-    if args.limit is not None:
-        rows = rows[: args.limit]
+    rows = scan_apk_rows(cfg, apk_root, limit=args.limit)
 
     rows = assign_splits(cfg, rows)
     write_dataset_index(cfg.paths.dataset_index, rows)

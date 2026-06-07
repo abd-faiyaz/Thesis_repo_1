@@ -1,17 +1,51 @@
-Dataset: https://huggingface.co/buckets/sakhawat2088/android-apks
+Dataset: https://huggingface.co/buckets/sakhawat2088/android-apks (~13.5k APKs, 2020–2023)
+Default corpus: /mnt/Files/thesis_full_dataset (see config/default.yaml paths.apk_root)
 
 cd permission_extractor
-pip install -r requirements.txt
-APK_ROOT=/path/to/android-apks ./run_mldp.sh
+source scripts/activate_thesis_env.sh   # repo-root thesis_venv
+python3 scripts/verify_setup.py         # P0 — must pass before full run
 
-Temporal eval (2022+2023):
-EVAL_TEMPORAL=1 APK_ROOT=/path/to/android-apks ./run_mldp.sh
+Full pipeline (P0–P8):
+./run_mldp.sh
 
-Or after training:
+Smoke / dev run (needs malware in index — use >=6500; not thesis numbers):
+PREPROCESS_LIMIT=6500 ./run_mldp.sh
+
+P6 eval (default): val (model selection between linear_svc / tiny_mlp) + temporal_holdout (primary test)
+Optional dev_test:
 python3 -m src.training.evaluate --splits val dev_test temporal_holdout
 
-Outputs
-artifacts/mldp/selected_permissions.json     frozen MLDP set S (≤40 perms)
-artifacts/metrics/evaluation_results.json      val + dev_test scores
-artifacts/checkpoints/mldp_pruned.pth          selected model (SVM or MLP)
-artifacts/export/mldp_pruned_permission/       ONNX bundle for VigiDroid later
+Split policy (thesis):
+  Same as LinRegDroid — stratified_development (2020+2021) + temporal_holdout (2022+2023 primary test)
+  Documented in config/default.yaml pipeline.split_policy_note
+
+Deployed model variant (VigiDroid + thesis):
+  MLDP-pruned frozen set S=40 permissions
+  Selected head: linear_svc (sigmoid-calibrated SVM) — not tiny_mlp in staged bundle
+  See Android_Works/momo_deployed_variants.md
+
+Outputs to check
+File | Purpose
+artifacts/mldp/selected_permissions.json | Frozen set S (≤40 perms) + MLDP metadata
+artifacts/mldp/selection_validation.json | |S| in [20,40], fallback_used check
+artifacts/metrics/evaluation_results.json | val + temporal_holdout
+artifacts/metrics/test_results.json | Primary test on 2022+2023 (split=test schema)
+Shared_pipeline_Files/results/offline/mldp_pruned_permission_test_*.json | Shared offline export
+artifacts/checkpoints/mldp_pruned.pth | Selected model checkpoint
+artifacts/export/mldp_pruned_permission/model.onnx | ONNX bundle
+artifacts/metrics/parity_report.json | P8 PC parity
+
+Stage to Android (after export):
+bash Android_Works/stage_momo_assets.sh   # copies to vigidroid/app/src/main/assets/models/mldp_pruned_permission/
+
+Repo-level ONNX parity:
+python Shared_pipeline_Files/tools/parity_check.py \
+  --bundle vigidroid/app/src/main/assets/models/mldp_pruned_permission
+
+On-device A4 parity:
+cd ../vigidroid && ./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.msh.vigidroid.MldpPrunedParityTest
+
+Pull device scan metrics after A3 scans:
+bash Shared_pipeline_Files/tools/pull_device_metrics.sh
+# → Shared_pipeline_Files/results/device/

@@ -1,0 +1,5 @@
+{
+  "malware_threshold": 0.5,
+  "decision_variant": "linregdroid1",
+  "description": "LinRegDroid1: predict malware when malware_probability >= malware_threshold. LinRegDroid2: nearest-class on raw linear score (see export_manifest decision_rules)."
+}

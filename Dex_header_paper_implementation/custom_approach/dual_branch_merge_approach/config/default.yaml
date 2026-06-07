@@ -33,7 +33,8 @@ preprocessing:
   cache_format: shard_npz
   split_mode: temporal_year
   train_years: [2020, 2021]
-  val_years: [2022, 2023]
+  test_years: [2022, 2023]
+  val_fraction: 0.1
   train_ratio: 0.9
   seed: 42
 

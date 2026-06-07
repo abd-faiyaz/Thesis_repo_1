@@ -71,9 +71,14 @@ def export_bundle(
         shutil.copy2(cfg.paths.checkpoints / "coefficients.json", out_dir / "coefficients.json")
 
     threshold = float(cfg.evaluation.get("threshold", 0.5))
+    primary_variant = str(cfg.model.get("variant", "linregdroid1"))
     thresholds = {
         "malware_threshold": threshold,
-        "description": "Predict malware when malware_probability >= malware_threshold",
+        "decision_variant": primary_variant,
+        "description": (
+            "LinRegDroid1: predict malware when malware_probability >= malware_threshold. "
+            "LinRegDroid2: nearest-class on raw linear score (see export_manifest decision_rules)."
+        ),
     }
     (out_dir / "thresholds.json").write_text(json.dumps(thresholds, indent=2) + "\n", encoding="utf-8")
 
@@ -82,8 +87,35 @@ def export_bundle(
         "domain": DOMAIN_ID,
         "exported_at": _utc_now(),
         "opset_version": ONNX_OPSET,
+        "preprocessing_version": "1",
+        "multidex_mode": "n/a",
+        "split_mode": cfg.preprocessing.get("split_mode", "stratified_development"),
+        "train_years": cfg.preprocessing.get("development_years", [2020, 2021]),
+        "test_years": cfg.preprocessing.get("temporal_holdout_years", [2022, 2023]),
+        "primary_test_split": "temporal_holdout",
         "feature_dim": feature_dim,
         "token_normalization": "vigidroid",
+        "label_encoding": {
+            "thesis": "benign=0, malware=1",
+            "paper": "benign=1, malware=0",
+            "note": "Training uses thesis labels; LinRegDroid2 applies paper nearest-class geometry at inference.",
+        },
+        "decision_variant": primary_variant,
+        "decision_rules": {
+            "linregdroid1": f"malware if clamp(linear_score, 0, 1) >= {threshold}",
+            "linregdroid2": "malware if |ŷ - 0| > |ŷ - 1| in paper label space (mapped to thesis labels)",
+        },
+        "score_output": {
+            "onnx_name": "malware_probability",
+            "transform": "clamp(linear_score, 0, 1)",
+            "paper_note": "Paper reports unbounded ŷ; mobile ONNX uses clamped probability for stable thresholds.",
+            "raw_score_export": False,
+        },
+        "ensemble_scope": cfg.model.get("ensemble_scope", "out_of_scope"),
+        "ensemble_note": (
+            "Paper Ensemble-1 (5× MLR bootstrap) and Ensemble-2 (MLR+SVM+trees) not implemented; "
+            "single MLR baseline for thesis comparison."
+        ),
         "inputs": [
             {
                 "name": "permissions",
@@ -101,11 +133,11 @@ def export_bundle(
             }
         ],
         "onnx_file": onnx_path.name,
+        "feature_asset": "features/permission_vocab.json",
         "android_assets_target": cfg.pipeline.get(
             "android_assets_target",
             "vigidroid/app/src/main/assets/models/linregdroid_permission/",
         ),
-        "ensemble_note": "Designed to run alongside existing VigiDroid models; integration deferred.",
     }
     (out_dir / "export_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -168,6 +200,14 @@ def main(argv: list[str] | None = None) -> int:
         num_parity_samples=args.num_parity_samples,
     )
     print(f"Export bundle → {out}")
+    try:
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from src.thesis_archive import after_export
+
+        after_export()
+    except ImportError:
+        pass
     return 0
 
 

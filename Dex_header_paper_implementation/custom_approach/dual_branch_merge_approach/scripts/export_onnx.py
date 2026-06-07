@@ -45,6 +45,12 @@ def main(argv: list[str] | None = None) -> int:
         skip_verify=args.skip_verify,
     )
     print(f"Export bundle written to {out_dir}")
+    try:
+        from src.thesis_archive import after_export
+
+        after_export()
+    except ImportError:
+        pass
     return 0
 
 

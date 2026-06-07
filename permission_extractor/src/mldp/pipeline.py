@@ -10,6 +10,7 @@ from src.features.permission_vector import save_selected_permissions
 from src.mldp.association_rules import mine_rule_permissions
 from src.mldp.prnr import compute_prnr, prnr_to_json
 from src.mldp.support_filter import filter_by_support
+from src.mldp.validation import validate_selected_set, write_selection_validation
 
 
 def run_mldp_selection(
@@ -59,6 +60,7 @@ def run_mldp_selection(
         min_support=float(assoc_cfg.get("min_support", 0.05)),
         min_confidence=float(assoc_cfg.get("min_confidence", 0.70)),
         min_lift=float(assoc_cfg.get("min_lift", 1.2)),
+        max_stored_rules=int(assoc_cfg.get("max_stored_rules", 200)),
     )
 
     rules_path = cfg.paths.mldp_dir / "association_rules.json"
@@ -84,8 +86,20 @@ def run_mldp_selection(
         "n_after_support": len(supported),
         "n_from_rules": len(rule_perms),
         "max_permissions": max_s,
+        "association_rule_mode": "malware_only_itemsets",
+        "association_rule_note": (
+            "FP-Growth on malware-only transactions; permissions from high-confidence "
+            "rules among PRNR/support candidates (implicit malware consequent)."
+        ),
     }
     save_selected_permissions(cfg.paths.selected_permissions, selected, metadata=metadata)
+
+    validation = validate_selected_set(selected, metadata, cfg)
+    validation_path = write_selection_validation(cfg, validation)
+    for warning in validation.get("warnings", []):
+        print(f"  MLDP warning: {warning}")
+    print(f"  selection validation → {validation_path} (passed={validation['passed']})")
+
     return selected
 
 

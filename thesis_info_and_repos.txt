@@ -1,0 +1,14 @@
+
+
+okay so the thesis that I am working on is like this:
+we are developing a malware detecting app for android which utilizes robust lightweight models for on device inference. It uses static analysis The workflow consists of 2 parts, as highlighted by the flowchart in the image:
+1) At first we are trying to implement models from different papers(directly for the lightweight ones, or using custom implementations for those models that are heavy but has high accuracy and F1 score). This is done using pytorch and training is done on our custom benign+malware apks, includes androzoo and is 500gb ish
+2) Next we made an app called vigidroid. Now for the trained models, we take the pth weight files, convert them to onnx format for using in our app. These models are used one by one to scan for now, but we'll try adaptive voting and ensembling to get better accuracy. 
+
+This is the repo for the app, https://github.com/Sakhawat238/vigidroid
+, go through it to understand how it works. In the image, the box with 6 points illustrates the tasks to be done using this pipeline.
+
+Also this is the total repo, where I kept implementation of 1 model from a paper, and 2 custom implementations based on the architecture of that paper to make the models lightweight yet accurate. Also another model called 1DCNN is implemented in this repo too. this is the link of that public repo:https://github.com/abd-faiyaz/Thesis_repo_1
+
+
+

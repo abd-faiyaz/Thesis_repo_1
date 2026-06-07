@@ -25,4 +25,5 @@ fi
 source "$ROOT/scripts/activate_thesis_env.sh"
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 
+shift  # run_id already consumed above; pass only extra flags (e.g. --apk-root)
 "$PYTHON" "$ROOT/scripts/finalize_bm1_archive.py" --run-id "$RUN_ID" "$@"

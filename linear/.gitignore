@@ -1,4 +1,5 @@
 artifacts/
+output_archives/
 data/apks/
 __pycache__/
 *.pyc

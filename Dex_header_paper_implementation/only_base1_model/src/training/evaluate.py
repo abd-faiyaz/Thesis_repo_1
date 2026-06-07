@@ -161,14 +161,19 @@ def run_evaluation(
     Returns dict with loss and metric values.
     """
     from src.config import ensure_artifact_dirs, load_config
-    from src.data.dataloaders import build_dataloaders_from_config
+    from src.data.dataloaders import build_dataloaders_from_config, build_test_loader_from_config
     from src.models.mlp_header import build_mlp_header
     from src.training.checkpoint import load_checkpoint, restore_from_checkpoint
     from src.training.setup import build_training_objects
 
     ensure_artifact_dirs(cfg)
     train_loader, val_loader, feature_dim = build_dataloaders_from_config(cfg)
-    loader = val_loader if split == "val" else train_loader
+    if split == "test":
+        loader, feature_dim = build_test_loader_from_config(cfg)
+    elif split == "val":
+        loader = val_loader
+    else:
+        loader = train_loader
 
     ckpt_path = checkpoint_path or cfg.paths.latest_checkpoint
     checkpoint = load_checkpoint(ckpt_path, map_location="cpu")
@@ -219,7 +224,12 @@ def run_evaluation(
         y_pred=y_pred,
         y_score=y_score,
     )
-    out_path = write_metrics_json(cfg, payload, split=split, metrics_out=metrics_out)
+    default_out = None
+    if metrics_out is None and split == "test":
+        default_out = cfg.root / "artifacts" / "metrics" / "test_results.json"
+    out_path = write_metrics_json(
+        cfg, payload, split=split, metrics_out=metrics_out or default_out
+    )
     log_checkpoint_summary(cfg, ckpt_path)
     manifest = finalize_run_manifest(cfg)
     if manifest is not None:
@@ -241,12 +251,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Evaluate MLP(H) on validation split.")
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, default=None)
-    parser.add_argument("--split", choices=("val", "train"), default="val")
+    parser.add_argument("--split", choices=("val", "train", "test"), default="test")
     parser.add_argument(
         "--metrics-out",
         type=Path,
         default=None,
-        help="JSON path for metrics (default: artifacts/metrics/metrics_{split}.json)",
+        help="JSON path for metrics (default: artifacts/metrics/test_results.json for test)",
     )
     return parser
 

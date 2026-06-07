@@ -120,6 +120,13 @@ def train_and_select(cfg) -> Path:
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
     )
 
+    try:
+        from src.thesis_archive import after_train
+
+        after_train(ckpt_path, meta)
+    except ImportError:
+        pass
+
     print(f"Selected model: {best_name} (val F1={best_f1:.4f})")
     for name, scores in results.items():
         print(f"  {name}: val_f1={scores['val_f1']:.4f}")

@@ -4,10 +4,19 @@
 pipeline:
   model_id: mldp_pruned_permission
   domain: manifest_permissions_mldp
+  enabled: true
+  export_offline_json: true
+  export_dir: Shared_pipeline_Files/results/offline
+  use_shared_splits: false
+  # shared_splits_dir: Shared_pipeline_Files/data/splits
+  # shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv
   android_assets_target: vigidroid/app/src/main/assets/models/mldp_pruned_permission/
+  split_policy_note: >
+    Train/val/dev_test from 2020-2021 (70/15/15 stratified).
+    temporal_holdout (2022+2023) is the primary test split for thesis metrics (test_results.json).
 
 paths:
-  apk_root: data/apks
+  apk_root: /mnt/Files/thesis_full_dataset
   artifacts: artifacts
   mldp_dir: artifacts/mldp
   transactions_dir: artifacts/transactions
@@ -21,6 +30,7 @@ paths:
   latest_checkpoint: artifacts/checkpoints/mldp_pruned.pth
 
 preprocessing:
+  # Same thesis eval protocol as LinRegDroid — see linear/config/default.yaml pipeline.split_policy_note
   split_mode: stratified_development
   development_years: [2020, 2021]
   train_ratio: 0.70
@@ -47,8 +57,14 @@ mldp:
     min_confidence: 0.70
     min_lift: 1.2
     algorithm: fpgrowth
+    max_stored_rules: 200
+    # Paper describes X ⇒ malware rules; code mines itemsets on malware-only APKs
+    # and unions permissions from high-confidence rules (implicit malware context).
+    rule_mode: malware_only_itemsets
   max_permissions: 40
   min_permissions: 5
+  expected_s_min: 20
+  expected_s_max: 40
 
 model:
   candidates: [linear_svc, tiny_mlp]
@@ -65,7 +81,8 @@ model:
 evaluation:
   threshold: 0.5
   metrics: [accuracy, f1, roc_auc]
-  run_ablation_full_permissions: false
+  # Full-permission ablation (~135+ dims unpruned classifier) is N/A for thesis baseline.
+  # Compare against LinRegDroid full-vocab model instead if needed.
 
 export:
   onnx_opset: 14

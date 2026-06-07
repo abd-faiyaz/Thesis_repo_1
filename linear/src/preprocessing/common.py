@@ -57,7 +57,12 @@ def label_settings(cfg: PipelineConfig) -> tuple[set[str], set[str]]:
     return benign, malicious
 
 
-def scan_apk_rows(cfg: PipelineConfig, apk_root: Path | None = None) -> list[DatasetRow]:
+def scan_apk_rows(
+    cfg: PipelineConfig,
+    apk_root: Path | None = None,
+    *,
+    limit: int | None = None,
+) -> list[DatasetRow]:
     root = apk_root or cfg.paths.apk_root
     benign, malicious = label_settings(cfg)
     seen_ids: set[str] = set()
@@ -80,6 +85,8 @@ def scan_apk_rows(cfg: PipelineConfig, apk_root: Path | None = None) -> list[Dat
                 split="unassigned",
             )
         )
+        if limit is not None and len(rows) >= limit:
+            break
 
     if not rows:
         raise FileNotFoundError(f"No .apk files under {root}")

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Broadcast Receiver + Permission Classifier — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+    code { background: #21262d; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="index.html">← All models</a></nav>
+<h1>Broadcast Receiver + Permission Classifier</h1>
+<p class="meta">Paper: Mohsen et al., CIC 2017 — <em>Detecting Android Malwares By Mining Statically Registered Broadcast Receivers</em></p>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>APK:</strong> A ZIP archive containing <code>AndroidManifest.xml</code> (what the app declares) and <code>classes.dex</code> (compiled code). You can scan APKs <em>without running</em> them — that is <strong>static analysis</strong>.</p>
+<p><strong>Permissions</strong> (<code>&lt;uses-permission&gt;</code>): capabilities such as <code>SEND_SMS</code> or <code>READ_CONTACTS</code>. Each declared permission is visible in the manifest.</p>
+<p><strong>Broadcast receiver:</strong> An Android component that runs code when a <strong>system event</strong> fires — e.g. <code>BOOT_COMPLETED</code> (phone finished booting), <code>SMS_RECEIVED</code> (new text). Malware often registers receivers so it wakes in the background.</p>
+<p><strong>Feature vector:</strong> A fixed-length list of 0/1 values — one bit per permission or intent action in a vocabulary learned from your training set.</p>
+<p><strong>Binary classification:</strong> The model outputs a malware probability; if it exceeds a threshold (usually 0.5), the APK is labeled malware.</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Permission feature vector</li>
+<li>Component B — Broadcast receiver intent-action vector</li>
+<li>Component C — Fusion and classifier</li>
+<li>Ensemble / fusion mechanism</li>
+<li>Experimental results</li>
+<li>Full end-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine you must screen <strong>50,000 APK files</strong> before they reach users’ phones. Most detectors use only <strong>manifest permissions</strong>, but benign games and banking apps often request <code>INTERNET</code> and <code>READ_PHONE_STATE</code> just like trojans — so permission-only models plateau. Mohsen et al. (CIC 2017) add a second manifest signal: <strong>which broadcast receivers and intent actions</strong> each app registers statically. Malware disproportionately listens for boot, SMS, and connectivity events to persist and intercept data. The architecture has three blocks: (1) a permission binary vector, (2) a receiver-action binary vector, (3) early fusion via concatenation plus an SVM with RBF kernel in the paper (logistic regression or tiny MLP for ONNX deployment). Everything is manifest-only — no Dex decompilation.</p>
+</section>
+
+<section>
+<h2>2. Component A — Permission feature vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Every <code>android:name</code> in <code>&lt;uses-permission&gt;</code> tags inside <code>AndroidManifest.xml</code>.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Permissions are Android’s primary static security declaration: malware that sends premium SMS, steals contacts, or records audio must often declare dangerous permissions visible to users and stores.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip the APK (it is a ZIP archive); locate <code>AndroidManifest.xml</code> (binary XML on disk — decode with AAPT2, Apktool, or an <code>AxmlReader</code>).</li>
+<li>Enumerate all <code>&lt;uses-permission android:name="…"&gt;</code> strings for this APK.</li>
+<li>From the <strong>training corpus only</strong>, build vocabulary \(\mathcal{P} = \{\text{perm}_1,\ldots,\text{perm}_P\}\) (typically \(P \approx 150\)–300 over ~50k APKs).</li>
+<li>For each APK \(i\), set \(p_{i,j}=1\) if \(\text{perm}_j\) appears in its manifest, else \(0\).</li>
+<li>Freeze \(\mathcal{P}\) at inference; permissions not in the vocabulary are ignored or optionally bucketed as “other.”</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ p_{i,j} = \begin{cases} 1 & \text{if } \text{perm}_j \in \text{Manifest}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{p}_i \in \{0,1\}^{P} \]</p>
+<ul class="vars"><li><strong>\(P\)</strong> — permission vocabulary size (number of dimensions)</li><li><strong>\(p_{i,j}\)</strong> — bit for permission \(j\) on APK \(i\)</li><li><strong>\(\mathbf{p}_i\)</strong> — permission feature row for one APK</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Raw APK
+  │
+  └─► AndroidManifest.xml
+         │
+         └─► &lt;uses-permission&gt; tags
+                │
+                ▼
+         Permission vector  (1×P)
+         e.g. 1×200  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{p} \in \{0,1\}^{P}\). This vector is the first half of the fused input \(\mathbf{x}\) before the classifier.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Standard baseline domain; the paper includes it so receiver features can be proven to add value beyond permissions alone.</div>
+</section>
+<section>
+<h2>3. Component B — Broadcast receiver intent-action vector</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Intent <code>android:name</code> strings under <code>&lt;receiver&gt;&lt;intent-filter&gt;&lt;action&gt;</code> — statically registered broadcast receivers only.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Receivers define <em>when</em> code runs without the user opening the app. Malware uses <code>BOOT_COMPLETED</code> to survive reboots and <code>SMS_RECEIVED</code> to intercept texts. The paper’s manual study (400 APKs) and large-scale experiments show malware registers more receivers and more sensitive actions than benign apps.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse the same <code>AndroidManifest.xml</code> as Component A.</li>
+<li>Find every <code>&lt;receiver&gt;</code> element (exported or not; static registration only).</li>
+<li>For each receiver, collect all <code>&lt;action android:name="…"&gt;</code> inside nested <code>&lt;intent-filter&gt;</code> blocks.</li>
+<li>Build training vocabulary \(\mathcal{A}\) of distinct action strings from the corpus (\(R \approx 50\)–100).</li>
+<li>Set \(r_{i,k}=1\) if action \(k\) appears in any receiver filter for APK \(i\), else \(0\).</li>
+<li>Freeze \(\mathcal{A}\) for inference.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ r_{i,k} = \begin{cases} 1 & \text{if } \text{action}_k \in \text{Receivers}(i) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{r}_i \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(R\)</strong> — receiver-action vocabulary size</li><li><strong>\(r_{i,k}\)</strong> — bit for intent action \(k\)</li><li><strong>\(\mathbf{r}_i\)</strong> — receiver feature vector for APK \(i\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+  │
+  └─► &lt;receiver&gt; → &lt;intent-filter&gt; → &lt;action&gt;
+         │
+         ▼
+   Receiver-action vector  (1×R)
+   e.g. 1×80  binary</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{r} \in \{0,1\}^{R}\). Concatenated with \(\mathbf{p}\) to form the classifier input \(\mathbf{x}\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from standard permission-only detectors:</strong> Drebin-style work rarely treats receiver actions as a dedicated feature block; Mohsen et al. show they improve accuracy when combined with permissions.</div>
+</section>
+<section>
+<h2>4. Component C — Fusion and classifier</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>The concatenated vector \(\mathbf{x} = [\mathbf{p} \| \mathbf{r}]\). Paper: C-SVM with RBF kernel; thesis/ONNX: logistic regression or a 1-hidden-layer MLP.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>After concatenation, the joint space is still sparse and moderate-dimensional; a linear boundary often works, but SVM with RBF handles mild nonlinear interactions (e.g. rare permission + boot receiver together).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Concatenate: \(\mathbf{x} \leftarrow [\mathbf{p}; \mathbf{r}]\) → dimension \(P+R\) (e.g. \(1 \times 280\)).</li>
+<li>Train on labeled APKs (malware = 1, benign = 0) with stratified cross-validation.</li>
+<li>Paper: grid-search SVM hyperparameters \(C\) (margin penalty) and \(\gamma\) (RBF width).</li>
+<li>ONNX path: train \(\mathbf{w}, b\) for logistic regression or small MLP; export to mobile runtime.</li>
+<li>At inference: build \(\mathbf{x}\) for a new APK → score → compare to threshold \(\tau\) (often 0.5).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>SVM decision (paper):</strong></p>
+<p>\[ f(\mathbf{x}) = \mathrm{sign}\left(\sum_{i \in SV} \alpha_i y_i K(\mathbf{x}_i, \mathbf{x}) + b\right) \]</p>
+<p>RBF kernel: \[ K(\mathbf{x}, \mathbf{x}') = \exp\left(-\gamma \|\mathbf{x} - \mathbf{x}'\|_2^2\right) \]</p>
+<p><strong>Logistic regression (ONNX-friendly):</strong></p>
+<p>\[ \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w}^T \mathbf{x} + b)}} \]</p>
+<ul class="vars"><li><strong>\(SV\)</strong> — support vectors (training points that define the SVM boundary)</li><li><strong>\(\alpha_i, y_i\)</strong> — dual coefficients and labels for support vectors</li><li><strong>\(C\)</strong> — SVM regularization (trade-off margin vs misclassification)</li><li><strong>\(\gamma\)</strong> — RBF kernel width</li><li><strong>\(\mathbf{w}, b\)</strong> — logistic weights and bias</li><li><strong>\(\hat{y}\)</strong> — estimated malware probability</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Permission p (1×P) ──┐
+                        ├──► Concat  x (1×(P+R))  ──► Classifier  ──► P(malware)
+Receiver r (1×R) ─────┘
+              e.g. (1×200)+(1×80) = (1×280)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Final output: malware probability or hard label. In a multistep VigiDroid stack, this score is one domain among others (Dex header, tail bytes, etc.).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Manifest-only parsing; typical extraction &lt; 100 ms; model &lt; 50 KB. Complements structural (Dex header) and raw-byte models without overlapping their feature domains.</div>
+</section>
+<section>
+<h2>5. Ensemble or fusion mechanism</h2>
+<p>This model uses <strong>early fusion</strong> (feature-level concatenation before a single classifier), not late fusion or score voting:</p>
+<p>\[ \mathbf{x} = [\mathbf{p} \| \mathbf{r}], \quad \hat{y} = f(\mathbf{x}) \]</p>
+<ul class="vars">
+<li><strong>\(\|\)</strong> — vector concatenation (append \(\mathbf{r}\) after \(\mathbf{p}\))</li>
+<li><strong>\(f\)</strong> — SVM or logistic/MLP; one joint decision boundary in \((P+R)\)-dimensional space</li>
+<li>There is no separate score per branch averaged at the end — both domains are learned jointly.</li>
+</ul>
+<pre class="flow">p (1×P) ──┐
+          ├──► x (1×(P+R))  e.g. 1×280 ──► f(·) ──► ŷ ∈ [0,1]
+r (1×R) ──┘</pre>
+</section>
+
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Feature configuration</th><th>Accuracy / role (paper)</th><th>Notes</th></tr>
+<tr><td>Permissions only</td><td>~76% (reported SVM baseline on one split)</td><td>Useful but insufficient alone</td></tr>
+<tr><td>Receivers only</td><td>Weaker than permissions alone</td><td>Still adds complementary signal</td></tr>
+<tr><td class="best">Permissions + receivers</td><td class="best">Best — combined feature set</td><td class="best">Manual study on 400 APKs; large-scale ML on 5,723+5,723 APKs</td></tr>
+</table>
+<p><strong>Why improvement happened:</strong> Permissions capture <em>capability</em> (what the app may do). Receivers capture <em>event-driven behavior</em> (when background code runs). A benign game may declare <code>INTERNET</code> but rarely pairs it with <code>BOOT_COMPLETED</code> and <code>SMS_RECEIVED</code> — a pattern common in banking trojans and SMS fraud malware.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │  (no Dex, no bytecode)
+└──────┬──────────┬───────┘
+       ▼          ▼
+  p (1×P)     r (1×R)     e.g. 1×200 , 1×80
+       │          │
+       └────┬─────┘
+            ▼
+      x (1×(P+R))         e.g. 1×280
+            ▼
+      Classifier (SVM-RBF / Logistic / MLP)
+            ▼
+      P(malware) ∈ [0,1]  →  threshold τ → label</pre>
+</section>
+
+</body>
+</html>

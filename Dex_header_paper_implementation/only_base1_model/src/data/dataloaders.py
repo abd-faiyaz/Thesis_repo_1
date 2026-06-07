@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from src.config import PipelineConfig
 from src.data.dataset import DexDataset
-from src.data.splits import temporal_split_indices, write_split_path_files
+from src.data.splits import temporal_three_way_split_indices, write_split_path_files
 from src.data.store import ProcessedBundle, load_processed_bundle
 
 
@@ -105,14 +105,51 @@ def resolve_split_settings(cfg: PipelineConfig | None = None, **overrides: Any) 
     else:
         splits_dir_str = str(splits_dir_raw)
 
+    test_years = overrides.get("test_years", pre.get("test_years", pre.get("val_years", [2022, 2023])))
+    val_fraction = overrides.get(
+        "val_fraction",
+        pre.get("val_fraction", data.get("val_fraction", 0.1)),
+    )
+
     return {
         "split_mode": str(split_mode),
         "train_years": overrides.get("train_years", pre.get("train_years", [2020, 2021])),
-        "val_years": overrides.get("val_years", pre.get("val_years", [2022, 2023])),
-        "val_fraction": float(overrides.get("val_fraction", data.get("val_fraction", 0.2))),
+        "test_years": test_years,
+        "val_fraction": float(val_fraction),
         "seed": int(overrides.get("seed", data.get("random_seed", 42))),
         "splits_dir": splits_dir_str,
     }
+
+
+def resolve_split_indices(
+    bundle: ProcessedBundle,
+    *,
+    split_mode: str = "stratified_random",
+    train_years: list[int | str] | None = None,
+    test_years: list[int | str] | None = None,
+    val_fraction: float = 0.1,
+    seed: int = 42,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    if split_mode == "temporal_year":
+        train_idx, val_idx, test_idx = temporal_three_way_split_indices(
+            bundle.paths,
+            bundle.labels,
+            train_years=train_years or [2020, 2021],
+            test_years=test_years or [2022, 2023],
+            val_fraction=val_fraction,
+            seed=seed,
+        )
+        return train_idx, val_idx, test_idx
+    if split_mode == "stratified_random":
+        train_idx, val_idx = split_train_val_indices(
+            bundle.features.shape[0],
+            val_fraction=val_fraction,
+            seed=seed,
+        )
+        return train_idx, val_idx, None
+    raise ValueError(
+        f"Unknown split_mode={split_mode!r}; use 'temporal_year' or 'stratified_random'"
+    )
 
 
 def resolve_train_val_indices(
@@ -120,25 +157,19 @@ def resolve_train_val_indices(
     *,
     split_mode: str = "stratified_random",
     train_years: list[int | str] | None = None,
-    val_years: list[int | str] | None = None,
-    val_fraction: float = 0.2,
+    test_years: list[int | str] | None = None,
+    val_fraction: float = 0.1,
     seed: int = 42,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    if split_mode == "temporal_year":
-        return temporal_split_indices(
-            bundle.paths,
-            train_years=train_years or [2020, 2021],
-            val_years=val_years or [2022, 2023],
-        )
-    if split_mode == "stratified_random":
-        return split_train_val_indices(
-            bundle.features.shape[0],
-            val_fraction=val_fraction,
-            seed=seed,
-        )
-    raise ValueError(
-        f"Unknown split_mode={split_mode!r}; use 'temporal_year' or 'stratified_random'"
+    train_idx, val_idx, _ = resolve_split_indices(
+        bundle,
+        split_mode=split_mode,
+        train_years=train_years,
+        test_years=test_years,
+        val_fraction=val_fraction,
+        seed=seed,
     )
+    return train_idx, val_idx
 
 
 def build_dataloaders_from_bundle(
@@ -146,8 +177,8 @@ def build_dataloaders_from_bundle(
     *,
     split_mode: str = "stratified_random",
     train_years: list[int | str] | None = None,
-    val_years: list[int | str] | None = None,
-    val_fraction: float = 0.2,
+    test_years: list[int | str] | None = None,
+    val_fraction: float = 0.1,
     seed: int = 42,
     batch_size: int = 16,
     num_workers: int = 4,
@@ -155,16 +186,16 @@ def build_dataloaders_from_bundle(
     splits_dir: Path | None = None,
 ) -> tuple[DataLoader, DataLoader, int]:
     """Build shuffled train and sequential val loaders from an in-memory bundle."""
-    train_idx, val_idx = resolve_train_val_indices(
+    train_idx, val_idx, test_idx = resolve_split_indices(
         bundle,
         split_mode=split_mode,
         train_years=train_years,
-        val_years=val_years,
+        test_years=test_years,
         val_fraction=val_fraction,
         seed=seed,
     )
     if splits_dir is not None:
-        write_split_path_files(splits_dir, bundle.paths, train_idx, val_idx)
+        write_split_path_files(splits_dir, bundle.paths, train_idx, val_idx, test_idx)
 
     train_ds = DexDataset.from_bundle(bundle, indices=train_idx)
     val_ds = DexDataset.from_bundle(bundle, indices=val_idx)
@@ -198,7 +229,8 @@ def build_dataloaders_from_config(
     data_cfg = cfg.data
     if split["split_mode"] == "temporal_year":
         print(
-            f"Temporal year split: train={split['train_years']} val={split['val_years']}"
+            f"Temporal year split: train_years={split['train_years']} "
+            f"test_years={split['test_years']} val_fraction={split['val_fraction']}"
         )
     else:
         print(
@@ -209,7 +241,7 @@ def build_dataloaders_from_config(
         bundle,
         split_mode=split["split_mode"],
         train_years=split["train_years"],
-        val_years=split["val_years"],
+        test_years=split["test_years"],
         val_fraction=split["val_fraction"],
         seed=split["seed"],
         batch_size=int(data_cfg.get("batch_size", 16)),
@@ -217,3 +249,36 @@ def build_dataloaders_from_config(
         pin_memory=bool(data_cfg.get("pin_memory", True)),
         splits_dir=splits_dir,
     )
+
+
+def build_test_loader_from_config(
+    cfg: PipelineConfig,
+) -> tuple[DataLoader, int]:
+    """Build a sequential test loader for the temporal holdout years."""
+    processed_path = resolve_processed_path(cfg)
+    bundle = load_processed_bundle(processed_path)
+    split = resolve_split_settings(cfg)
+
+    if split["split_mode"] != "temporal_year":
+        raise ValueError("Test split is only defined for split_mode='temporal_year'")
+
+    _, _, test_idx = resolve_split_indices(
+        bundle,
+        split_mode=split["split_mode"],
+        train_years=split["train_years"],
+        test_years=split["test_years"],
+        val_fraction=split["val_fraction"],
+        seed=split["seed"],
+    )
+    if test_idx is None:
+        raise ValueError("No test indices available for this split configuration")
+
+    test_ds = DexDataset.from_bundle(bundle, indices=test_idx)
+    data_cfg = cfg.data
+    loader = build_eval_loader(
+        test_ds,
+        batch_size=int(data_cfg.get("batch_size", 16)),
+        num_workers=int(data_cfg.get("num_workers", 4)),
+        pin_memory=bool(data_cfg.get("pin_memory", True)),
+    )
+    return loader, bundle.feature_dim

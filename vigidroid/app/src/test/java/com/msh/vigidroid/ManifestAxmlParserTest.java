@@ -37,4 +37,22 @@ public class ManifestAxmlParserTest {
       assertEquals(11, tokens.size());
     }
   }
+
+  @Test
+  public void extractManifestPermissions_omitsIntentTokens() throws Exception {
+    try (InputStream is =
+        getClass().getClassLoader().getResourceAsStream("sample_AndroidManifest.xml")) {
+      if (is == null) {
+        return;
+      }
+      List<String> permissions = ManifestAxmlParser.extractManifestPermissions(is);
+      Set<String> found = new HashSet<>(permissions);
+      assertTrue(found.contains("android.permission.WRITE_EXTERNAL_STORAGE"));
+      assertTrue(found.contains("com.msh.vigidroid.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"));
+      assertEquals(4, permissions.size());
+      for (String token : permissions) {
+        assertTrue(!token.startsWith("android.intent."));
+      }
+    }
+  }
 }

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Rankings — Thesis Suggested Models</title>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; max-width: 1400px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    h1 { color: var(--accent); font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    p.meta { color: var(--muted); font-size: 0.9rem; margin: 0.75rem 0 1.5rem; }
+    .wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { border: 1px solid var(--border); padding: 0.6rem 0.75rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+    tr:nth-child(even) td { background: rgba(0,0,0,0.12); }
+    a { color: #79c0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .rank { font-weight: 700; color: #3fb950; text-align: center; white-space: nowrap; }
+    .type { font-size: 0.82rem; color: var(--muted); }
+    .papers { font-size: 0.8rem; font-family: ui-monospace, monospace; }
+    .rec td:first-child { box-shadow: inset 3px 0 0 #3fb950; }
+    code { background: #21262d; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+
+<h1>Model rankings</h1>
+<p class="meta">
+  Eleven suggested models from <code>more_papers_opus.md</code>.
+  <strong>Usability rank</strong> = theoretical balance of low on-device resource use vs detection value (F1/AUC potential).
+  <strong>Implementation complexity rank</strong> = 1 = easiest to build end-to-end (training + ONNX + Java parity).
+  MSFDroid paper PDF is not in this workspace; hybrids that use Dex header / BoW / ASCNN reference MSFDroid via implementation docs.
+</p>
+
+<div class="wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Usability rank</th>
+      <th>Impl. complexity rank</th>
+      <th>Model name</th>
+      <th>Type</th>
+      <th>Architecture (feature domain — 3 elements)</th>
+      <th>Paper file(s)</th>
+      <th>Rough HTML plan</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    <tr class="rec">
+      <td class="rank">1</td>
+      <td class="rank">6</td>
+      <td><strong>Broadcast + MLDP Hybrid</strong></td>
+      <td class="type">Hybrid <em>(with modifications)</em></td>
+      <td>MLDP-pruned permission bits · broadcast-receiver intent actions · fused tiny MLP head (~80–120-d manifest vector)</td>
+      <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code><br><code>12_Detecting Android Malwares By Mining Statically Registered Broadcast Receivers (Full paper).pdf</code></td>
+      <td><a href="rough_model_explanations/broadcast_mldp_hybrid.html">broadcast_mldp_hybrid.html</a></td>
+    </tr>
+
+    <tr class="rec">
+      <td class="rank">2</td>
+      <td class="rank">5</td>
+      <td><strong>MLDP + Dex Header Cascade</strong></td>
+      <td class="type">Hybrid <em>(with modifications)</em></td>
+      <td>MLDP-selected permission subset (~30-d) · normalized Dex header bytes (104-d, multidex sum-pool) · cascade or fused tiny MLP (~150-d)</td>
+      <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code><br>MSFDroid (no PDF in folder)</td>
+      <td><a href="rough_model_explanations/mldp_dex_header_cascade.html">mldp_dex_header_cascade.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">3</td>
+      <td class="rank">4</td>
+      <td><strong>MLDP-Pruned Permission</strong></td>
+      <td class="type">Custom (single paper)</td>
+      <td>PRNR-ranked permissions · support-filtered permission set · association-rule–selected ~20–40 binary permission bits</td>
+      <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code></td>
+      <td><a href="rough_model_explanations/mldp_pruned_permission_classifier.html">mldp_pruned_permission_classifier.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">4</td>
+      <td class="rank">2</td>
+      <td><strong>Broadcast Receiver + Permission</strong></td>
+      <td class="type">Original (single paper)</td>
+      <td>Manifest permission binary vector · broadcast-receiver intent-action binary vector · concatenated linear/SVM classifier input</td>
+      <td class="papers"><code>12_Detecting Android Malwares By Mining Statically Registered Broadcast Receivers (Full paper).pdf</code></td>
+      <td><a href="rough_model_explanations/broadcast_receiver_permission_classifier.html">broadcast_receiver_permission_classifier.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">5</td>
+      <td class="rank">7</td>
+      <td><strong>Dex Header + Broadcast Receiver Fusion</strong></td>
+      <td class="type">Hybrid <em>(with modifications)</em></td>
+      <td>Dex header structural vector (104-d) · broadcast-receiver intent actions (~50-d) · late-fusion MLP towers (Pattern B–style)</td>
+      <td class="papers">MSFDroid (no PDF in folder)<br><code>12_Detecting Android Malwares By Mining Statically Registered Broadcast Receivers (Full paper).pdf</code></td>
+      <td><a href="rough_model_explanations/dex_header_broadcast_receiver_fusion.html">dex_header_broadcast_receiver_fusion.html</a></td>
+    </tr>
+
+    <tr class="rec">
+      <td class="rank">6</td>
+      <td class="rank">8</td>
+      <td><strong>ANASTASIA-lite</strong></td>
+      <td class="type">Custom (single paper)</td>
+      <td>Manifest intents &amp; components · Dex-used permissions / suspicious APIs / system commands · top-128 behavioral binary flags → small MLP</td>
+      <td class="papers"><code>fereidooni2016.pdf</code></td>
+      <td><a href="rough_model_explanations/anastasia_behavioral_classifier.html">anastasia_behavioral_classifier.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">7</td>
+      <td class="rank">1</td>
+      <td><strong>LinRegDroid</strong></td>
+      <td class="type">Original (single paper)</td>
+      <td>Full manifest permission vocabulary · per-permission binary indicators · multiple linear regression score + threshold rule</td>
+      <td class="papers"><code>55_LinRegDroid_Detection_of_Android_Malware_Using_Mul.pdf</code></td>
+      <td><a href="rough_model_explanations/linregdroid_permission_classifier.html">linregdroid_permission_classifier.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">8</td>
+      <td class="rank">3</td>
+      <td><strong>ERBE Permission + Intent MLP</strong></td>
+      <td class="type">Custom (single paper)</td>
+      <td>Manifest permission names · manifest intent-action strings · ~1K-d binary vector → single MLP (not full 15-run ERBE)</td>
+      <td class="papers"><code>19_An extrinsic random-based ensemble approach for android malware detection.pdf</code></td>
+      <td><a href="rough_model_explanations/erbe_permission_intent_mlp.html">erbe_permission_intent_mlp.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">9</td>
+      <td class="rank">9</td>
+      <td><strong>ANASTASIA + Manifest BoW Fusion</strong></td>
+      <td class="type">Hybrid <em>(with modifications)</em></td>
+      <td>ANASTASIA-lite behavioral top-128 · MSFDroid manifest permission/intent BoW (~4381-d) · early-concat ASCNN(C) single tower (~4509-d)</td>
+      <td class="papers"><code>fereidooni2016.pdf</code><br>MSFDroid (no PDF in folder)</td>
+      <td><a href="rough_model_explanations/anastasia_manifest_bow_fusion.html">anastasia_manifest_bow_fusion.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">10</td>
+      <td class="rank">10</td>
+      <td><strong>FexDroid Category-Pruned Sparse</strong></td>
+      <td class="type">Custom (single paper)</td>
+      <td>Manifest component strings · Dex API/call/intent category buckets · capped ~3K–5K sparse binary Drebin-style vector</td>
+      <td class="papers"><code>36_Effective and Explainable Detection of Android Malware Based on Machine Learning Algorithms.pdf</code></td>
+      <td><a href="rough_model_explanations/fexdroid_category_sparse_classifier.html">fexdroid_category_sparse_classifier.html</a></td>
+    </tr>
+
+    <tr>
+      <td class="rank">11</td>
+      <td class="rank">11</td>
+      <td><strong>FexDroid + Raw APK Tail Dual-Branch</strong></td>
+      <td class="type">Hybrid <em>(with modifications)</em></td>
+      <td>FexDroid-lite multi-category sparse vector · last 1024 raw APK tail bytes · dual-branch late fusion (sparse tower + 1DCNN)</td>
+      <td class="papers"><code>36_Effective and Explainable Detection of Android Malware Based on Machine Learning Algorithms.pdf</code><br><code>56_One-dimensional convolutional neural networks for Android malware detection.pdf</code></td>
+      <td><a href="rough_model_explanations/fexdroid_tail_bytes_dual_branch.html">fexdroid_tail_bytes_dual_branch.html</a></td>
+    </tr>
+
+  </tbody>
+</table>
+</div>
+
+<p class="meta" style="margin-top:1.25rem;">
+  <strong>Not listed:</strong> hybrid ideas in <code>more_papers_opus.md</code> §3b (unmodified score fusion only) — no rough HTML plans yet.
+  <strong>Already implemented</strong> (MLP(H), Pattern A/B, 1DCNN, D1 XGBoost) — see <code>already_implemented_models/</code>.
+  All rough plans: <a href="rough_model_explanations/index.html">rough_model_explanations/index.html</a>
+</p>
+
+</body>
+</html>

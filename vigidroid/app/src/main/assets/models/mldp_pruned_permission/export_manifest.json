@@ -1,0 +1,53 @@
+{
+  "model_id": "mldp_pruned_permission",
+  "domain": "manifest_permissions_mldp",
+  "exported_at": "2026-06-06T22:59:12.284745+00:00",
+  "opset_version": 14,
+  "preprocessing_version": "1",
+  "multidex_mode": "n/a",
+  "split_mode": "stratified_development",
+  "train_years": [
+    2020,
+    2021
+  ],
+  "test_years": [
+    2022,
+    2023
+  ],
+  "primary_test_split": "temporal_holdout",
+  "feature_dim": 40,
+  "model_type": "linear_svc",
+  "token_normalization": "vigidroid",
+  "feature_asset": "features/selected_permissions.json",
+  "mldp": {
+    "frozen_set_s": 40,
+    "association_rule_mode": "malware_only_itemsets",
+    "association_rule_note": "Malware-only FP-Growth itemsets; implicit malware consequent (thesis simplification).",
+    "fallback_used": false,
+    "full_permission_ablation": "not_implemented"
+  },
+  "inputs": [
+    {
+      "name": "permissions",
+      "shape": [
+        1,
+        40
+      ],
+      "dtype": "float32",
+      "description": "Binary vector aligned with features/selected_permissions.json (frozen set S)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "malware_probability",
+      "shape": [
+        1,
+        1
+      ],
+      "dtype": "float32",
+      "description": "Sigmoid-calibrated malware probability in [0, 1]"
+    }
+  ],
+  "onnx_file": "model.onnx",
+  "android_assets_target": "vigidroid/app/src/main/assets/models/mldp_pruned_permission/"
+}

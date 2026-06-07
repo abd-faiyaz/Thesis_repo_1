@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutorial — Detecting Android Malware by Mining Statically Registered Broadcast Receivers (Mohsen et al., CIC 2017)</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      line-height: 1.75;
+      color: #222;
+      background: #faf9f7;
+      margin: 0;
+      padding: 0;
+    }
+    .layout {
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+    nav.toc {
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      width: 240px;
+      min-width: 240px;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem 2rem;
+      background: #2c3e50;
+      color: #ecf0f1;
+      font-family: system-ui, sans-serif;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    nav.toc h2 {
+      font-size: 0.95rem;
+      margin: 0 0 0.75rem;
+      color: #fff;
+      border: none;
+    }
+    nav.toc a {
+      color: #aed6f1;
+      text-decoration: none;
+      display: block;
+      padding: 0.25rem 0;
+    }
+    nav.toc a:hover { color: #fff; text-decoration: underline; }
+    nav.toc ul { list-style: none; padding: 0; margin: 0; }
+    nav.toc li { margin: 0.15rem 0; }
+    nav.toc li.sub { padding-left: 0.75rem; font-size: 0.78rem; }
+    main {
+      flex: 1;
+      max-width: 900px;
+      padding: 2rem 2.5rem 4rem;
+      background: #fff;
+    }
+    h1 {
+      font-size: 1.75rem;
+      color: #1a5276;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 0.5rem;
+      margin-top: 0;
+    }
+    .meta { color: #666; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    h2 {
+      font-size: 1.35rem;
+      color: #1a5276;
+      margin-top: 2.5rem;
+      padding-top: 0.5rem;
+      border-bottom: 1px solid #ddd;
+    }
+    h3 {
+      font-size: 1.05rem;
+      color: #2874a6;
+      margin-top: 1.5rem;
+    }
+    section { margin-bottom: 2rem; }
+    p { margin: 0.65rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #34495e; color: #fff; }
+    tr:nth-child(even) { background: #f4f6f7; }
+    td.best, tr.best-row td {
+      background: #d5f5e3 !important;
+      font-weight: bold;
+      color: #145a32;
+    }
+    .flowchart {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      padding: 1.1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 1rem 0;
+    }
+    .novelty-box {
+      border-left: 4px solid #e67e22;
+      background: #fef9e7;
+      padding: 0.85rem 1.1rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+    .novelty-box strong { color: #d35400; }
+    .formula-box {
+      background: #f0f3f4;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    ul.vars {
+      font-size: 0.92rem;
+      margin: 0.5rem 0 1rem 1.25rem;
+      color: #444;
+    }
+    ul.vars li { margin: 0.3rem 0; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.4rem 0; }
+    code {
+      font-family: Consolas, monospace;
+      background: #ecf0f1;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+    .callout {
+      background: #ebf5fb;
+      border: 1px solid #aed6f1;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    .fig-ref { font-style: italic; color: #555; }
+
+    /* —— End-to-end pipeline diagram —— */
+    .pipeline-wrap {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      border: 1px solid #d5dce4;
+      border-radius: 12px;
+      padding: 1.5rem 1.25rem 2rem;
+      margin: 1.25rem 0;
+      overflow-x: auto;
+    }
+    .pipeline-wrap .pipe-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed #c5cdd6;
+      font-size: 0.78rem;
+      color: #555;
+    }
+    .pipeline-wrap .pipe-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .pipeline-wrap .pipe-legend i {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .pipe-phase {
+      margin-bottom: 1.75rem;
+      position: relative;
+    }
+    .pipe-phase:last-child { margin-bottom: 0; }
+    .pipe-phase-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #5d6d7e;
+      margin-bottom: 0.65rem;
+      padding-left: 0.25rem;
+    }
+    .pipe-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .pipe-node {
+      text-align: center;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      min-width: 140px;
+      max-width: 280px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      transition: transform 0.15s ease;
+    }
+    .pipe-node:hover { transform: translateY(-1px); }
+    .pipe-node .pipe-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      line-height: 1.3;
+      margin-bottom: 0.2rem;
+    }
+    .pipe-node .pipe-sub {
+      font-size: 0.72rem;
+      opacity: 0.9;
+      line-height: 1.35;
+      font-family: Consolas, monospace;
+    }
+    .pipe-node .pipe-dim {
+      display: inline-block;
+      margin-top: 0.35rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.08);
+    }
+    .pipe-node.input-node {
+      background: #2c3e50;
+      color: #fff;
+      border-color: #1a252f;
+    }
+    .pipe-node.tool-node {
+      background: #5d6d7e;
+      color: #fff;
+      border-color: #4a5868;
+    }
+    .pipe-node.manifest-node {
+      background: #1a5276;
+      color: #fff;
+      border-color: #154360;
+      max-width: 320px;
+    }
+    .pipe-node.feature-a {
+      background: #d4e6f1;
+      color: #1a5276;
+      border-color: #85c1e9;
+    }
+    .pipe-node.feature-b {
+      background: #fdebd0;
+      color: #7d6608;
+      border-color: #f4d03f;
+    }
+    .pipe-node.fusion-node {
+      background: #e8daef;
+      color: #4a235a;
+      border-color: #bb8fce;
+      max-width: 200px;
+    }
+    .pipe-node.train-node {
+      background: #d5f5e3;
+      color: #145a32;
+      border-color: #82e0aa;
+      max-width: 340px;
+    }
+    .pipe-node.model-node {
+      background: #fadbd8;
+      color: #922b21;
+      border-color: #f1948a;
+      max-width: 300px;
+    }
+    .pipe-node.output-node {
+      background: #1e8449;
+      color: #fff;
+      border-color: #145a32;
+    }
+    .pipe-node.optional-node {
+      background: #fff;
+      color: #566573;
+      border: 2px dashed #aab7b8;
+      box-shadow: none;
+      max-width: 340px;
+    }
+    .pipe-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #7f8c8d;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 0.2rem 0;
+      user-select: none;
+    }
+    .pipe-arrow span {
+      font-size: 0.65rem;
+      color: #95a5a6;
+      margin-top: 0.15rem;
+      font-weight: 500;
+    }
+    .pipe-split {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.75rem 1rem;
+      align-items: start;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .pipe-split .pipe-branch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .pipe-split .pipe-branch-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.4rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .pipe-branch-a .pipe-branch-label { background: #d4e6f1; color: #1a5276; }
+    .pipe-branch-b .pipe-branch-label { background: #fdebd0; color: #7d6608; }
+    .pipe-join {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-top: 2.5rem;
+      color: #7f8c8d;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pipe-scenarios {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.65rem;
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .pipe-scenario {
+      background: #fff;
+      border-radius: 8px;
+      padding: 0.6rem 0.5rem;
+      text-align: center;
+      border: 1px solid #dde4ea;
+      font-size: 0.75rem;
+      line-height: 1.35;
+    }
+    .pipe-scenario strong {
+      display: block;
+      font-size: 0.78rem;
+      margin-bottom: 0.25rem;
+      color: #1a5276;
+    }
+    .pipe-scenario.best {
+      border-color: #82e0aa;
+      background: #eafaf1;
+      box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.2);
+    }
+    .pipe-scenario code {
+      font-size: 0.68rem;
+      background: #f4f6f7;
+    }
+    .pipe-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.72rem;
+    }
+    .pipe-metrics em {
+      background: #fef9e7;
+      border: 1px solid #f9e79f;
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      font-style: normal;
+      color: #7d6608;
+    }
+    @media (max-width: 640px) {
+      .pipe-split {
+        grid-template-columns: 1fr;
+        max-width: 280px;
+      }
+      .pipe-split .pipe-join { display: none; }
+      .pipe-scenarios { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      nav.toc {
+        position: relative;
+        width: 100%;
+        max-height: none;
+      }
+      main { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Contents</h2>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#not-dl">Not a neural network</a></li>
+      <li><a href="#prelim">Android preliminaries</a></li>
+      <li><a href="#empirical">Empirical study (400 APKs)</a></li>
+      <li><a href="#perm">Component A — Permissions</a></li>
+      <li><a href="#receiver">Component B — Receiver actions</a></li>
+      <li><a href="#fusion">Early fusion</a></li>
+      <li><a href="#svm">Component C — SVM classifier</a></li>
+      <li><a href="#preprocess">Data preprocessing</a></li>
+      <li><a href="#onreceive">onReceive() analysis</a></li>
+      <li><a href="#results">Experimental results</a></li>
+      <li><a href="#generalization">Independent test set</a></li>
+      <li><a href="#pipeline">End-to-end pipeline</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <h1>Detecting Android Malware by Mining Statically Registered Broadcast Receivers</h1>
+    <p class="meta">
+      <strong>Mohsen, Bisgin, Scott &amp; Strait</strong> — IEEE CIC 2017 (DOI: 10.1109/CIC.2017.00021)<br>
+      Self-contained tutorial: architecture, methodology, and how to read the results — no need to open the PDF first.
+    </p>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <h2>Overview — Big Picture</h2>
+      <p>
+        Android malware must often run <em>in the background</em> without the user opening the app — for example to intercept SMS, restart after reboot, or react to connectivity changes.
+        The paper’s core insight is that <strong>statically registered broadcast receivers</strong> (declared in <code>AndroidManifest.xml</code> under <code>&lt;receiver&gt;</code>) reveal <em>which system events wake the app</em>, while <strong>permissions</strong> reveal <em>what sensitive resources the app may access</em>.
+        The authors first run a small <strong>empirical study</strong> (200 benign + 200 malware APKs) comparing manifest patterns and <code>onReceive()</code> Java code, then build a <strong>machine-learning detector</strong> on a large corpus (5,723 malware + samples from 48,262 benign apps) using <strong>binary feature vectors</strong> and a <strong>C-SVM with RBF kernel</strong> — not a deep neural network.
+        They train three feature configurations: <strong>receiver actions only</strong>, <strong>permissions only</strong>, and <strong>both concatenated</strong>, and show that combining receivers with permissions raises average test accuracy from ~96% to ~97% on their main (duplicate-configuration) split.
+      </p>
+    </section>
+
+    <!-- NOT DL -->
+    <section id="not-dl">
+      <h2>Important — This Paper Is Not “Model Architecture” in the Deep-Learning Sense</h2>
+      <div class="callout">
+        There are no convolutional layers, embeddings, or backpropagation. The “architecture” is a <strong>static feature pipeline + SVM</strong>.
+        If you are implementing this for a thesis or ONNX deployment, the same vectors can feed a <strong>logistic regression</strong> or <strong>tiny MLP</strong> instead of SVM; the <em>features</em> are what the paper contributes.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Layer (conceptual)</th><th>Role</th><th>Output size</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Manifest parser</td><td>Extract permissions + receiver intent actions</td><td>Raw sets per APK</td></tr>
+          <tr><td>Binary encoding</td><td>Map to global vocabulary (bag-of-features)</td><td>\(P\) + \(R\) bits (paper-dependent)</td></tr>
+          <tr><td>Early fusion</td><td>Concatenate vectors</td><td>\(P+R\) dimensions</td></tr>
+          <tr><td>C-SVM (RBF)</td><td>Binary classify malware vs benign</td><td>Label \(\in \{-1,+1\}\)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- PRELIMINARIES -->
+    <section id="prelim">
+      <h2>Android Preliminaries — What the Paper Assumes You Know</h2>
+
+      <h3>Permissions (<code>&lt;uses-permission&gt;</code>)</h3>
+      <p>
+        Each APK declares capabilities in the manifest (e.g. <code>SEND_SMS</code>, <code>READ_PHONE_STATE</code>).
+        Normal permissions are granted silently; dangerous ones are shown to the user at install (older Android) or at runtime (Android 6+).
+        <span class="fig-ref">Figure 1 in the paper</span> shows a runtime permission dialog — the ML part of the paper still uses <strong>static manifest declarations</strong>, not runtime grants.
+      </p>
+
+      <h3>Broadcast receivers — static vs dynamic</h3>
+      <p>
+        A <strong>broadcast receiver</strong> runs code when a system or app event fires (boot completed, SMS received, etc.).
+        <strong>Static registration</strong>: <code>&lt;receiver&gt;</code> in the manifest — the OS can deliver broadcasts even if the app is not running.
+        <strong>Dynamic registration</strong>: <code>registerReceiver()</code> in Java — only active while the registering context (e.g. an Activity) lives.
+        <strong>This paper mines only static (manifest) receivers</strong>, and specifically the <code>android:name</code> strings on <code>&lt;action&gt;</code> tags inside <code>&lt;intent-filter&gt;</code> that match known <strong>system actions</strong>.
+      </p>
+
+      <div class="novelty-box">
+        <strong>Key novelty:</strong> Prior malware work (Drebin, PUMA, etc.) focused heavily on permissions. Mohsen et al. treat <strong>which system events the app listens for</strong> as a first-class feature and show it improves detection when fused with permissions — receivers were mentioned in rule-based work (e.g. Kirin) but not studied at this scale.
+      </div>
+
+      <h3>Example manifest snippet (Listing 1 in paper)</h3>
+      <pre class="flowchart">AndroidManifest.xml
+  ├─ &lt;uses-permission android:name="CALL_PHONE" /&gt;
+  ├─ &lt;uses-permission android:name="READ_SMS" /&gt;
+  └─ &lt;receiver android:name=".ExternalBroadcastReceiver" exported="true"&gt;
+        &lt;intent-filter&gt;
+          &lt;action android:name="BOOT_COMPLETED" /&gt;
+          &lt;action android:name="ACTION_AIRPLANE_MODE_CHANGED" /&gt;
+        &lt;/intent-filter&gt;
+     &lt;/receiver&gt;</pre>
+    </section>
+
+    <!-- EMPIRICAL STUDY -->
+    <section id="empirical">
+      <h2>Empirical Study — Section III (400 APKs, No Classifier Yet)</h2>
+      <p>
+        Before ML, the authors analyze <strong>200 malware + 200 benign</strong> APKs from prior work (M0droid dataset).
+        Tools: <strong>Apktool</strong> for manifest/XML, <strong>dex2jar + JD</strong> for Java source.
+        Goal: show that malware <em>uses</em> broadcast receivers differently, motivating the feature design.
+      </p>
+
+      <h3>Manifest-level receiver statistics (Table I)</h3>
+      <table>
+        <thead><tr><th>Category</th><th>Has any receiver</th><th>Has receiver for system action</th></tr></thead>
+        <tbody>
+          <tr><td>Malware</td><td>74%</td><td>70%</td></tr>
+          <tr><td>Benign</td><td>65%</td><td>46%</td></tr>
+        </tbody>
+      </table>
+      <p>Malware is more likely to register receivers, especially for <strong>system actions</strong>.</p>
+
+      <h3>Top system actions — malware vs benign (Tables II &amp; III)</h3>
+      <table>
+        <thead><tr><th>Rank</th><th>Malware (Table II)</th><th>Freq.</th><th>Benign (Table III)</th><th>Freq.</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>BOOT_COMPLETED</td><td>131</td><td>BOOT_COMPLETED</td><td>86</td></tr>
+          <tr><td>2</td><td>USER_PRESENT</td><td>91</td><td>PACKAGE_REPLACED</td><td>24</td></tr>
+          <tr><td>3</td><td>PHONE_STATE</td><td>88</td><td>PACKAGE_ADDED</td><td>22</td></tr>
+          <tr><td>4</td><td>SMS_RECEIVED</td><td>23</td><td>PACKAGE_REMOVED</td><td>18</td></tr>
+          <tr><td>5</td><td>NEW_OUTGOING_CALL</td><td>9</td><td>TIME_SET</td><td>14</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Both classes use <code>BOOT_COMPLETED</code> most, but malware’s next actions are <strong>privacy-sensitive</strong> (user present, phone state, SMS, outgoing call).
+        Benign apps favor <strong>package management</strong> events (install/update/remove).
+        Malware collectively uses only <strong>28</strong> distinct system actions vs <strong>57</strong> for benign — malware targets a narrower, more “attack-relevant” set.
+      </p>
+      <p class="fig-ref">Figure 2 (paper): distribution of how many system actions each app registers — large gap at “3 actions” (88 malware vs 12 benign).</p>
+
+      <h3>Permission patterns (Figure 3, Tables IV &amp; V)</h3>
+      <p>
+        Permissions per app: benign 0–39 (avg 9), malware 0–45 (avg 9.5); many malware apps have exactly 9 permissions.
+        Distinct permissions across the small set: malware <strong>98</strong>, benign <strong>178</strong> — again malware uses a narrower palette.
+        ~70% overlap in top-10 permission lists, but malware over-requests e.g. <code>SEND_SMS</code> (67% vs 5% benign), <code>INSTALL_PACKAGES</code> (56% vs 0.5%), <code>DELETE_PACKAGES</code> (42% vs 0%).
+      </p>
+    </section>
+
+    <!-- COMPONENT A: PERMISSIONS -->
+    <section id="perm">
+      <h2>Component A — Permission Binary Feature Vector</h2>
+
+      <h3>What it analyzes</h3>
+      <p>Every <code>android:name</code> in <code>&lt;uses-permission&gt;</code> elements from the decoded manifest.</p>
+
+      <h3>Why this input was chosen</h3>
+      <p>
+        Permissions are the dominant static signal in Android malware literature (e.g. PUMA).
+        The paper includes them as a <strong>strong baseline</strong> and to test whether receivers add information <em>beyond</em> permissions (Section IV, scenario ii and iii).
+      </p>
+
+      <h3>Step-by-step process</h3>
+      <ol class="steps">
+        <li>Reverse-engineer each APK (Apktool) and obtain <code>AndroidManifest.xml</code>.</li>
+        <li>Collect the set of permission strings declared by that app.</li>
+        <li>From the <strong>training corpus</strong>, build vocabulary \(\mathcal{P} = \{\text{perm}_1, \ldots, \text{perm}_P\}\) — all distinct permissions observed (order fixed for all experiments).</li>
+        <li>For each app \(i\), set bit \(p_{i,j} = 1\) if \(\text{perm}_j\) is declared, else \(0\).</li>
+        <li>Use the same \(\mathcal{P}\) at test time (missing permissions in vocab → dimension stays 0).</li>
+      </ol>
+
+      <h3>Mathematical formulation</h3>
+      <div class="formula-box">
+        \[
+        p_{i,j} = \begin{cases}
+          1 & \text{if } \text{perm}_j \in \text{Manifest}(i) \\
+          0 & \text{otherwise}
+        \end{cases}
+        \qquad
+        \mathbf{p}_i \in \{0,1\}^{P}
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(i\)</strong> — index of one APK in the dataset</li>
+        <li><strong>\(P\)</strong> — number of unique permissions in the global vocabulary (implicitly defined by all manifests in the study; not a single fixed number in the paper)</li>
+        <li><strong>\(p_{i,j}\)</strong> — presence bit for permission \(j\) in app \(i\)</li>
+        <li><strong>\(\mathbf{p}_i\)</strong> — permission feature row vector for app \(i\)</li>
+      </ul>
+
+      <h3>Architecture flowchart</h3>
+      <div class="flowchart">Raw APK
+  │
+  └─► Apktool ──► AndroidManifest.xml
+                    │
+                    └─► &lt;uses-permission&gt; names
+                           │
+                           ▼
+                    Permission vector  p  (1 × P)   [binary]</div>
+
+      <h3>Output and connection to next stage</h3>
+      <p>
+        Output \(\mathbf{p}_i \in \{0,1\}^{P}\).
+        Used alone in the <strong>“permissions only”</strong> experiment, or concatenated with \(\mathbf{r}_i\) for the combined model.
+      </p>
+    </section>
+
+    <!-- COMPONENT B: RECEIVERS -->
+    <section id="receiver">
+      <h2>Component B — Broadcast Receiver “Action Items” Vector</h2>
+
+      <h3>What it analyzes</h3>
+      <p>
+        For each <code>&lt;receiver&gt;</code> in the manifest, every <code>&lt;action android:name="…"&gt;</code> under <code>&lt;intent-filter&gt;</code>
+        that matches a <strong>system action</strong> from a compiled list of Android OS broadcast actions (paper: one master file of system actions per OS release family).
+        Custom app-specific actions are not the focus — only system-level intent actions.
+      </p>
+
+      <h3>Why this input was chosen</h3>
+      <p>
+        Static receivers can wake the app without user interaction — ideal for persistence and interception.
+        The empirical study showed malware registers more receivers for sensitive events (boot, SMS, phone state).
+        The paper calls these features <strong>“action items”</strong> in Section IV (same as intent action strings).
+      </p>
+
+      <h3>Step-by-step process</h3>
+      <ol class="steps">
+        <li>Parse the same manifest as Component A.</li>
+        <li>Enumerate all <code>&lt;receiver&gt;</code> blocks.</li>
+        <li>Within each receiver, read all <code>&lt;action android:name&gt;</code> under <code>&lt;intent-filter&gt;</code>.</li>
+        <li>Keep actions that appear in the predefined <strong>system action</strong> list.</li>
+        <li>Build vocabulary \(\mathcal{A} = \{\text{action}_1, \ldots, \text{action}_R\}\) from the training corpus.</li>
+        <li>Set \(r_{i,k}=1\) if action \(k\) appears in any static receiver for app \(i\), else \(0\).</li>
+      </ol>
+
+      <h3>Mathematical formulation</h3>
+      <div class="formula-box">
+        \[
+        r_{i,k} = \begin{cases}
+          1 & \text{if } \text{action}_k \in \text{StaticReceivers}(i) \\
+          0 & \text{otherwise}
+        \end{cases}
+        \qquad
+        \mathbf{r}_i \in \{0,1\}^{R}
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(R\)</strong> — number of distinct system actions in vocabulary \(\mathcal{A}\)</li>
+        <li><strong>\(r_{i,k}\)</strong> — presence bit for system action \(k\)</li>
+        <li><strong>\(\mathbf{r}_i\)</strong> — receiver/action feature vector</li>
+      </ul>
+
+      <h3>Architecture flowchart</h3>
+      <div class="flowchart">AndroidManifest.xml
+  │
+  └─► &lt;receiver&gt; ──► &lt;intent-filter&gt; ──► &lt;action&gt; names
+         │                      │
+         │                      └─► filter: system action list
+         ▼
+   Receiver-action vector  r  (1 × R)   [binary]</div>
+
+      <h3>Output and connection to next stage</h3>
+      <p>Output \(\mathbf{r}_i\). Alone: <strong>“action items only”</strong> experiment (~76–79% accuracy). Fused: \(\mathbf{x}_i = [\mathbf{p}_i \| \mathbf{r}_i]\).</p>
+
+      <div class="novelty-box">
+        <strong>Why this is different from standard permission-only detectors:</strong>
+        Permissions say what the app <em>may</em> do; receiver actions say <em>when</em> background logic runs.
+        A benign app may declare <code>INTERNET</code> without pairing <code>BOOT_COMPLETED</code> + <code>SMS_RECEIVED</code> — a pattern more typical of trojans.
+      </div>
+    </section>
+
+    <!-- FUSION -->
+    <section id="fusion">
+      <h2>Early Fusion — Combining Permissions and Receiver Actions</h2>
+      <p>The paper does <strong>not</strong> use late fusion (separate classifiers + vote). It concatenates features <em>before</em> a single SVM.</p>
+
+      <div class="formula-box">
+        \[
+        \mathbf{x}_i = [\mathbf{p}_i \| \mathbf{r}_i] \in \{0,1\}^{P+R}
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(\|\)</strong> — vector concatenation (permissions first, then actions — order must match training)</li>
+        <li><strong>\(\mathbf{x}_i\)</strong> — joint input to the SVM for the combined scenario</li>
+      </ul>
+
+      <div class="flowchart">p  (1 × P)  ──┐
+                        ├──►  x  (1 × (P+R))  ──►  single C-SVM  ──►  ŷ ∈ {malware, benign}
+r  (1 × R)  ──┘</div>
+    </section>
+
+    <!-- SVM -->
+    <section id="svm">
+      <h2>Component C — C-SVM with RBF Kernel (The Classifier)</h2>
+
+      <h3>What it analyzes</h3>
+      <p>The fused or single-domain binary vector \(\mathbf{x}_i\) for each APK, labeled malware (\(y_i = +1\)) or benign (\(y_i = -1\)).</p>
+
+      <h3>Why SVM was chosen</h3>
+      <p>
+        High-dimensional sparse binary features are common in text-like malware work.
+        SVMs with kernels handle non-linear boundaries without explicit neural layers; the paper cites Vapnik and prior text-mining use (Section IV-B).
+      </p>
+
+      <h3>Step-by-step training process</h3>
+      <ol class="steps">
+        <li>Build one of three feature matrices: actions-only, perms-only, or combined (see preprocessing).</li>
+        <li>Split data <strong>~80% train / ~20% test</strong> (paper: approximately 4:1).</li>
+        <li>On the training fold, run <strong>10-fold cross-validation</strong> grid search over \(C \in \{10^1,\ldots,10^5\}\) and \(\gamma \in \{10^{-6},\ldots,10^{-1}\}\) for RBF kernel.</li>
+        <li>Select best \((C, \gamma)\); paper’s average optimum: <strong>\(C = 10^1\)</strong>, <strong>\(\gamma = 10^{-1}\)</strong> for both duplicate and unique pipelines.</li>
+        <li>Train final C-SVM on full training split; evaluate on held-out test split.</li>
+        <li>Repeat for <strong>10 random balanced datasets</strong>; report mean accuracy and standard deviation.</li>
+      </ol>
+
+      <h3>Mathematical formulation</h3>
+      <p><strong>Primal margin hyperplanes (binary labels \(y_i \in \{-1,+1\}\)):</strong></p>
+      <div class="formula-box">
+        \[
+        \mathbf{w}^T \mathbf{x} + b \geq 1 \quad \text{if } y_i = +1 \qquad
+        \mathbf{w}^T \mathbf{x} + b \leq -1 \quad \text{if } y_i = -1
+        \]
+        \[
+        \text{Maximize margin } \rho = \frac{2}{\|\mathbf{w}\|}
+        \quad \Leftrightarrow \quad
+        \min_{\mathbf{w},b} \frac{1}{2}\mathbf{w}^T\mathbf{w}
+        \quad \text{s.t. } y_i(\mathbf{w}^T \mathbf{x}_i + b) \geq 1
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(\mathbf{w}, b\)</strong> — weight vector and bias defining the separating hyperplane</li>
+        <li><strong>\(y_i\)</strong> — class label (+1 malware, −1 benign in the paper’s notation)</li>
+        <li><strong>\(\rho\)</strong> — margin between classes</li>
+      </ul>
+
+      <p><strong>C-SVM:</strong> soft margin with penalty \(C\) for misclassified points (trade-off margin vs errors).</p>
+
+      <p><strong>RBF kernel (Eq. 2 in paper):</strong></p>
+      <div class="formula-box">
+        \[
+        K(\mathbf{x}_i, \mathbf{x}_j) = \exp\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|_2^2\right)
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(K\)</strong> — kernel function mapping inputs to a higher-dimensional space implicitly</li>
+        <li><strong>\(\gamma\)</strong> — RBF width; large \(\gamma\) → tighter, more complex decision boundary</li>
+        <li><strong>\(C\)</strong> — regularization; large \(C\) → fewer training errors allowed</li>
+      </ul>
+
+      <p><strong>Decision function (dual form):</strong></p>
+      <div class="formula-box">
+        \[
+        f(\mathbf{x}) = \mathrm{sign}\left( \sum_{i \in SV} \alpha_i y_i K(\mathbf{x}_i, \mathbf{x}) + b \right)
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>\(SV\)</strong> — support vectors (training points that define the boundary)</li>
+        <li><strong>\(\alpha_i\)</strong> — dual coefficients learned during optimization</li>
+      </ul>
+
+      <h3>Architecture flowchart</h3>
+      <div class="flowchart">Feature vector x  (1 × D)     where D = P, R, or P+R
+        │
+        ▼
+   10-fold CV grid on train
+   (C, γ) for RBF kernel
+        │
+        ▼
+   Trained C-SVM  ──►  f(x)  ──►  malware / benign</div>
+
+      <h3>Evaluation metrics (Section V)</h3>
+      <div class="formula-box">
+        \[
+        \text{Sensitivity} = \frac{TP}{TP + FN}
+        \qquad
+        \text{Specificity} = \frac{TN}{TN + FP}
+        \]
+      </div>
+      <ul class="vars">
+        <li><strong>TP, FN, TN, FP</strong> — from confusion matrix (Table IX): actual M/B vs predicted \(\hat{M}\)/\(\hat{B}\)</li>
+        <li><strong>Sensitivity</strong> — true positive rate (catch malware)</li>
+        <li><strong>Specificity</strong> — true negative rate (accept benign)</li>
+      </ul>
+      <p class="fig-ref">Figure 5: box plots of sensitivity/specificity over 10 runs. Median sensitivity for <em>actions-only</em> models: 64% (duplicate) and 75% (unique) — actions alone favor missing some malware; combining with permissions raises sensitivity.</p>
+    </section>
+
+    <!-- PREPROCESSING -->
+    <section id="preprocess">
+      <h2>Data Preprocessing — Two Pipelines (Figure 4)</h2>
+      <p>
+        <strong>Source pool:</strong> 5,723 malware APKs and 48,262 benign APKs.
+        Manifests parsed for permissions and system action items.
+      </p>
+
+      <h3>Pipeline 1 — “Duplicate configurations” (upper path in Figure 4)</h3>
+      <ol class="steps">
+        <li>Randomly sample <strong>5,723 benign</strong> apps to match malware count.</li>
+        <li>Form balanced set of <strong>11,446 apps</strong> (5,723 + 5,723).</li>
+        <li>Repeat random sampling <strong>10 times</strong> → ten datasets.</li>
+        <li>Many APKs can share the <em>exact same</em> permission+action bit pattern → duplicates remain in train/test splits.</li>
+      </ol>
+
+      <h3>Pipeline 2 — “Unique configurations” (lower path in Figure 4)</h3>
+      <ol class="steps">
+        <li>Collapse APKs that share identical feature vectors: keep one representative per configuration.</li>
+        <li>Pool shrinks to <strong>960 malware</strong> and <strong>8,708 benign</strong> unique configs.</li>
+        <li>Sample benign to match malware count per scenario → balanced sizes in Table VII.</li>
+      </ol>
+
+      <table>
+        <thead>
+          <tr><th>Scenario</th><th>Benign (unique pool)</th><th>Malware (unique)</th><th>Balanced dataset size</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Actions only</td><td>825</td><td>83</td><td>166</td></tr>
+          <tr><td>Permissions only</td><td>7,543</td><td>894</td><td>1,788</td></tr>
+          <tr><td>Combined</td><td>8,708</td><td>960</td><td>1,920</td></tr>
+        </tbody>
+      </table>
+      <p class="fig-ref">Figure 4: flow diagram — green = sampled benign, magenta = malware pool; two parallel tracks for duplicate vs unique feature configurations.</p>
+
+      <div class="novelty-box">
+        <strong>Why duplicate vs unique matters for interpreting results:</strong>
+        When the same \((\mathbf{p}, \mathbf{r})\) pattern appears in both train and test, accuracy is inflated (memorization of configurations).
+        Unique-configuration experiments drop accuracy (~96% → ~86% for permissions) but better reflect generalization to <em>unseen combinations</em> of features.
+      </div>
+    </section>
+
+    <!-- ONRECEIVE -->
+    <section id="onreceive">
+      <h2>Manual Java Analysis — <code>onReceive()</code> (Section III-C, Table VI)</h2>
+      <p>
+        On a subset with receivers (138 malware, 92 benign), the authors inspect decompiled <code>onReceive(Context, Intent)</code> for API calls:
+        start service, register another receiver, <code>goAsync()</code>, start activity, create notification, or none.
+      </p>
+      <table>
+        <thead><tr><th>Behavior in onReceive()</th><th>Malware</th><th>Benign</th></tr></thead>
+        <tbody>
+          <tr><td>Start Activity</td><td class="best">65.5%</td><td>11%</td></tr>
+          <tr><td>Start Service</td><td>16%</td><td class="best">42.4%</td></tr>
+          <tr><td>Register receiver</td><td>0%</td><td>5.43%</td></tr>
+          <tr><td>goAsync()</td><td>0%</td><td>1.1%</td></tr>
+          <tr><td>Create Notification</td><td>11%</td><td>5.4%</td></tr>
+          <tr><td>None of the above</td><td>7.5%</td><td class="best">34.67%</td></tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>Interpretation:</strong> Malware “uses” receivers — 92.5% implement something in <code>onReceive</code> vs 65.33% benign; malware often jumps to an Activity (UI or further payload).
+        This analysis <strong>does not feed the SVM</strong>; it supports the narrative that receivers are actively exploited, while the classifier stays manifest-only for scalability.
+      </p>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="results">
+      <h2>Experimental Results — How to Read Table VIII (Main Test Split)</h2>
+      <p>
+        Ten balanced datasets; train/test split ~4:1; metrics are <strong>mean accuracy ± std</strong> over the ten runs.
+        Optimal hyperparameters averaged: \(\gamma = 0.1\), \(C = 10\).
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Features</th>
+            <th>Duplicate configs — Accuracy</th>
+            <th>Std dev</th>
+            <th>Unique configs — Accuracy</th>
+            <th>Std dev</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Actions only</td>
+            <td>78%</td><td>0.006</td>
+            <td>79%</td><td>0.065</td>
+          </tr>
+          <tr>
+            <td>Permissions only</td>
+            <td>96%</td><td>0.005</td>
+            <td>86%</td><td>0.018</td>
+          </tr>
+          <tr class="best-row">
+            <td>Actions + Permissions (combined)</td>
+            <td class="best">97%</td><td class="best">0.004</td>
+            <td>86%</td><td>0.013</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>What improved over what — and why</h3>
+      <table>
+        <thead><tr><th>Comparison</th><th>Observation</th><th>Explanation</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Actions vs permissions (duplicate)</td>
+            <td>78% vs 96%</td>
+            <td>Permissions alone are very discriminative on this corpus; many malware families request distinctive dangerous permissions.</td>
+          </tr>
+          <tr>
+            <td>Permissions vs combined (duplicate)</td>
+            <td>96% → <strong>97%</strong></td>
+            <td>Receiver actions add complementary signal: event-driven behavior not fully captured by permission bits. Small but consistent gain; paper highlights improved <em>sensitivity</em> (Figure 5).</td>
+          </tr>
+          <tr>
+            <td>Actions-only duplicate vs unique</td>
+            <td>78% vs 79%</td>
+            <td>Stable — action patterns generalize similarly.</td>
+          </tr>
+          <tr>
+            <td>Permissions duplicate vs unique</td>
+            <td>96% → 86%</td>
+            <td>Duplicate APKs with identical feature vectors leak into train and test; unique collapse exposes harder generalization.</td>
+          </tr>
+          <tr>
+            <td>Combined duplicate vs unique</td>
+            <td>97% → 86%</td>
+            <td>Same configuration leakage effect; combined model on unique data matches permissions-only unique (~86%).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <strong>Takeaway for your thesis:</strong> Quote <strong>97%</strong> only with the duplicate-configuration caveat.
+        For honest generalization, emphasize the <strong>unique</strong> row (~86%) or the independent test (below).
+      </p>
+    </section>
+
+    <!-- GENERALIZATION -->
+    <section id="generalization">
+      <h2>Independent Test Set — Table X &amp; Figure 6</h2>
+      <p>
+        <strong>398 apps</strong> (199 malware + 199 benign), more recent than the main corpus.
+        Features restricted to the <strong>intersection</strong> of actions/permissions seen in the original training vocab (new permissions/actions in newer apps are dropped → “missing features”).
+        The ten models trained earlier are applied without retraining.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Features</th>
+            <th>Duplicate models — Accuracy</th>
+            <th>Unique models — Accuracy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Actions only</td><td>71%</td><td>72%</td></tr>
+          <tr><td>Permissions only</td><td>76%</td><td>74%</td></tr>
+          <tr class="best-row">
+            <td>Combined</td>
+            <td class="best">77%</td><td class="best">76%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Why accuracy drops (97% → 77% for permissions+combined)</h3>
+      <ul class="vars">
+        <li><strong>Temporal drift:</strong> Newer malware/benign apps use permissions and actions not in the old vocabulary → zeros in the feature vector.</li>
+        <li><strong>Feature intersection only:</strong> Deliberate design for fair comparison, but it weakens signal on new APKs.</li>
+        <li><strong>Actions still help:</strong> Combined (77%) beats permissions alone (76%) on duplicate models — consistent with the main claim under harder conditions.</li>
+        <li><strong>Sensitivity vs specificity:</strong> On this set, catching malware (sensitivity) is harder than labeling benign (specificity) — opposite tendency to the main test (Figure 6).</li>
+      </ul>
+    </section>
+
+    <!-- FULL PIPELINE -->
+    <section id="pipeline">
+      <h2>Full End-to-End Pipeline Summary</h2>
+      <p>Follow the flow top to bottom. Color indicates stage type (see legend). Dimensions <code>P</code> and <code>R</code> are vocabulary sizes learned from the training corpus.</p>
+
+      <div class="pipeline-wrap" role="img" aria-label="End-to-end malware detection pipeline">
+
+        <div class="pipe-legend">
+          <span><i style="background:#2c3e50"></i> Input</span>
+          <span><i style="background:#5d6d7e"></i> Tooling</span>
+          <span><i style="background:#1a5276"></i> Manifest</span>
+          <span><i style="background:#85c1e9"></i> Permission features</span>
+          <span><i style="background:#f4d03f"></i> Receiver features</span>
+          <span><i style="background:#bb8fce"></i> Fusion</span>
+          <span><i style="background:#82e0aa"></i> Training</span>
+          <span><i style="background:#e74c3c"></i> Classifier</span>
+        </div>
+
+        <!-- Phase 1 -->
+        <div class="pipe-phase">
+          <div class="pipe-phase-label">Phase 1 — Input &amp; decode</div>
+          <div class="pipe-col">
+            <div class="pipe-node input-node">
+              <div class="pipe-title">Raw APK</div>
+              <div class="pipe-sub">ZIP: manifest + classes.dex + assets</div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼ <span>Apktool reverse-engineer</span></div>
+            <div class="pipe-node tool-node">
+              <div class="pipe-title">Decoded package</div>
+              <div class="pipe-sub">Resources + readable XML</div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼</div>
+            <div class="pipe-node manifest-node">
+              <div class="pipe-title">AndroidManifest.xml</div>
+              <div class="pipe-sub">Static analysis only — no bytecode execution</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="pipe-phase">
+          <div class="pipe-phase-label">Phase 2 — Parallel feature extraction</div>
+          <div class="pipe-split">
+            <div class="pipe-branch pipe-branch-a">
+              <div class="pipe-branch-label">Component A</div>
+              <div class="pipe-node feature-a">
+                <div class="pipe-title">Permissions</div>
+                <div class="pipe-sub">&lt;uses-permission&gt; names</div>
+                <span class="pipe-dim">p → 1×P</span>
+              </div>
+              <div class="pipe-arrow" aria-hidden="true">▼ <span>binary bits</span></div>
+              <div class="pipe-node feature-a">
+                <div class="pipe-title">Vector p</div>
+                <div class="pipe-sub">1 if declared, else 0</div>
+              </div>
+            </div>
+            <div class="pipe-join">both from<br>manifest</div>
+            <div class="pipe-branch pipe-branch-b">
+              <div class="pipe-branch-label">Component B</div>
+              <div class="pipe-node feature-b">
+                <div class="pipe-title">Receiver actions</div>
+                <div class="pipe-sub">&lt;receiver&gt; → &lt;action&gt; (system events)</div>
+                <span class="pipe-dim">r → 1×R</span>
+              </div>
+              <div class="pipe-arrow" aria-hidden="true">▼ <span>binary bits</span></div>
+              <div class="pipe-node feature-b">
+                <div class="pipe-title">Vector r</div>
+                <div class="pipe-sub">1 if action registered, else 0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="pipe-phase">
+          <div class="pipe-phase-label">Phase 3 — Choose experiment (three scenarios)</div>
+          <div class="pipe-col">
+            <div class="pipe-scenarios">
+              <div class="pipe-scenario">
+                <strong>Scenario A</strong>
+                Actions only<br>
+                <code>x = r</code><br>
+                <em>~78% acc.</em>
+              </div>
+              <div class="pipe-scenario">
+                <strong>Scenario B</strong>
+                Permissions only<br>
+                <code>x = p</code><br>
+                <em>~96% acc.</em>
+              </div>
+              <div class="pipe-scenario best">
+                <strong>Scenario C ★</strong>
+                Early fusion<br>
+                <code>x = [p ‖ r]</code><br>
+                <em>~97% acc.</em>
+              </div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼ <span>concatenate for Scenario C</span></div>
+            <div class="pipe-node fusion-node">
+              <div class="pipe-title">Fused feature x</div>
+              <div class="pipe-sub">1 × (P + R) sparse binary</div>
+              <span class="pipe-dim">e.g. 1×280</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="pipe-phase">
+          <div class="pipe-phase-label">Phase 4 — Dataset &amp; training (Section IV)</div>
+          <div class="pipe-col">
+            <div class="pipe-node train-node">
+              <div class="pipe-title">Balanced datasets ×10</div>
+              <div class="pipe-sub">5,723 malware + 5,723 sampled benign → 11,446 APKs each run</div>
+              <div class="pipe-metrics">
+                <em>Duplicate configs</em>
+                <em>Unique configs</em>
+              </div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼ <span>80% train / 20% test</span></div>
+            <div class="pipe-node train-node">
+              <div class="pipe-title">10-fold cross-validation</div>
+              <div class="pipe-sub">Grid search C ∈ {10¹…10⁵}, γ ∈ {10⁻⁶…10⁻¹}</div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼</div>
+            <div class="pipe-node model-node">
+              <div class="pipe-title">C-SVM + RBF kernel</div>
+              <div class="pipe-sub">Best avg.: C ≈ 10, γ ≈ 0.1</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 5 -->
+        <div class="pipe-phase">
+          <div class="pipe-phase-label">Phase 5 — Output &amp; optional evaluation</div>
+          <div class="pipe-col">
+            <div class="pipe-arrow" aria-hidden="true">▼</div>
+            <div class="pipe-node output-node">
+              <div class="pipe-title">Prediction</div>
+              <div class="pipe-sub">Malware (+1) or Benign (−1)</div>
+            </div>
+            <div class="pipe-arrow" aria-hidden="true">▼ <span>generalization check</span></div>
+            <div class="pipe-node optional-node">
+              <div class="pipe-title">Independent test (optional)</div>
+              <div class="pipe-sub">398 newer APKs · shared vocab only · Table X · ~71–77% accuracy</div>
+              <div class="pipe-metrics">
+                <em>Sensitivity</em>
+                <em>Specificity</em>
+                <em>Figure 5 &amp; 6</em>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <h3>Mapping to your implementation (models_info.md)</h3>
+      <p>
+        <strong>Faithful “Broadcast Receiver + Permission” model:</strong> same \(\mathbf{p}\), \(\mathbf{r}\), early fusion, SVM or linear classifier.
+        <strong>Hybrid variants</strong> (e.g. Broadcast + MLDP) replace or prune \(\mathbf{p}\) with MLDP-selected permissions but keep the receiver branch from this paper.
+      </p>
+    </section>
+
+    <section>
+      <h2>Quick Reference — Paper Sections</h2>
+      <table>
+        <thead><tr><th>Section</th><th>Content</th></tr></thead>
+        <tbody>
+          <tr><td>I</td><td>Introduction, motivation</td></tr>
+          <tr><td>II</td><td>Permissions, components, receiver lifecycle</td></tr>
+          <tr><td>III</td><td>Empirical study (400 APKs) + onReceive analysis</td></tr>
+          <tr><td>IV</td><td>ML methodology: preprocessing, SVM, CV</td></tr>
+          <tr><td>V</td><td>Results Tables VIII–X, Figures 5–6</td></tr>
+          <tr><td>VI</td><td>Related work</td></tr>
+          <tr><td>VII</td><td>Conclusion (claims 74%/70% receivers, 97% combined)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="meta" style="margin-top: 3rem;">
+      Open this file in any browser. Math renders via MathJax CDN. Generated for thesis study of Mohsen et al. (CIC 2017).
+    </p>
+  </main>
+</div>
+</body>
+</html>

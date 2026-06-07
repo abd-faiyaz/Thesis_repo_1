@@ -15,7 +15,7 @@ from src.pipeline_integration import (
 from src.preprocessing.common import (
     scan_apk_rows,
     stratified_split,
-    temporal_year_split,
+    temporal_three_way_split,
     write_dataset_index,
     write_split_file,
 )
@@ -42,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit is not None:
         rows = rows[: args.limit]
 
+    split_mode = str(pre.get("split_mode", "stratified_random"))
+    test_rows: list | None = None
+
     settings = get_pipeline_settings(cfg)
     shared_paths = load_shared_train_val_paths(settings)
     if shared_paths is not None:
@@ -54,18 +57,22 @@ def main(argv: list[str] | None = None) -> int:
             f"(train={len(train_rows)}, val={len(val_rows)})"
         )
     else:
-        split_mode = str(pre.get("split_mode", "stratified_random"))
         if split_mode == "temporal_year":
             train_years = pre.get("train_years", [2020, 2021])
-            val_years = pre.get("val_years", [2022, 2023])
-            train_rows, val_rows = temporal_year_split(
+            test_years = pre.get("test_years", pre.get("val_years", [2022, 2023]))
+            val_fraction = float(pre.get("val_fraction", 0.1))
+            seed = int(pre.get("seed", 42))
+            train_rows, val_rows, test_rows = temporal_three_way_split(
                 rows,
                 train_years=train_years,
-                val_years=val_years,
+                test_years=test_years,
+                val_fraction=val_fraction,
+                seed=seed,
             )
             print(
-                f"Temporal year split: train={train_years} val={val_years} "
-                f"(train={len(train_rows)}, val={len(val_rows)})"
+                f"Temporal year split: train_years={train_years} test_years={test_years} "
+                f"val_fraction={val_fraction} "
+                f"(train={len(train_rows)}, val={len(val_rows)}, test={len(test_rows)})"
             )
         elif split_mode == "stratified_random":
             train_rows, val_rows = stratified_split(
@@ -82,11 +89,15 @@ def main(argv: list[str] | None = None) -> int:
     write_dataset_index(cfg.paths.dataset_index, rows)
     write_split_file(cfg.paths.splits_dir / "train.txt", train_rows)
     write_split_file(cfg.paths.splits_dir / "val.txt", val_rows)
+    if test_rows is not None:
+        write_split_file(cfg.paths.splits_dir / "test.txt", test_rows)
 
     print(f"APK root: {apk_root}")
     print(f"Indexed {len(rows)} APKs → {cfg.paths.dataset_index}")
     print(f"  train: {len(train_rows)} → {cfg.paths.splits_dir / 'train.txt'}")
     print(f"  val:   {len(val_rows)} → {cfg.paths.splits_dir / 'val.txt'}")
+    if test_rows is not None:
+        print(f"  test:  {len(test_rows)} → {cfg.paths.splits_dir / 'test.txt'}")
     return 0
 
 

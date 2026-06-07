@@ -45,8 +45,19 @@ def main() -> int:
         print(f"Bad normalization: {sample}")
         return 1
 
+    apk_root = cfg.paths.apk_root
+    if not apk_root.is_dir():
+        print(f"ERROR: apk_root not found: {apk_root}")
+        print("  Set paths.apk_root in config/default.yaml or export APK_ROOT=/path/to/corpus")
+        return 1
+
+    apk_count = sum(1 for _ in apk_root.rglob("*.apk"))
+    if apk_count == 0:
+        print(f"ERROR: no .apk files under {apk_root}")
+        return 1
+
     print("Dependencies OK.")
-    print(f"  apk_root: {cfg.paths.apk_root}")
+    print(f"  apk_root: {apk_root} ({apk_count} APKs)")
     print(f"  model_id: {cfg.pipeline.get('model_id')}")
     print(f"  max |S|: {cfg.mldp.get('max_permissions')}")
     return 0

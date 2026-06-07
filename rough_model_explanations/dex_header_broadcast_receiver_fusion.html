@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dex Header + Broadcast Receiver Fusion — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="index.html">← All models</a></nav>
+<h1>Dex Header + Broadcast Receiver Fusion</h1>
+<p class="meta">Cross-paper: MSFDroid (Dex header H, Peng et al. 2022) + Mohsen et al. 2017 (broadcast receiver intent actions)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Dex header (104 bytes):</strong> After 8-byte magic (<code>dex\n035</code>), bytes 8–111 encode section sizes/offsets (strings, methods, classes). Malware often shows abnormal header statistics without readable manifest changes.</p>
+<p><strong>MSFDroid MLP(H):</strong> Normalize header bytes to \(\mathbf{H} \in [0,1]^{104}\); sum-pool across multidex; small MLP → 128-d embedding.</p>
+<p><strong>Broadcast receivers:</strong> Manifest <code>&lt;receiver&gt;</code> components with <code>&lt;action&gt;</code> tags — which system events wake the app (boot, SMS, connectivity).</p>
+<p><strong>Late fusion (Pattern B):</strong> Separate towers per modality → concat embeddings → final FC + sigmoid (MSFDroid Pattern B style, but BoW replaced by ~50-d receiver vector).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Dex header feature H (104-d)</li>
+<li>Component B — Broadcast receiver actions R (~50-d)</li>
+<li>Component C — MLP(H) tower</li>
+<li>Component D — Receiver tower</li>
+<li>Late fusion mechanism (Pattern B)</li>
+<li>Experimental results (expected / comparative)</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>You need a detector richer than <strong>header-only MLP(H)</strong> (~83.5% ACC alone in MSFDroid Table 6) but lighter than <strong>4380-d manifest BoW</strong> or ANASTASIA bytecode scan. This hybrid fuses <strong>104-d Dex header</strong> (structural signal) with <strong>~30–80-d broadcast receiver intent actions</strong> (event-subscription signal) using <strong>late fusion Pattern B</strong>: two small towers → concat embeddings → sigmoid. No permissions, no API strings, no raw tail bytes — manifest parse is limited to receivers; Dex read is header-only.</p>
+</section>
+
+<section>
+<h2>Component A — Dex header feature H (104-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Bytes 8–111 of each <code>classes*.dex</code> file after magic verification (MSFDroid §3.3).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Header reflects compiler/linker layout; malware packing and multidex anomalies perturb offsets/sizes before any string is read — complements manifest receivers.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; enumerate all <code>classes*.dex</code>.</li>
+<li>Verify first 8 bytes match Dex magic.</li>
+<li>Read bytes 8–111 → raw vector \(\mathbf{h}^{(	ext{dex})}\).</li>
+<li>Encode: \(h_b = 	ext{byte}_b / 255\).</li>
+<li>Min–max normalize each dimension using training corpus stats.</li>
+<li>Multidex: element-wise sum \(\mathbf{H} = \sum_{	ext{dex}} \mathbf{h}^{(	ext{dex})}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ h_b = \frac{\text{byte}_b}{255}, \quad \mathbf{H} = \sum_{d=1}^{N_{\text{dex}}} \mathbf{h}^{(d)} \in [0,1]^{104} \]</p>
+<p>Corpus normalization: \(\tilde{H}_j = \frac{H_j - \min_j}{\max_j - \min_j + \epsilon}\).</p>
+<ul class="vars"><li><strong>\(\mathbf{H}\)</strong> — pooled normalized header (104-d)</li><li><strong>\(N_{\text{dex}}\)</strong> — number of dex files in APK</li><li><strong>\(\epsilon\)</strong> — numerical stability in min–max</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">classes*.dex
+    │
+    ▼
+ bytes [8:112]  (104 values)
+    │
+    ▼
+ ÷255 → min-max norm → sum-pool
+    │
+    ▼
+ H  (1×104)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{H}\). Input to MLP(H) tower (Component C).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> O(1) in Dex file size — only fixed header window, not full entropy scan (MLP(M) dropped in MSFDroid-lite).</div>
+</section>
+<section>
+<h2>Component B — Broadcast receiver actions R (~50-d)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Intent <code>android:name</code> strings under <code>&lt;receiver&gt;&lt;intent-filter&gt;&lt;action&gt;</code> in manifest (Mohsen et al. 2017).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Receivers capture <em>when</em> code runs without user launch — malware registers BOOT_COMPLETED, SMS_RECEIVED more aggressively than benign apps.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Parse <code>AndroidManifest.xml</code>.</li>
+<li>Find all <code>&lt;receiver&gt;</code> elements.</li>
+<li>Collect <code>&lt;action android:name="…"&gt;</code> under each receiver's intent-filter.</li>
+<li>Build training vocabulary \(\mathcal{A}\) of distinct actions (\(R pprox 30\)–80).</li>
+<li>Set \(R_k = 1\) if action \(k\) present in APK, else 0.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ R_k = \begin{cases} 1 & \text{if } \text{action}_k \in \text{Receivers}(\text{APK}) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{R} \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(R\)</strong> — receiver-action vocabulary size</li><li><strong>\(R_k\)</strong> — binary bit for action \(k\)</li><li><strong>\(\mathbf{R}\)</strong> — receiver feature vector (~50-d typical)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">AndroidManifest.xml
+    │
+    └─► &lt;receiver&gt; → &lt;action&gt; names
+            │
+            ▼
+      R  (1×R)  binary  e.g. 1×50</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{R}\). Input to receiver tower (Component D).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why different from Pattern A BoW:</strong> ~50 dims vs 4381 — same manifest-parse family as Mohsen but fused with Dex header, not permissions.</div>
+</section>
+<section>
+<h2>Component C — MLP(H) tower (MSFDroid Base Model 1)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Normalized header vector \(\mathbf{H} \in \mathbb{R}^{104}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Two FC+ReLU blocks (paper Fig. 3) map structural layout to 128-d embedding suitable for fusion.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Input \(\mathbf{H}\) shape (1×104).</li>
+<li>Layer 1: Linear(104 → \(h_1\)), ReLU (paper-style FC+BN+ReLU).</li>
+<li>Layer 2: Linear(\(h_1\) → 128), ReLU.</li>
+<li>Output embedding \(\mathbf{z}_H \in \mathbb{R}^{128}\).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z}_H = \mathrm{ReLU}\big(\mathbf{W}_{H2}\,\mathrm{ReLU}(\mathbf{W}_{H1}\mathbf{H} + \mathbf{b}_{H1}) + \mathbf{b}_{H2}\big), \quad \mathbf{z}_H \in \mathbb{R}^{128} \]</p>
+<ul class="vars"><li><strong>\(\mathbf{z}_H\)</strong> — header branch embedding (128-d)</li><li><strong>\(\mathbf{W}_{H1}, \mathbf{W}_{H2}\)</strong> — learned weight matrices</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">H  (1×104)
+  │
+  ▼
+ FC → ReLU → FC → ReLU
+  │
+  ▼
+ z_H  (1×128)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{z}_H\). Concatenated with \(\mathbf{z}_R\) in fusion (Component late fusion section).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Proven MSFDroid stream — cheap, no manifest lexicon explosion.</div>
+</section>
+<section>
+<h2>Component D — Receiver tower (linear or tiny MLP)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Binary receiver vector \(\mathbf{R} \in \{0,1\}^{R}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Sparse binary inputs need only a shallow map to embedding space before fusion.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Option A: Linear(\(R\) → 64) + ReLU.</li>
+<li>Option B: MLP \(R\) → 32 → 64 with ReLU.</li>
+<li>Output \(\mathbf{z}_R \in \mathbb{R}^{64}\) (typical).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z}_R = \mathrm{ReLU}(\mathbf{W}_R \mathbf{R} + \mathbf{b}_R), \quad \mathbf{z}_R \in \mathbb{R}^{d_R},\ d_R \approx 32\text{–}64 \]</p>
+<ul class="vars"><li><strong>\(\mathbf{z}_R\)</strong> — receiver branch embedding</li><li><strong>\(d_R\)</strong> — receiver embedding dimension</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">R  (1×R)  e.g. 1×50
+  │
+  ▼
+ Linear/MLP  →  ReLU
+  │
+  ▼
+ z_R  (1×64)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{z}_R\). Late-fused with \(\mathbf{z}_H\).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Captures event-driven malware behavior Mohsen showed improves over permissions alone — without 4380-d BoW.</div>
+</section>
+<section>
+<h2>6. Late fusion mechanism (Pattern B style)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Embeddings \(\mathbf{z}_H\) (structural) and \(\mathbf{z}_R\) (manifest behavioral) from separate towers.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Late fusion lets each modality use its own inductive bias — header MLP for continuous layout, shallow net for sparse binary actions — before joint decision. Matches MSFDroid Pattern B (separate ASCNN/MLP branches) but swaps manifest BoW for receivers.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps">
+<li>Compute \(\mathbf{H}\) and \(\mathbf{R}\) from APK.</li>
+<li>Forward through MLP(H) → \(\mathbf{z}_H\).</li>
+<li>Forward through receiver tower → \(\mathbf{z}_R\).</li>
+<li>Concatenate \(\mathbf{z} = [\mathbf{z}_H \| \mathbf{z}_R]\).</li>
+<li>Final FC + sigmoid → \(\hat{y}\).</li>
+</ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ \mathbf{z} = [\mathbf{z}_H \| \mathbf{z}_R] \in \mathbb{R}^{128 + d_R}, \quad \hat{y} = \sigma(\mathbf{w}^T \mathbf{z} + b) \]</p>
+<ul class="vars">
+<li><strong>\(\mathbf{z}\)</strong> — fused embedding (e.g. 192-d if \(d_R=64\))</li>
+<li><strong>\(\hat{y}\)</strong> — malware probability</li>
+</ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► classes*.dex ──► H (1×104) ──► MLP(H) ──► z_H (1×128)
+ │
+ └─► Manifest receivers ──► R (1×50) ──► Tower ──► z_R (1×64)
+                              │
+                              └─► z = [z_H || z_R]  (1×192)
+                                        │
+                                        ▼
+                                   FC + sigmoid
+                                        │
+                                        ▼
+                                   P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Single malware score for ensemble / multistep policy. Can run as <strong>Step 2</strong> after MLDP+header cascade when uncertain.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>vs Pattern B (MSFDroid):</strong> Replaces 4380-d manifest BoW with ~50-d receivers — ~90% smaller manifest branch, still adds behavioral manifest signal. <strong>vs MLP(H) only:</strong> Adds event-subscription semantics MSFDroid header cannot see.</div>
+</section>
+
+<section>
+<h2>7. Experimental results (comparative / expected)</h2>
+<table>
+<tr><th>Model</th><th>Manifest cost</th><th>Dex cost</th><th>Expected F1 / ACC</th></tr>
+<tr><td>MLP(H) only (MSFDroid)</td><td>None</td><td>Header only</td><td>~83.5% ACC (paper Table 6, alone)</td></tr>
+<tr><td>Mohsen receivers only</td><td>Small</td><td>None</td><td>Weaker alone; informative combined</td></tr>
+<tr><td>Pattern B (H + BoW I)</td><td>Large (4381-d)</td><td>Header</td><td>High (paper fusion)</td></tr>
+<tr><td class="best"><strong>H + R fusion (this model)</strong></td><td class="best"><strong>Small (~50-d)</strong></td><td class="best"><strong>Header only</strong></td><td class="best"><strong>Moderate–high; between H-only and full Pattern B (thesis target)</strong></td></tr>
+</table>
+<p><strong>Why fusion should help:</strong> Header catches structural/packing anomalies; receivers catch persistence/SMS hooks invisible in 104 bytes. Together they approximate part of Pattern B's manifest value at far lower dimension — good when ANASTASIA extraction is too costly.</p>
+</section>
+
+<section>
+<h2>8. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ├────────────────────────┐
+       ▼                        ▼
+ classes*.dex              AndroidManifest
+       │                        │
+       ▼                        ▼
+ H (1×104)                  R (1×R)
+       │                        │
+       ▼                        ▼
+ MLP(H) tower              Receiver tower
+       │                        │
+       ▼                        ▼
+ z_H (1×128)              z_R (1×64)
+       │                        │
+       └──────────┬─────────────┘
+                  ▼
+         z = [z_H || z_R]  (1×192)
+                  ▼
+            FC + sigmoid
+                  ▼
+         P(malware) ∈ [0,1]  →  label</pre>
+</section>
+
+</body>
+</html>

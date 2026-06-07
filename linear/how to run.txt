@@ -1,17 +1,52 @@
 Dataset: Hugging Face android-apks bucket (~13.5k APKs, year folders 2020–2023).
-cd linear
-pip install -r requirements.txt   
-APK_ROOT=/path/to/android-apks ./run_linregdroid.sh
+Default corpus: /mnt/Files/thesis_full_dataset (see config/default.yaml paths.apk_root)
 
-When you want 2022+2023 results:
-EVAL_TEMPORAL=1 APK_ROOT=/path/to/android-apks ./run_linregdroid.sh
-Or after training:
+cd linear
+source scripts/activate_thesis_env.sh   # repo-root thesis_venv
+python scripts/verify_setup.py          # P0 — must pass before full run
+
+Full pipeline (P0–P8):
+./run_linregdroid.sh
+
+Smoke / dev run (subset of APKs; not thesis numbers):
+PREPROCESS_LIMIT=500 ./run_linregdroid.sh
+
+P6 eval (default): val (threshold tuning) + temporal_holdout (primary test → test_results.json)
+Optional dev_test (in-distribution check only):
 python -m src.training.evaluate --splits val dev_test temporal_holdout
 
+Split policy (thesis):
+  stratified_development — train/val/dev_test from 2020+2021 (stratified by label)
+  temporal_holdout — primary test on 2022+2023 (reported as split=test in test_results.json)
+  Documented in config/default.yaml pipeline.split_policy_note
+
+Deployed model variant (VigiDroid + thesis):
+  Single sklearn MLR (no bagging ensemble)
+  Decision rule: LinRegDroid1 — malware if clamp(linear_score,0,1) >= 0.5
+  (LinRegDroid2 nearest-class reported offline when evaluation.report_both_variants: true)
+  See Android_Works/momo_deployed_variants.md
 
 Outputs to check
-File |	Purpose
-artifacts/metrics/evaluation_results.json |Val + dev_test (and optional temporal) scores
-artifacts/checkpoints/linregdroid.pth |PyTorch checkpoint
-artifacts/export/linregdroid_permission/model.onnx |Ready for VigiDroid assets
-artifacts/export/linregdroid_permission/features/permission_vocab.json |Must ship with the model on device
+File | Purpose
+artifacts/metrics/evaluation_results.json | All evaluated splits (val + temporal_holdout)
+artifacts/metrics/test_results.json | Primary test on 2022+2023 (split=test schema)
+Shared_pipeline_Files/results/offline/linregdroid_permission_test_*.json | Shared offline export (pipeline.export_offline_json: true)
+artifacts/checkpoints/linregdroid.pth | PyTorch checkpoint
+artifacts/export/linregdroid_permission/model.onnx | ONNX bundle
+artifacts/export/linregdroid_permission/features/permission_vocab.json | 173-d permission vocab
+artifacts/metrics/parity_report.json | P8 PC parity (torch vs ONNX)
+
+Stage to Android (after export):
+bash Android_Works/stage_momo_assets.sh   # copies to vigidroid/app/src/main/assets/models/linregdroid_permission/
+
+Repo-level ONNX parity (staged or export bundle):
+python Shared_pipeline_Files/tools/parity_check.py \
+  --bundle vigidroid/app/src/main/assets/models/linregdroid_permission
+
+On-device A4 parity (device/emulator connected):
+cd ../vigidroid && ./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.msh.vigidroid.LinRegDroidParityTest
+
+Pull device scan metrics after A3 scans:
+bash Shared_pipeline_Files/tools/pull_device_metrics.sh
+# → Shared_pipeline_Files/results/device/

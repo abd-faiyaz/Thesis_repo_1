@@ -1,4 +1,11 @@
-"""Stage 3 — association rule mining on malware-only transactions."""
+"""Stage 3 — association rule mining on malware-only transactions.
+
+Paper describes explicit X ⇒ malware rules. This implementation mines frequent
+itemsets on malware-only transactions via FP-Growth and keeps permissions appearing
+in high-confidence/lift rules among PRNR/support-filtered candidates. That is an
+acceptable simplification: consequents are implicit malware context, not a separate
+class label column.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +20,7 @@ def mine_rule_permissions(
     min_support: float = 0.05,
     min_confidence: float = 0.70,
     min_lift: float = 1.2,
+    max_stored_rules: int = 200,
 ) -> tuple[set[str], list[dict]]:
     candidate_set = set(candidates)
     if not malware_transactions or not candidates:
@@ -57,5 +65,9 @@ def mine_rule_permissions(
                 "lift": float(row["lift"]),
             }
         )
+
+    rule_records.sort(key=lambda r: r["lift"], reverse=True)
+    if len(rule_records) > max_stored_rules:
+        rule_records = rule_records[:max_stored_rules]
 
     return selected, rule_records

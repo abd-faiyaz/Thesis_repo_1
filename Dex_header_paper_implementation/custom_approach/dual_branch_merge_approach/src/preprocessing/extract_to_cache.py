@@ -40,13 +40,19 @@ def _shard_dir(cfg: PipelineConfig, split: str) -> Path:
         return cfg.paths.shards_train_dir
     if split == "val":
         return cfg.paths.shards_val_dir
-    raise ValueError(f"split must be 'train' or 'val', got {split!r}")
+    if split == "test":
+        return cfg.paths.shards_test_dir
+    raise ValueError(f"split must be 'train', 'val', or 'test', got {split!r}")
 
 
 def _manifest_path(cfg: PipelineConfig, split: str) -> Path:
     if split == "train":
         return cfg.paths.manifest_train
-    return cfg.paths.manifest_val
+    if split == "val":
+        return cfg.paths.manifest_val
+    if split == "test":
+        return cfg.paths.manifest_test
+    raise ValueError(f"split must be 'train', 'val', or 'test', got {split!r}")
 
 
 def extract_split(cfg: PipelineConfig, split: str, *, limit: int | None = None) -> dict[str, int]:
@@ -177,9 +183,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument(
         "--split",
-        choices=("train", "val", "both"),
-        default="both",
-        help="Which split to extract (default: both)",
+        choices=("train", "val", "test", "all"),
+        default="all",
+        help="Which split to extract (default: all train+val+test)",
     )
     parser.add_argument("--limit", type=int, default=None, help="Process only first N APKs per split")
     args = parser.parse_args(argv)
@@ -190,7 +196,10 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(args.config)
     ensure_artifact_dirs(cfg)
 
-    splits = ["train", "val"] if args.split == "both" else [args.split]
+    if args.split == "all":
+        splits = ["train", "val", "test"]
+    else:
+        splits = [args.split]
     for split in splits:
         summary = extract_split(cfg, split, limit=args.limit)
         print(f"\n{split}:")

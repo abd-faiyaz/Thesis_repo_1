@@ -89,7 +89,8 @@ def extract_split(
             continue
 
         shard_path = shard_root / f"{row.apk_id}.npz"
-        tmp_path = shard_path.with_suffix(".npz.tmp")
+        # np.savez_compressed always appends ".npz" — use ".tmp.npz" not ".npz.tmp".
+        tmp_path = shard_path.with_suffix(".tmp.npz")
         np.savez_compressed(
             tmp_path,
             p=vec.astype(np.float32),

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FexDroid Category-Pruned Sparse Classifier — Architecture Explained</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\(', '\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="index.html">← All models</a></nav>
+<h1>FexDroid Category-Pruned Sparse Classifier</h1>
+<p class="meta">Paper: ICCAI 2018 — <em>Effective and Explainable Detection of Android Malware</em> (FexDroid / ProDroid family)</p>
+
+<section class="prereq">
+<h2>Prerequisites</h2>
+<p><strong>Drebin feature space:</strong> Famous Android malware benchmark. Each APK maps to a <strong>sparse binary vector</strong> — one dimension per unique static string (API, permission, URL, activity, …). Joint vocabulary can exceed <strong>545,333</strong> dimensions.</p>
+<p><strong>Sparse vector:</strong> Almost all entries are 0; only present terms are 1. Storage and dot-products must exploit sparsity.</p>
+<p><strong>Linear SVM (LibLinear):</strong> Finds a hyperplane \(w^T x + b = 0\) that separates classes with margin; efficient on sparse high-D data in the paper.</p>
+<p><strong>Category taxonomy:</strong> FexDroid groups features into <strong>10 semantic buckets</strong> so pruning is interpretable (drop whole noisy categories, not arbitrary indices).</p>
+</section>
+
+<section class="toc">
+<h2>Contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — Static multi-source extraction (Drebin-style)</li>
+<li>Component B — Ten-category bucketing</li>
+<li>Component C — Category &amp; frequency pruning</li>
+<li>Component D — FexDroid-lite vocabulary cap (thesis)</li>
+<li>Component E — Linear SVM classifier (paper)</li>
+<li>Experimental results</li>
+<li>End-to-end pipeline</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>Imagine <strong>50,000 APK files</strong> and a Drebin-style extractor that could produce a vector with <strong>545K+</strong> dimensions — impossible to train or run on a phone. <strong>ProDroid/FexDroid</strong> (ICCAI 2018) attack this by (1) organizing features into <strong>10 categories</strong> (permissions, API calls, intents, …), (2) <strong>pruning</strong> rare and high-uncertainty categories (URLs, activities), shrinking space toward <strong>~49K</strong>, and (3) training a <strong>linear SVM</strong> for fast sparse classification (~94% TPR reported in the family). Your thesis <strong>FexDroid-lite</strong> caps each category at ~500 top terms → <strong>3K–5K</strong> frozen dimensions + ASCNN or MLP for ONNX. Extraction needs manifest + Dex static analysis — highest cost among single-pass suggestions except full Drebin.</p>
+</section>
+
+<section>
+<h2>Component A — Static multi-source extraction (Drebin-style)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Manifest declarations (permissions, components, intent filters) plus Dex/static strings: API invocations, method call patterns, URLs, provider names, etc.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Drebin proved that joint static features discriminate malware well; FexDroid keeps that expressiveness but structures it for explainability and pruning.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Unzip APK; parse <code>AndroidManifest.xml</code> for permissions, activities, services, receivers, providers, intent filters.</li>
+<li>Disassemble or statically analyze all <code>classes*.dex</code> files (Androguard / equivalent).</li>
+<li>Collect API call signatures, call-graph edges, embedded URL/host strings, hardware <code>uses-feature</code> entries.</li>
+<li>Normalize strings (e.g. permission names to <code>real_permission</code> form).</li>
+<li>For each extracted term, record which <strong>category</strong> it belongs to (next component).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Per-term indicator: \[ f_j = \mathbb{1}[\text{term}_j \in \text{APK}] \]</p>
+<p>Before pruning, dimension index \(j\) runs over full Drebin vocabulary \(|\mathcal{V}| \approx 545{,}333\).</p>
+<ul class="vars"><li><strong>\(f_j\)</strong> — binary feature for term \(j\)</li><li><strong>\(\mathbb{1}[\cdot]\)</strong> — indicator: 1 if term present, else 0</li><li><strong>\(|\mathcal{V}|\)</strong> — full joint vocabulary size before reduction</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">APK
+ ├─► Manifest ──► perms, intents, components
+ └─► Dex/static ──► APIs, calls, URLs, strings
+         │
+         ▼
+   Raw term multiset  (→ bucketed next)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs unstructured multiset of labeled static terms. Fed into category bucketing (Component B).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key novelty:</strong> Same information source as Drebin but pipeline designed for <strong>explainable</strong> category-wise analysis, not a flat hash of strings.</div>
+</section>
+<section>
+<h2>Component B — Ten-category bucketing</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>All extracted terms partitioned into fixed semantic categories (see table in paper).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Pruning and explanation work per category — e.g. drop <code>url</code> entirely because domains change daily; keep <code>api_call</code> because malware API sequences are stable.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Assign each term to exactly one category label \(c \in \mathcal{C}\), \(|\mathcal{C}| = 10\).</li>
+<li>Build per-category vocabularies \(\mathcal{V}_c\).</li>
+<li>Concatenate category blocks (order fixed at training) into global index set.</li>
+<li>Maintain category metadata for explainability (which APIs fired, etc.).</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Categories \(\mathcal{C}\): \(\{\text{real\_permission}, \text{feature}, \text{api\_call}, \text{call}, \text{permission}, \text{provider}, \text{intent}, \text{service\_receiver}, \text{activity}, \text{url}\}\).</p>
+<p>\[ \mathbf{f} = [\mathbf{f}_{c_1} \| \mathbf{f}_{c_2} \| \cdots \| \mathbf{f}_{c_{10}}] \]</p>
+<ul class="vars"><li><strong>\(\mathcal{C}\)</strong> — set of 10 category names</li><li><strong>\(\mathcal{V}_c\)</strong> — vocabulary for category \(c\)</li><li><strong>\(\mathbf{f}_c\)</strong> — binary sub-vector for category \(c\)</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">Extracted terms
+       │
+       ▼
+┌──────────────────────────────────┐
+│ real_permission │ feature │ api_call │
+│ call │ permission │ provider │ intent │
+│ service_receiver │ activity │ url │
+└──────────────────────────────────┘
+       │
+       ▼
+  f partitioned by category</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs structured sparse vector with category boundaries. Feeds pruning (Component C).</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Why this is different from flat Drebin:</strong> Enables <strong>whole-category removal</strong> (URLs, activities) based on uncertainty analysis — not just global frequency cuts.</div>
+</section>
+<section>
+<h2>Component C — Category & frequency pruning (FexDroid / ProDroid)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Full 545K-dimensional space and per-category statistics: term frequency, class-conditional probability, uncertainty.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Rare terms (≤5 occurrences) add noise and memory; URL/activity categories have high entropy — dropping them shrinks ~545K → ~40K–49K with small accuracy loss (paper).</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li><strong>ProDroid step:</strong> Remove features appearing ≤5 times in training corpus.</li>
+<li>Remove features with high uncertainty (weak class separation).</li>
+<li><strong>FexDroid step:</strong> Drop entire categories <code>url</code> and <code>activity</code> (noisy, unstable).</li>
+<li>Rebuild vocabulary \(\mathcal{V}'\) with \(|\mathcal{V}'| \approx 49{,}000\) (paper reduction path).</li>
+<li>Re-index APK features into pruned space.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>Pruned dimension: \[ D_{\text{Fex}} \ll 545{,}333, \quad D_{\text{Fex}} \approx 4 \times 10^4 \]</p>
+<p>Retention rule (conceptual): keep term \(j\) if \(\mathrm{freq}(j) > \tau_f\) and \(\mathrm{uncertainty}(j) < \tau_u\), with category-level overrides.</p>
+<ul class="vars"><li><strong>\(\tau_f\)</strong> — minimum frequency threshold (e.g. 5)</li><li><strong>\(D_{\text{Fex}}\)</strong> — dimension after FexDroid pruning</li><li><strong>url / activity</strong> — categories removed wholesale</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_full  (545K+ sparse)
+    │
+    ├─► drop rare (freq ≤ 5)
+    ├─► drop high-uncertainty terms
+    └─► drop url + activity categories
+            │
+            ▼
+    f_pruned  (~49K sparse)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{f}' \in \{0,1\}^{D_{\text{Fex}}}\). For mobile thesis path, passes to lite cap (Component D) before classifier.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> ~10× dimension reduction with explainable rules; ~94% TPR reported in ProDroid/FexDroid line on Drebin-style evaluation.</div>
+</section>
+<section>
+<h2>Component D — FexDroid-lite vocabulary cap (thesis deployment)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Pruned feature space per category after Component C.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>49K is still large for on-device ONNX; capping top 500 terms per category yields **3K–5K** dims — fits ASCNN/MLP and multistep cascade stage 3+.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>For each category \(c\), rank terms by training frequency (or mutual information).</li>
+<li>Keep top \(K_c \approx 500\) terms; map OOV to drop or rare bucket.</li>
+<li>Freeze lexicon for inference.</li>
+<li>Build \(\mathbf{f}_{\text{lite}} \in \{0,1\}^{D}\), \(D \approx 3000\)–5000.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p>\[ D_{\text{lite}} = \sum_{c \in \mathcal{C}'} |\mathcal{V}_c^{\text{top-}K}|, \quad \mathcal{C}' = \mathcal{C} \setminus \{\text{url}, \text{activity}\} \]</p>
+<ul class="vars"><li><strong>\(K_c\)</strong> — max terms kept per category (~500)</li><li><strong>\(D_{\text{lite}}\)</strong> — final deployable dimension (~3K–5K)</li><li><strong>\(\mathcal{C}'\)</strong> — categories retained after FexDroid drops</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_pruned (~49K)
+    │
+    ▼
+ per-category top-500 cap
+    │
+    ▼
+ f_lite  (1×3000–5000)  frozen vocab</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs \(\mathbf{f}_{\text{lite}}\) to classifier (Component E). Used when cheaper models (header, MLDP) are uncertain in cascade.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Thesis novelty:</strong> Same semantic categories as paper, but vocabulary sized for mobile inference — not paper's full 49K LibLinear run.</div>
+</section>
+<section>
+<h2>Component E — Linear SVM classifier (paper) / ASCNN or MLP (thesis)</h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Sparse binary vector \(\mathbf{f}\) or \(\mathbf{f}_{\text{lite}}\).</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Linear SVM scales to very high sparse dimension with hinge loss; thesis may swap ASCNN from MSFDroid for denoising high-D sparse input before sigmoid.</p>
+<h3 class="sub">Step-by-Step Process</h3>
+<ol class="steps"><li>Train LibLinear SVM on \((\mathbf{f}_i, y_i)\) with labels \(y_i \in \{-1,+1\}\) or \(\{0,1\}\).</li>
+<li>Hyperparameter \(C\) controls margin vs misclassification (grid search in paper).</li>
+<li>Decision: \(\mathrm{sign}(\mathbf{w}^T \mathbf{f} + b)\) or probability via Platt scaling.</li>
+<li>Thesis alternative: \(\hat{y} = \sigma(\mathrm{MLP}(\mathbf{f}_{\text{lite}}))\) or ASCNN embedding → MLP.</li></ol>
+<h3 class="sub">Mathematical Formulation</h3>
+<p><strong>Linear SVM (paper):</strong> \[ \min_{\mathbf{w},b} \frac{1}{2}\|\mathbf{w}\|^2 + C \sum_i \max(0, 1 - y_i(\mathbf{w}^T \mathbf{f}_i + b)) \]</p>
+<p><strong>MLP (thesis ONNX):</strong> \[ \hat{y} = \sigma(\mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1 \mathbf{f}_{\text{lite}} + \mathbf{b}_1) + \mathbf{b}_2) \]</p>
+<ul class="vars"><li><strong>\(\mathbf{w}, b\)</strong> — SVM hyperplane weights and bias</li><li><strong>\(C\)</strong> — regularization constant</li><li><strong>\(\hat{y}\)</strong> — malware probability or score</li></ul>
+<h3 class="sub">Architecture Flowchart</h3>
+<pre class="flow">f_lite  (1×D)
+    │
+    ├─► Paper: Linear SVM  →  sign(w^T f + b)
+    └─► Thesis: ASCNN/MLP  →  σ(·)  →  P(malware)</pre>
+<h3 class="sub">Output and how it connects to the next stage</h3>
+<p>Outputs malware score in \([0,1]\). Feeds ensemble or multistep policy as high-cost high-F1 stage.</p>
+<h3 class="sub">Key Advantage / Novelty</h3>
+<div class="novelty"><strong>Key advantage:</strong> Paper SVM is proven on sparse Drebin family; thesis MLP/ASCNN unifies export format with MSFDroid stack.</div>
+</section>
+<section>
+<h2>6. Experimental results</h2>
+<table>
+<tr><th>Method</th><th>Feature dims</th><th>TPR / accuracy</th><th>Inference (paper)</th></tr>
+<tr><td>Full Drebin + SVM</td><td>545,333+</td><td>High</td><td>Very slow train/infer</td></tr>
+<tr><td>ProDroid (frequency prune)</td><td>~40K</td><td>~94% TPR</td><td>~4 s (reported)</td></tr>
+<tr><td>FexDroid (category prune)</td><td>~49K → effective ~40K</td><td>Comparable to ProDroid</td><td>Faster than full Drebin</td></tr>
+<tr><td class="best"><strong>FexDroid-lite (thesis cap)</strong></td><td class="best"><strong>3K–5K</strong></td><td class="best"><strong>Target similar TPR, mobile-feasible</strong></td><td class="best"><strong>ONNX MLP/ASCNN &lt;&lt; 4 s</strong></td></tr>
+</table>
+<p><strong>Why improvement over full Drebin happened:</strong> URLs and activity names dominate vocabulary size but change with repackaging and benign app updates — removing them cuts noise. API calls and permissions remain stable discriminators. Category caps prevent single bucket from exploding dimension.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ├──────────────────────┐
+       ▼                      ▼
+ Manifest parse          Dex/static analysis
+       │                      │
+       └──────────┬───────────┘
+                  ▼
+        Terms → 10 categories
+                  ▼
+     Prune: rare + drop url/activity
+     545K → ~49K (paper)
+                  ▼
+     Lite: top-500/category (thesis)
+                  ▼
+        f  (1×3000–5000)  sparse binary
+                  ▼
+     Linear SVM (paper) / ASCNN|MLP (thesis)
+                  ▼
+           P(malware) ∈ [0,1]</pre>
+</section>
+
+</body>
+</html>

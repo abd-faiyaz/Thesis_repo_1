@@ -47,6 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     pt_onnx = report["pytorch_vs_onnx"]
     print(f"Parity {status}: max_abs_diff={pt_onnx['max_abs_diff']:.2e} (tolerance {args.tolerance})")
     print(f"  report → {report_path}")
+    try:
+        from src.thesis_archive import after_parity
+
+        after_parity(report_path)
+    except ImportError:
+        pass
     return 0 if report["passed"] else 1
 
 

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Architecture Explanations — Index</title>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1419; color: #e6edf3; max-width: 760px; margin: 2rem auto; padding: 0 1.5rem 3rem; line-height: 1.65; }
+    h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+    h2 { color: #79c0ff; margin-top: 2rem; font-size: 1.2rem; }
+    a { color: #79c0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    li { margin: 0.55rem 0; }
+    .rec { color: #3fb950; font-weight: 600; }
+    p.meta { color: #8b949e; font-size: 0.9rem; }
+    code { background: #1a2332; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.88em; }
+    ol { padding-left: 1.4rem; }
+  </style>
+</head>
+<body>
+  <h1>Model architecture explanations</h1>
+  <p class="meta">Self-contained architecture guides for thesis malware-detection models. Each page follows <code>explanation_instructions.md</code>: prerequisites → table of contents → overview → per-component sections (what / why / steps / math / flowchart / output / novelty) → fusion → experimental results → end-to-end pipeline with dimensions.</p>
+  <p class="meta">Source catalog: <code>more_papers_opus.md</code></p>
+
+  <h2>Recommended starting points</h2>
+  <ul>
+    <li><a href="broadcast_mldp_hybrid.html"><span class="rec">Broadcast + MLDP hybrid</span></a> — low cost, strong manifest balance</li>
+    <li><a href="anastasia_behavioral_classifier.html"><span class="rec">ANASTASIA behavioral (lite)</span></a> — bytecode behavior, 128-d MLP</li>
+  </ul>
+
+  <h2>All 11 models</h2>
+  <ol>
+    <li><a href="broadcast_receiver_permission_classifier.html">Broadcast receiver + permission classifier</a> — Mohsen et al. 2017</li>
+    <li><a href="mldp_pruned_permission_classifier.html">MLDP-pruned permission classifier</a> — Permission Extraction Framework 2020</li>
+    <li><a href="broadcast_mldp_hybrid.html">Broadcast + MLDP permission hybrid</a> — cross-paper manifest fusion</li>
+    <li><a href="anastasia_behavioral_classifier.html">ANASTASIA behavioral classifier (lite)</a> — Fereidooni et al. 2016</li>
+    <li><a href="linregdroid_permission_classifier.html">LinRegDroid permission classifier</a> — minimal linear baseline</li>
+    <li><a href="fexdroid_category_sparse_classifier.html">FexDroid category-pruned sparse classifier</a> — ICCAI 2018</li>
+    <li><a href="erbe_permission_intent_mlp.html">ERBE permission + intent MLP</a> — manifest MLP ~1K-d</li>
+    <li><a href="dex_header_broadcast_receiver_fusion.html">Dex header + broadcast receiver fusion</a> — MSFDroid H + Mohsen receivers</li>
+    <li><a href="anastasia_manifest_bow_fusion.html">ANASTASIA + manifest BoW fusion</a> — 128-d behavioral + 4381-d BoW, ASCNN Pattern A, concat 4509-d</li>
+    <li><a href="fexdroid_tail_bytes_dual_branch.html">FexDroid + raw APK tail dual-branch</a> — 3K–5K sparse + 1DCNN last 1024 bytes, late fusion, 95–97% tail accuracy</li>
+    <li><a href="mldp_dex_header_cascade.html">MLDP + Dex header cascade</a> — ~30-d MLDP + 104-d header, fused MLP 150-d or multistep cascade</li>
+  </ol>
+
+  <h2>Already implemented (see repo)</h2>
+  <p class="meta">MSFDroid MLP(H), Pattern A ASCNN(C), Pattern B late fusion, and 1DCNN ByteCNN are documented under <code>already_implemented_models/</code> — not duplicated here.</p>
+
+  <p class="meta">Style rules: <code>explanation_instructions.md</code> · Model list: <code>more_papers_opus.md</code></p>
+</body>
+</html>

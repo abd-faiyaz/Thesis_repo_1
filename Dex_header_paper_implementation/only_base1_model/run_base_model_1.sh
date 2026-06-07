@@ -136,8 +136,9 @@ echo "BM1_ARCHIVE:     $BM1_ARCHIVE"
 echo "BM1_RUN_ID:      ${BM1_RUN_ID:-<auto when BM1_ARCHIVE=1>}"
 SPLIT_MODE="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('split_mode','?'))")"
 TRAIN_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('train_years','?'))")"
-VAL_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('val_years','?'))")"
-echo "SPLIT_MODE:      $SPLIT_MODE (train years $TRAIN_YEARS, val years $VAL_YEARS)"
+TEST_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); p=c.get('preprocessing',{}); print(p.get('test_years', p.get('val_years','?')))")"
+VAL_FRAC="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); p=c.get('preprocessing',{}); print(p.get('val_fraction', c.get('data',{}).get('val_fraction','?')))")"
+echo "SPLIT_MODE:      $SPLIT_MODE (train years $TRAIN_YEARS, test years $TEST_YEARS, val_fraction $VAL_FRAC)"
 
 # --- Step 1 (optional): Install dependencies -----------------------------------
 if [[ "$INSTALL_DEPS" == "1" ]]; then
@@ -241,13 +242,13 @@ fi
 if [[ "$SKIP_EVAL" != "1" ]]; then
   section "Step 5: Evaluation (ACC, F1, AUC)"
 
-  EVAL_ARGS=(--split val)
+  EVAL_ARGS=(--split test --metrics-out "$ROOT/artifacts/metrics/test_results.json")
   if [[ -n "$CONFIG" ]]; then
     EVAL_ARGS+=(--config "$CONFIG")
   fi
   EVAL_ARGS+=(--checkpoint "$CHECKPOINT")
 
-  # Load checkpoint and report sklearn metrics on validation split
+  # Final metrics on temporal holdout (2022+2023); val split is only for training monitoring
   "$PYTHON" -m src.training.evaluate "${EVAL_ARGS[@]}"
 else
   echo ""
@@ -306,7 +307,7 @@ echo "Processed features: $PROCESSED_FILE"
 echo "Checkpoint:         $CHECKPOINT"
 echo "Metrics dir:        $ROOT/artifacts/metrics"
 echo "ONNX bundle:        $ROOT/artifacts/export/mlp_header/"
-echo "Splits:             $ROOT/artifacts/splits/ (train.txt, val.txt)"
+echo "Splits:             $ROOT/artifacts/splits/ (train.txt, val.txt, test.txt)"
 echo "Failed APK log:     $ROOT/artifacts/failed_apks.log (if any failures)"
 if [[ "$BM1_ARCHIVE" == "1" ]]; then
   echo "Run archive:        $ROOT/output_archives/$BM1_RUN_ID"

@@ -57,6 +57,12 @@ public class ScanService extends JobIntentService {
     private PatternBOnnxRunner patternBRunner;
     private DexHeaderFeatureExtractor patternBHeaderExtractor;
     private ManifestBowExtractor patternBBowExtractor;
+    private LinRegDroidOnnxRunner linRegRunner;
+    private LinRegPermissionExtractor linRegExtractor;
+    private MldpPrunedOnnxRunner mldpRunner;
+    private MldpPrunedPermissionExtractor mldpExtractor;
+    private BroadcastMldpHybridOnnxRunner broadcastMldpRunner;
+    private BroadcastMldpHybridExtractor broadcastMldpExtractor;
     private List<String> featureColumns = new ArrayList<>();
     private Map<String, Integer> featureIndex = new HashMap<>();
 
@@ -117,6 +123,24 @@ public class ScanService extends JobIntentService {
         } catch (Exception e) {
             Log.w(TAG, "Pattern B pipeline not loaded", e);
             sendLog("Pattern B skipped: " + e.getMessage(), null);
+        }
+        try {
+            initLinRegPermissionPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "LinRegDroid permission pipeline not loaded", e);
+            sendLog("LinRegDroid permission skipped: " + e.getMessage(), null);
+        }
+        try {
+            initMldpPrunedPermissionPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "MLDP pruned permission pipeline not loaded", e);
+            sendLog("MLDP pruned permission skipped: " + e.getMessage(), null);
+        }
+        try {
+            initBroadcastMldpHybridPipeline();
+        } catch (Exception e) {
+            Log.w(TAG, "Broadcast + MLDP hybrid pipeline not loaded", e);
+            sendLog("Broadcast + MLDP hybrid skipped: " + e.getMessage(), null);
         }
     }
 
@@ -197,6 +221,42 @@ public class ScanService extends JobIntentService {
             long cnnInferStart = SystemClock.elapsedRealtimeNanos();
             float cnnScore = runCnnInference(cnnInput);
             long cnnInferEnd = SystemClock.elapsedRealtimeNanos();
+
+            // Broadcast + MLDP hybrid (manifest-only early gate) — separate stage
+            double broadcastMldpParseMs = 0.0;
+            double broadcastMldpVecMs = 0.0;
+            double broadcastMldpInferMs = 0.0;
+            float broadcastMldpScore = -1f;
+            long broadcastMldpMemDelta = 0L;
+            if (broadcastMldpRunner != null && broadcastMldpExtractor != null) {
+                long broadcastMldpMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    BroadcastMldpHybridExtractor.ExtractionResult extraction =
+                            broadcastMldpExtractor.extract(apk);
+                    broadcastMldpParseMs = extraction.parseMs();
+                    broadcastMldpVecMs = extraction.vectorizeMs();
+                    long broadcastMldpInferStart = SystemClock.elapsedRealtimeNanos();
+                    broadcastMldpScore = broadcastMldpRunner.predict(extraction.vector);
+                    broadcastMldpInferMs =
+                            (SystemClock.elapsedRealtimeNanos() - broadcastMldpInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "Broadcast + MLDP hybrid failed for " + apkName, ex);
+                    sendLog("Broadcast + MLDP hybrid error: " + ex.getMessage(), null);
+                }
+                broadcastMldpMemDelta = Debug.getNativeHeapAllocatedSize() - broadcastMldpMemBefore;
+            }
+
+            if (broadcastMldpScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "Broadcast+MLDP: score=%.4f parse=%.2fms vec=%.2fms infer=%.2fms mem=%d bytes",
+                        broadcastMldpScore,
+                        broadcastMldpParseMs,
+                        broadcastMldpVecMs,
+                        broadcastMldpInferMs,
+                        broadcastMldpMemDelta
+                ), null);
+            }
 
             // BM1 mlp_header (Dex header only) — separate stage; does not affect CNN/XGB ensemble
             double mlpParseMs = 0.0;
@@ -332,14 +392,79 @@ public class ScanService extends JobIntentService {
                 ), null);
             }
 
+            // LinRegDroid (manifest permissions only) — separate stage; does not affect CNN/XGB ensemble
+            double linRegParseMs = 0.0;
+            double linRegVecMs = 0.0;
+            double linRegInferMs = 0.0;
+            float linRegScore = -1f;
+            long linRegMemDelta = 0L;
+            if (linRegRunner != null && linRegExtractor != null) {
+                long linRegMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    LinRegPermissionExtractor.ExtractionResult extraction = linRegExtractor.extract(apk);
+                    linRegParseMs = extraction.extractNanos / 1_000_000.0;
+                    linRegVecMs = extraction.vectorizeNanos / 1_000_000.0;
+                    long linRegInferStart = SystemClock.elapsedRealtimeNanos();
+                    linRegScore = linRegRunner.predict(extraction.vector);
+                    linRegInferMs =
+                            (SystemClock.elapsedRealtimeNanos() - linRegInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "LinRegDroid permission failed for " + apkName, ex);
+                    sendLog("LinRegDroid permission error: " + ex.getMessage(), null);
+                }
+                linRegMemDelta = Debug.getNativeHeapAllocatedSize() - linRegMemBefore;
+            }
+
+            if (linRegScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "LinRegDroid: score=%.4f parse=%.2fms vec=%.2fms infer=%.2fms mem=%d bytes",
+                        linRegScore, linRegParseMs, linRegVecMs, linRegInferMs, linRegMemDelta
+                ), null);
+            }
+
+            // MLDP pruned permissions — separate stage; does not affect CNN/XGB ensemble
+            double mldpParseMs = 0.0;
+            double mldpVecMs = 0.0;
+            double mldpInferMs = 0.0;
+            float mldpScore = -1f;
+            long mldpMemDelta = 0L;
+            if (mldpRunner != null && mldpExtractor != null) {
+                long mldpMemBefore = Debug.getNativeHeapAllocatedSize();
+                try {
+                    MldpPrunedPermissionExtractor.ExtractionResult extraction = mldpExtractor.extract(apk);
+                    mldpParseMs = extraction.extractNanos / 1_000_000.0;
+                    mldpVecMs = extraction.vectorizeNanos / 1_000_000.0;
+                    long mldpInferStart = SystemClock.elapsedRealtimeNanos();
+                    mldpScore = mldpRunner.predict(extraction.vector);
+                    mldpInferMs = (SystemClock.elapsedRealtimeNanos() - mldpInferStart) / 1_000_000.0;
+                } catch (Exception ex) {
+                    Log.w(TAG, "MLDP pruned permission failed for " + apkName, ex);
+                    sendLog("MLDP pruned permission error: " + ex.getMessage(), null);
+                }
+                mldpMemDelta = Debug.getNativeHeapAllocatedSize() - mldpMemBefore;
+            }
+
+            if (mldpScore >= 0f) {
+                sendLog(String.format(
+                        Locale.US,
+                        "MLDP pruned: score=%.4f parse=%.2fms vec=%.2fms infer=%.2fms mem=%d bytes",
+                        mldpScore, mldpParseMs, mldpVecMs, mldpInferMs, mldpMemDelta
+                ), null);
+            }
+
             File metricsFile = writeScanMetrics(
                     trigger,
                     apk,
                     parsingMs, vectorMs, inferenceMs, score,
                     cnnParsingMs, cnnInferenceMs, cnnScore,
+                    broadcastMldpParseMs, broadcastMldpVecMs, broadcastMldpInferMs,
+                    broadcastMldpScore, broadcastMldpMemDelta,
                     mlpParseMs, mlpVecMs, mlpInferMs, mlpScore, mlpMemDelta,
                     patternAParseMs, patternABowMs, patternAInferMs, patternAScore, patternAMemDelta,
                     patternBParseMs, patternBBowMs, patternBInferMs, patternBScore, patternBMemDelta,
+                    linRegParseMs, linRegVecMs, linRegInferMs, linRegScore, linRegMemDelta,
+                    mldpParseMs, mldpVecMs, mldpInferMs, mldpScore, mldpMemDelta,
                     totalMs, cpuMs / 1_000_000.0, memDelta,
                     xgbMemDelta, cnnMemDelta,
                     totalDexFilesFound,
@@ -470,11 +595,7 @@ public class ScanService extends JobIntentService {
     }
 
     private String normalizePermission(String p) {
-        p = p.toLowerCase(Locale.US);
-        if (p.startsWith("android.permission.")) {
-            p = p.substring("android.permission.".length());
-        }
-        return "permissions::" + p.replace('.', '_');
+        return PermissionNormalizer.normalize(p);
     }
 
     private String normalizeIntent(String i) {
@@ -583,6 +704,55 @@ public class ScanService extends JobIntentService {
         patternBBowExtractor = ManifestBowExtractor.fromAssets(this, ManifestBowExtractor.PATTERN_B_VOCAB_ASSET);
         patternBRunner = PatternBOnnxRunner.create(this, ortEnvironment);
         sendLog("Pattern B ONNX loaded", null);
+    }
+
+    private void initLinRegPermissionPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        linRegExtractor = LinRegPermissionExtractor.fromAssets(this);
+        linRegRunner = LinRegDroidOnnxRunner.create(this, ortEnvironment);
+        sendLog(
+                "LinRegDroid "
+                        + ModelRegistry.LINREGDROID_PERMISSION.modelId
+                        + " ONNX loaded (domain="
+                        + ModelRegistry.LINREGDROID_PERMISSION.domain
+                        + ")",
+                null);
+    }
+
+    private void initMldpPrunedPermissionPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        mldpExtractor = MldpPrunedPermissionExtractor.fromAssets(this);
+        mldpRunner = MldpPrunedOnnxRunner.create(this, ortEnvironment);
+        sendLog(
+                "MLDP "
+                        + ModelRegistry.MLDP_PRUNED_PERMISSION.modelId
+                        + " ONNX loaded (domain="
+                        + ModelRegistry.MLDP_PRUNED_PERMISSION.domain
+                        + ", type="
+                        + mldpRunner.getModelType()
+                        + ")",
+                null);
+    }
+
+    private void initBroadcastMldpHybridPipeline() throws Exception {
+        if (ortEnvironment == null) {
+            ortEnvironment = OrtEnvironment.getEnvironment();
+        }
+        broadcastMldpExtractor = BroadcastMldpHybridExtractor.fromAssets(this);
+        broadcastMldpRunner = BroadcastMldpHybridOnnxRunner.create(this, ortEnvironment);
+        sendLog(
+                "Broadcast+MLDP "
+                        + ModelRegistry.BROADCAST_MLDP_HYBRID.modelId
+                        + " ONNX loaded (domain="
+                        + ModelRegistry.BROADCAST_MLDP_HYBRID.domain
+                        + ", type="
+                        + broadcastMldpRunner.getModelType()
+                        + ")",
+                null);
     }
 
     private float runInference(float[] inputVector) {
@@ -697,11 +867,16 @@ public class ScanService extends JobIntentService {
             File apk,
             double xgbParseMs, double xgbVecMs, double xgbInferMs, float xgbScore,
             double cnnParseMs, double cnnInferMs, float cnnScore,
+            double broadcastMldpParseMs, double broadcastMldpVecMs, double broadcastMldpInferMs,
+            float broadcastMldpScore, long broadcastMldpMemDelta,
             double mlpParseMs, double mlpVecMs, double mlpInferMs, float mlpScore, long mlpMemDelta,
             double patternAParseMs, double patternABowMs, double patternAInferMs, float patternAScore,
             long patternAMemDelta,
             double patternBParseMs, double patternBBowMs, double patternBInferMs, float patternBScore,
             long patternBMemDelta,
+            double linRegParseMs, double linRegVecMs, double linRegInferMs, float linRegScore,
+            long linRegMemDelta,
+            double mldpParseMs, double mldpVecMs, double mldpInferMs, float mldpScore, long mldpMemDelta,
             double wallMs, double cpuMs, long memDeltaBytes,
             long xgbMemDelta,
             long cnnMemDelta,
@@ -726,6 +901,16 @@ public class ScanService extends JobIntentService {
                     "manifest_xgb", xgbParseMs, xgbVecMs, xgbInferMs, xgbScore, xgbMemDelta));
             scan.stages.add(new MetricsWriter.StageMetrics(
                     "bytecnn", cnnParseMs, 0.0, cnnInferMs, cnnScore, cnnMemDelta));
+            if (broadcastMldpScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        ModelRegistry.BROADCAST_MLDP_HYBRID.domain,
+                        ModelRegistry.BROADCAST_MLDP_HYBRID.modelId,
+                        broadcastMldpParseMs,
+                        broadcastMldpVecMs,
+                        broadcastMldpInferMs,
+                        broadcastMldpScore,
+                        broadcastMldpMemDelta));
+            }
             if (mlpScore >= 0f) {
                 scan.stages.add(new MetricsWriter.StageMetrics(
                         MlpHeaderOnnxRunner.DOMAIN,
@@ -740,6 +925,16 @@ public class ScanService extends JobIntentService {
                 scan.stages.add(new MetricsWriter.StageMetrics(
                         PatternBOnnxRunner.DOMAIN,
                         patternBParseMs, patternBBowMs, patternBInferMs, patternBScore, patternBMemDelta));
+            }
+            if (linRegScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        ModelRegistry.LINREGDROID_PERMISSION.domain,
+                        linRegParseMs, linRegVecMs, linRegInferMs, linRegScore, linRegMemDelta));
+            }
+            if (mldpScore >= 0f) {
+                scan.stages.add(new MetricsWriter.StageMetrics(
+                        ModelRegistry.MLDP_PRUNED_PERMISSION.domain,
+                        mldpParseMs, mldpVecMs, mldpInferMs, mldpScore, mldpMemDelta));
             }
 
             if (ensemble >= 0f) {
@@ -817,6 +1012,15 @@ public class ScanService extends JobIntentService {
         }
         if (patternBRunner != null) {
             try { patternBRunner.close(); } catch (Exception ignored) {}
+        }
+        if (linRegRunner != null) {
+            try { linRegRunner.close(); } catch (Exception ignored) {}
+        }
+        if (mldpRunner != null) {
+            try { mldpRunner.close(); } catch (Exception ignored) {}
+        }
+        if (broadcastMldpRunner != null) {
+            try { broadcastMldpRunner.close(); } catch (Exception ignored) {}
         }
         if (ortEnvironment != null) {
             try { ortEnvironment.close(); } catch (Exception ignored) {}

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLDP + Dex Header Cascade — Architecture (Opus, paper-verified)</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    .fix { background: #2e2418; border: 1px solid #9e6a03; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .fix strong { color: #f0b429; }
+    .verified { background: #16221a; border: 1px solid #2ea043; padding: 0.5rem 0.9rem; border-radius: 6px; margin-top: 0.6rem; font-size: 0.9rem; }
+    .verified strong { color: #56d364; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+    code { background: #21262d; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+    .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 4px; vertical-align: middle; margin-left: 0.4rem; }
+    .tag.changed { background: #9e6a03; color: #fff; }
+    .tag.kept { background: #238636; color: #fff; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="../rough_model_explanations/index.html">← All models</a> · <span class="meta">MLDP verified vs source PDF #7; Dex header verified vs deployed MLP(H) implementation (MSFDroid PDF not in workspace)</span></nav>
+<h1>MLDP Permissions + Dex Header Cascade <span style="font-size:1rem;color:var(--muted)">(Opus — verified rough plan)</span></h1>
+<p class="meta">Cross-paper hybrid:
+  <strong>#7</strong> Ghasempour, Mohd Sani &amp; Abari, “Permission Extraction Framework for Android Malware Detection”, <em>IJACSA</em> 11(11), 2020 (MLDP permission pruning — <strong>PDF present, fully verified</strong>)
+  +
+  <strong>MSFDroid</strong> (Dex header structural bytes + MLP(H)) — <strong>PDF absent from workspace</strong>, so the Dex-header block is verified against the operative deployed implementation in <code>Dex_header_paper_implementation/only_base1_model/</code> and <code>vigidroid/.../models/mlp_header/</code>.
+</p>
+
+<section class="prereq">
+<h2>0. What changed vs the original rough plan (executive summary)</h2>
+<p>The original <code>rough_model_explanations/mldp_dex_header_cascade.html</code> is <strong>directionally correct</strong> — combining the two cheapest static domains (MLDP-pruned permissions + Dex-header bytes) as either a fused tiny MLP (Mode A) or a two-stage cascade (Mode B) is sound and matches both the MLDP paper and the deployed MLP(H). After reading paper #7 end-to-end and the deployed Dex-header code, the items below needed correction or sharpening. Each is justified inline in its section.</p>
+<table>
+<tr><th>#</th><th>Item</th><th>Original plan said</th><th>Corrected (paper / code grounded)</th></tr>
+<tr><td>M1</td><td>MLDP set size \(|\mathcal S|\)</td><td>“~20–40”, flowchart “≈30”</td><td><strong>~16–25, typically ≈22</strong> (paper #7 Table I = 22 via Variant 1; Table VI = 16 dangerous, experiments “20 selected” via Variant 2)</td></tr>
+<tr><td>M2</td><td>Which MLDP algorithm</td><td>“PRNR → support → association rules” called <em>the</em> MLDP</td><td>Paper #7 contains <strong>two</strong> pipelines. PRNR→SPR→PMAR is the <em>SigPID / Li [10]</em> chain quoted in §II-D (→22). #7’s <em>own</em> §IV framework is skew-correct → TF-IDF → PCA → Kaiser+Cumulative → intersect Li &amp; Google lists (→16/20). Pick one explicitly — recommend Variant 1.</td></tr>
+<tr><td>M3</td><td>PRNR formula &amp; semantics</td><td>not given in cascade plan; sibling plan implied a ratio \(\tfrac{M_j/N_m}{B_j/N_b}\)</td><td>Paper #7 eq. 2: \(R(P_j)=\tfrac{S_M(P_j)-S_B(P_j)}{S_M(P_j)+S_B(P_j)}\in[-1,1]\), <strong>after skew correction (eq. 1/3)</strong>; keep <em>both</em> extremes, drop only \(R\approx0\).</td></tr>
+<tr><td>M4</td><td>Dex-header normalization (order &amp; range)</td><td>“bytes/255, min–max normalized, sum-pooled”; \(\mathbf H=\sum_d \mathbf h^{(d)}\in[0,1]^{104}\)</td><td><strong>Three ordered stages</strong>: (1) per-byte \(/255\) on each dex, (2) <em>sum-pool</em> across <code>classes*.dex</code> → range \([0,D_{\mathrm{dex}}]\), (3) <strong>corpus min–max</strong> from train stats → \([0,1]\). The summed vector is <strong>not</strong> in \([0,1]\); min–max comes last and uses saved train mins/maxs.</td></tr>
+<tr><td>M5</td><td>Fused dimension \(d\)</td><td>“~150” = \(30+104+\text{bias}\)</td><td><strong>\(d=|\mathcal S|+104\approx 126\)</strong> (with \(|\mathcal S|\approx22\)); bias terms are <em>not</em> input dimensions. “~150” over-counts; realistic range \(120\text{–}134\).</td></tr>
+<tr><td>M6</td><td>Classifier architecture</td><td>fused MLP “\(150\to64\to1\)”; MLP(H) generic</td><td>The deployed <strong>MLP(H) is \(104\to128\to128\to1\)</strong> (Linear+BatchNorm+ReLU ×2, sigmoid head). Mode B Stage 2 should <em>reuse that exact shipped model</em>. Mode A fused head = \(d\to64\to1\) (tiny) or \(d\to128\to1\).</td></tr>
+<tr><td>M7</td><td>Classifier baselines</td><td>MLP/logistic only</td><td>Paper #7 classifies with <strong>SVM + Decision Tree</strong> (80/20 split). Add those as offline reproducibility baselines for the MLDP block; MLP(H) is itself the header baseline.</td></tr>
+<tr><td>M8</td><td>Multidex aggregation</td><td>“element-wise sum-pool” stated as the method</td><td>Correct &amp; matches the deployed default (<code>multidex.mode: sum</code>). Note: the MSFDroid paper itself used <em>primary <code>classes.dex</code> only</em>; keep <code>primary_only</code> as an ablation.</td></tr>
+<tr><td>M9</td><td>Parity assets</td><td>not mentioned</td><td>Both Python and Java must load the <strong>same</strong> <code>normalization_header.json</code> (dex min/max) and <code>mldp_permission_vocab.json</code>. Ship both in the export bundle (parity prerequisite).</td></tr>
+<tr><td>M10</td><td>“header read is O(1) in file size”</td><td>literal claim</td><td>Soften: you still unzip + locate every <code>classes*.dex</code>; only the <strong>112-byte header</strong> per dex is parsed (no bytecode/string scan). Cheap, but not literally O(1) in APK size.</td></tr>
+<tr><td>M11</td><td>“~70% of APKs exit after Step 1”</td><td>stated as expectation</td><td>Frame as a <strong>hypothesis to calibrate</strong> \(t_{\mathrm{low}},t_{\mathrm{high}}\) on a train-holdout val set — not a result. Report the actual exit rate in P6.</td></tr>
+<tr><td>M12</td><td>Class imbalance</td><td>not mentioned</td><td>Both source contexts handle it (#7 skew correction; deployed BM1 uses <code>pos_weight</code>). Add <code>pos_weight</code>/balanced training.</td></tr>
+</table>
+<p class="verified"><strong>Verified unchanged:</strong> the two-cheap-domain idea; binary MLDP permission encoding; Dex-header = bytes 8–111 (104-d) with magic check; sum-pool default for multidex; early-exit cascade structure; tiny ONNX-friendly head; “filter before expensive byte/BoW models”.</p>
+</section>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>MLDP-pruned permissions:</strong> instead of the ~135-permission Android space, an offline procedure keeps only ~16–25 highly discriminative permissions (paper #7 publishes the list — e.g. <code>SEND_SMS</code>, <code>READ_SMS</code>, <code>RECEIVE_BOOT_COMPLETED</code>, <code>INSTALL_PACKAGES</code>, <code>READ_CONTACTS</code>, <code>CAMERA</code>, <code>DISABLE_KEYGUARD</code>). Manifest-only — no Dex needed. See <code>../rough_model_explanations/mldp_pruned_permission_classifier.html</code>.</p>
+<p><strong>Dex header \(\mathbf H\) (104-d):</strong> every <code>classes*.dex</code> file starts with a fixed 112-byte header. Bytes 0–7 are the magic (<code>dex\n035\0</code>); bytes 8–111 hold the checksum, SHA-1 signature, and a series of <code>uint32</code> section sizes/offsets (<code>file_size</code>, <code>map_off</code>, <code>string_ids_size</code>, …). Reading just these 104 bytes captures the structural “shape” of the code without scanning any bytecode. This is exactly the deployed <strong>MLP(H)</strong> input.</p>
+<p><strong>Cascade / multistep detection:</strong> run the cheapest model first; <strong>early-exit</strong> if the score \(s &lt; t_{\mathrm{low}}\) (confidently benign) or \(s &gt; t_{\mathrm{high}}\) (confidently malware); otherwise escalate to a more expensive model (thesis Task 2).</p>
+<p><strong>Fused single-pass variant:</strong> alternatively concatenate \(\mathbf x^{(S)}\) and \(\mathbf H\) into one vector and run a single tiny MLP — simpler to deploy as one ONNX graph than tuning two cascade thresholds.</p>
+<p><strong>Two-stage normalization (Dex):</strong> “min–max” here means scaling each feature \(x\to(x-\min)/(\max-\min)\) using <em>fixed mins/maxs computed once on the training corpus</em> — never recomputed on a single phone APK (that would break parity).</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — MLDP permission sub-vector \(\mathbf x^{(S)}\)</li>
+<li>Component B — Dex header vector \(\mathbf H\) (104-d)</li>
+<li>Component C — Fused tiny MLP (Mode A)</li>
+<li>Component D — Two-stage cascade (Mode B)</li>
+<li>Expected results (paper / code grounded)</li>
+<li>Full end-to-end pipeline</li>
+<li>Faithfulness ledger</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p><strong>Problem:</strong> running ByteCNN, ASCNN(C), and XGBoost on every APK wastes battery. <strong>Solution:</strong> combine the two <em>cheapest</em> static domains in the thesis — (1) <strong>MLDP-pruned permissions</strong> \(\mathbf x^{(S)}\in\{0,1\}^{|\mathcal S|}\), \(|\mathcal S|\approx22\) (paper #7), and (2) the <strong>Dex header</strong> \(\mathbf H\in[0,1]^{104}\) (deployed MLP(H)). Deploy as <strong>Mode A</strong> (fused vector \(\mathbf x\in\mathbb R^{d},\ d\approx126\) → one tiny MLP) or <strong>Mode B</strong> (cascade: MLDP logistic → reuse MLP(H) → expensive stack). Goal: cheaply gate a large fraction of APKs in one early pass before manifest BoW or raw-byte models.</p>
+<div class="fix"><strong>Correction M5:</strong> with \(|\mathcal S|\approx22\) and the header \(=104\), the fused width is \(d=|\mathcal S|+104\approx126\) (range 120–134), not “~150”. Bias terms do not count toward input width.</div>
+<p><strong>Why these two domains are complementary:</strong> permissions are <em>declared</em> capability/intent (what the app says it can do); the Dex header is <em>structural</em> evidence (how the compiled code is laid out — oversized string pools, odd offsets). A trojan with a near-empty manifest can still have an anomalous header, and vice-versa. Orthogonal, both cheap.</p>
+</section>
+
+<section>
+<h2>2. Component A — MLDP permission sub-vector \(\mathbf x^{(S)}\) <span class="tag changed">corrected</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Only the permissions in the frozen MLDP set \(\mathcal S\), derived offline from the <strong>train split only</strong>.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>The full ~135-permission space is redundant and noisy. Paper #7 shows a small curated set keeps F-measure ≈94–97% even as the corpus grows to 60k apps, where unpruned permission models degrade (their Table II/VIII–X). It is the compact “what can this app do?” signal, and it requires only a manifest parse.</p>
+
+<div class="fix"><strong>Correction M2 — which algorithm?</strong> Paper #7 actually describes <em>two</em> pruning pipelines and the original rough plan blended them:
+<ul>
+<li><strong>Variant 1 (SigPID / MLDP, §II-D, attributed to Li [10]):</strong> three layers — (i) <em>PRNR</em> Permission Ranking with Negative Rate, (ii) <em>SPR</em> Support-based Permission Ranking, (iii) <em>PMAR</em> Permission Mining with Association Rules. Reductions stated in the paper: <strong>135 → 95 (PRNR) → 25 (SPR) → 22 (PMAR)</strong>. The 22 permissions are in Table I.</li>
+<li><strong>Variant 2 (#7’s own “Proposed Framework”, §IV):</strong> data-skew correction → <em>TF-IDF</em> permission ranking → <em>PCA</em> → <em>Kaiser + Cumulative</em> factor analysis → intersect with Li’s list &amp; Google’s dangerous list. Result: <strong>16 dangerous permissions</strong> (Table VI); experiments report “20 selected permissions” (Tables VIII–IX).</li>
+</ul>
+<strong>Recommendation:</strong> implement <em>Variant 1 (PRNR→SPR→PMAR)</em> — deterministic, cheap, reproducible on our own train split — and keep #7’s published 16/22-permission list as a fixed fallback / sanity baseline. Variant 2’s PCA + factor-analysis is harder to reproduce exactly and is unnecessary for a binary presence vector.</div>
+
+<h3 class="sub">Step-by-step (Variant 1, recommended)</h3>
+<ol class="steps">
+<li>Offline on <code>split=train</code> APKs build matrices \(M\) (malware) and \(B\) (benign), entries \(M_{ij},B_{ij}\in\{0,1\}\) = permission \(j\) declared by app \(i\).</li>
+<li><strong>Data-skew correction (eq. 1/3):</strong> scale the support of the larger class down so \(|M|\) and \(|B|\) are comparable before ranking.</li>
+<li><strong>PRNR (eq. 2):</strong> compute \(R(P_j)\in[-1,1]\) (below); drop permissions with \(R(P_j)\approx0\) (used equally by both classes). 135 → ~95.</li>
+<li><strong>SPR:</strong> rank survivors by overall support; keep the most-supported. ~95 → ~25.</li>
+<li><strong>PMAR (Apriori, confidence ≥ 96.5%, min-support 10%):</strong> collapse permissions that imply each other (e.g. <code>WRITE_SMS ⇒ READ_SMS</code>); paper removed 3. ~25 → <strong>~22</strong>. Freeze as \(\mathcal S\).</li>
+<li>At inference: parse manifest; set \(x^{(S)}_j=1\) iff permission \(j\in\mathcal S\) is declared.</li>
+</ol>
+
+<h3 class="sub">Mathematical formulation <span class="tag changed">M3 — exact PRNR added</span></h3>
+<p>Per-class support of permission \(P_j\) (fraction of class apps declaring it), <em>after</em> skew correction so \(|M|\) and \(|B|\) are comparable:</p>
+<p>\[ S_M(P_j)=\frac{1}{|M|}\sum_i M_{ij}, \qquad S_B(P_j)=\frac{1}{|B|}\sum_i B_{ij} \]</p>
+<p>Permission Ranking with Negative Rate (paper #7 eq. 2), range \([-1,1]\):</p>
+<p>\[ R(P_j)=\frac{S_M(P_j)-S_B(P_j)}{S_M(P_j)+S_B(P_j)} \]</p>
+<p>\(R\to+1\): malware-indicative (dangerous); \(R\to-1\): benign-indicative; \(R\approx0\): non-discriminative → dropped. <em>(Correction M3: the cascade plan gave no PRNR formula and the sibling MLDP plan implied a one-sided ratio \(\tfrac{M_j/N_m}{B_j/N_b}\). The paper’s actual score is the symmetric difference-over-sum above, and <strong>both</strong> extremes are kept because a strongly-benign permission separates classes just as well — only \(R\approx0\) is pruned.)</em></p>
+<p>Final inference encoding:</p>
+<p>\[ x^{(S)}_j = \begin{cases} 1 & \text{if } \mathrm{perm}_j \in \mathcal S \text{ and declared} \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf x^{(S)} \in \{0,1\}^{|\mathcal S|},\ \ |\mathcal S|\approx 22 \]</p>
+<ul class="vars"><li><strong>\(\mathcal S\)</strong> — MLDP-frozen permission subset (train-only)</li><li><strong>\(\mathbf x^{(S)}\)</strong> — pruned permission feature block</li></ul>
+
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">OFFLINE (train split only)
+  M,B matrices → skew-correct → PRNR(135→95) → SPR(95→25) → PMAR(25→22) → freeze S
+INFERENCE
+  Manifest → x^(S)  (1×|S|)   e.g. 1×22</pre>
+<div class="novelty"><strong>Key novelty:</strong> ~22 curated, train-frozen dimensions vs the 2500-d deployed XGBoost permission/feature space — an ideal cheap cascade front-end.</div>
+</section>
+
+<section>
+<h2>3. Component B — Dex header vector \(\mathbf H\) (104-d) <span class="tag changed">corrected</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Bytes 8–111 of every <code>classes*.dex</code> header — checksum, SHA-1 signature, and the <code>uint32</code> section sizes/offsets (<code>file_size</code>, <code>header_size</code>, <code>map_off</code>, <code>string_ids_size</code>, …). Structural metadata only; no bytecode is read.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>Malware often has an abnormal Dex layout (oversized string pools, odd offsets, packed/multidex artifacts) even when the manifest looks minimal. The header is a fixed 112-byte prefix, so parsing it is very cheap.</p>
+
+<div class="fix"><strong>Correction M10 — cost claim.</strong> The original said the header read is “O(1) in file size — no string scan.” More precisely: you still <em>unzip</em> the APK and <em>locate</em> each <code>classes*.dex</code> entry, but only the first <strong>112 bytes per dex</strong> are parsed (no bytecode/string-pool scan). So the parse cost is tiny and roughly constant per dex, but not literally O(1) in total APK size.</div>
+
+<div class="fix"><strong>Correction M4 — normalization is three ordered stages, not one.</strong> The rough plan said “bytes/255, min–max normalized, sum-pooled” and wrote \(\mathbf H=\sum_d \mathbf h^{(d)}\in[0,1]^{104}\). The deployed implementation (and therefore the parity-correct definition) is:
+<ol class="steps">
+<li><strong>Per-byte scale:</strong> for each dex, \(h^{(d)}_b=\mathrm{byte}_b/255\in[0,1]\), \(b=8\ldots111\).</li>
+<li><strong>Multidex sum-pool:</strong> \(\mathbf H_{\text{raw}}=\sum_{d=1}^{D_{\mathrm{dex}}}\mathbf h^{(d)}\). This sum lies in \([0,D_{\mathrm{dex}}]\) per dimension — <strong>not</strong> in \([0,1]\).</li>
+<li><strong>Corpus min–max:</strong> \(\mathbf H=(\mathbf H_{\text{raw}}-\boldsymbol{\min})/(\boldsymbol{\max}-\boldsymbol{\min})\), where \(\boldsymbol{\min},\boldsymbol{\max}\) are <em>fixed train-corpus statistics</em> shipped in <code>normalization_header.json</code>; constant dims map to 0.</li>
+</ol>
+So the model input is the <em>min–max-of-the-sum</em>, in that order. The maxs are <strong>not</strong> capped at 1.0 (sum-pooling pushes them to ~tens).</div>
+
+<h3 class="sub">Step-by-step</h3>
+<ol class="steps">
+<li>Unzip APK; enumerate all <code>classes*.dex</code> (regex <code>^classes(\d*)\.dex$</code>, primary first then numeric suffix).</li>
+<li>Verify the 8-byte magic <code>dex\n035\0</code> (reject otherwise → <code>failed_apks.log</code>).</li>
+<li>For each dex: \(h^{(d)}_b=\mathrm{byte}_b/255\) for \(b=8\ldots111\) (104 values).</li>
+<li>Sum-pool element-wise across all dex → \(\mathbf H_{\text{raw}}\in[0,D_{\mathrm{dex}}]^{104}\) (default <code>multidex.mode = sum</code>).</li>
+<li>Apply saved train-corpus min–max → \(\mathbf H\in[0,1]^{104}\).</li>
+</ol>
+
+<h3 class="sub">Mathematical formulation</h3>
+<p>\[ h^{(d)}_b=\frac{\mathrm{byte}^{(d)}_b}{255},\qquad \mathbf H_{\text{raw}}=\sum_{d=1}^{D_{\mathrm{dex}}}\mathbf h^{(d)}\in[0,D_{\mathrm{dex}}]^{104} \]</p>
+<p>\[ \mathbf H=\frac{\mathbf H_{\text{raw}}-\boldsymbol{\min}_{\text{train}}}{\boldsymbol{\max}_{\text{train}}-\boldsymbol{\min}_{\text{train}}}\in[0,1]^{104} \]</p>
+<ul class="vars"><li><strong>\(D_{\mathrm{dex}}\)</strong> — number of dex files in the APK</li><li><strong>\(\boldsymbol{\min}_{\text{train}},\boldsymbol{\max}_{\text{train}}\)</strong> — per-dimension train statistics (shipped, frozen)</li><li><strong>\(\mathbf H\)</strong> — final 104-d header feature vector</li></ul>
+
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">APK
+  ├─ classes.dex  → bytes[8:112]/255 ─┐
+  ├─ classes2.dex → bytes[8:112]/255 ─┼─► sum-pool → H_raw (1×104, range [0,D])
+  └─ classes3.dex → bytes[8:112]/255 ─┘            │
+                                                    ▼
+                                  corpus min–max (train stats) → H (1×104, [0,1])</pre>
+<div class="fix"><strong>Correction M8 — multidex.</strong> Sum-pool is correct and matches the deployed default. The MSFDroid paper itself used the <em>primary</em> <code>classes.dex</code> only; keep <code>primary_only</code> as a documented ablation (<code>multidex_mode</code> recorded in the export manifest for parity).</div>
+<div class="novelty"><strong>Why pair with MLDP:</strong> permissions = declared risk; header = structural risk — orthogonal cheap signals, both extractable in well under a manifest-BoW or byte-CNN budget.</div>
+</section>
+
+<section>
+<h2>4. Component C — Fused tiny MLP (Mode A) <span class="tag changed">dims &amp; head corrected</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>A single forward pass on the concatenated MLDP + header vector — one ONNX graph, one score.</p>
+<h3 class="sub">Why this mode</h3>
+<p>When the latency budget allows one network call but you do not want to maintain two-stage threshold logic, fusion is simpler to deploy: one input tensor, one output, no branch.</p>
+<h3 class="sub">Step-by-step</h3>
+<ol class="steps">
+<li>Build \(\mathbf x^{(S)}\in\{0,1\}^{|\mathcal S|}\) (manifest) and \(\mathbf H\in[0,1]^{104}\) (dex, 3-stage normalized).</li>
+<li>Concatenate \(\mathbf x=[\mathbf x^{(S)}\,\|\,\mathbf H]\in\mathbb R^{d}\), \(d=|\mathcal S|+104\approx126\).</li>
+<li>MLP layer 1: \(\mathbf h=\mathrm{ReLU}(\mathbf W_1\mathbf x+\mathbf b_1)\), hidden dim 64 (BatchNorm optional).</li>
+<li>Output: \(\hat y=\sigma(\mathbf w_2^\top\mathbf h+b_2)\).</li>
+<li>Calibrate \(t_{\mathrm{low}},t_{\mathrm{high}}\) on the val holdout for early-exit; export ONNX (opset 14), target &lt; 30 KB.</li>
+</ol>
+<h3 class="sub">Mathematical formulation <span class="tag changed">M5, M6</span></h3>
+<p>\[ \mathbf x=[\mathbf x^{(S)}\,\|\,\mathbf H]\in\mathbb R^{d},\quad d=|\mathcal S|+104\approx126,\qquad \hat y=\sigma\!\big(\mathbf W_2\,\mathrm{ReLU}(\mathbf W_1\mathbf x+\mathbf b_1)+b_2\big) \]</p>
+<p>Trained with class-imbalance-weighted BCE (Correction M12):</p>
+<p>\[ \mathcal L=-\big[\,w_+\,y\log\hat y+(1-y)\log(1-\hat y)\,\big],\qquad w_+=\frac{N_{\text{neg}}}{N_{\text{pos}}} \]</p>
+<ul class="vars"><li><strong>\(d\approx126\)</strong> — fused dimension \(=|\mathcal S|+104\) (M5; not 150)</li><li><strong>\(\hat y\)</strong> — malware probability from a single pass</li></ul>
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">x^(S) (1×|S|)  e.g. 1×22 ──┐
+                            ├──► x (1×d)  d≈126 ──► MLP(d→64→1) ──► ŷ ∈ [0,1]
+H (1×104) ─────────────────┘</pre>
+<div class="novelty"><strong>Key advantage:</strong> one ONNX graph, one manifest + header read — the simplest possible integration for a Step-1 filter.</div>
+</section>
+
+<section>
+<h2>5. Component D — Two-stage cascade (Mode B) <span class="tag changed">reuse deployed MLP(H)</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Stage 1: logistic/linear on MLDP permissions only (fastest, manifest-only). Stage 2: the <strong>already-deployed MLP(H)</strong> on \(\mathbf H\), invoked only when Stage 1 is uncertain.</p>
+<div class="fix"><strong>Correction M6 — reuse, don’t reinvent.</strong> The deployed <code>mlp_header</code> model is exactly \(104\to128\to128\to1\) (Linear+BatchNorm+ReLU twice, sigmoid head). Mode B Stage 2 should <em>load that shipped ONNX</em> rather than training a new header net — so Mode B’s only new artifact is the Stage-1 MLDP logistic head.</div>
+<h3 class="sub">Why this mode</h3>
+<p>It separates manifest-only cost from dex-header cost: for confident Stage-1 decisions you can skip the unzip-and-read-dex step entirely (an optional latency optimization).</p>
+<h3 class="sub">Step-by-step</h3>
+<ol class="steps">
+<li>Stage 1: \(s_1=\sigma(\mathbf w_1^\top\mathbf x^{(S)}+b_1)\) (offline twin: SVM/DT per #7).</li>
+<li>If \(s_1&lt;t_{\mathrm{low}}\) → label benign, STOP.</li>
+<li>If \(s_1&gt;t_{\mathrm{high}}\) → label malware, STOP.</li>
+<li>Else Stage 2: \(s_2=\mathrm{MLP_H}(\mathbf H)\) (deployed \(104\to128\to128\to1\), sigmoid already inside).</li>
+<li>If still uncertain → escalate to ByteCNN / ASCNN / XGBoost, etc.</li>
+</ol>
+<h3 class="sub">Mathematical formulation</h3>
+<p>Stage 1: \[ s_1=\sigma(\mathbf w_1^\top\mathbf x^{(S)}+b_1) \]</p>
+<p>Stage 2 (reused model, sigmoid in-graph): \[ s_2=\mathrm{MLP_H}(\mathbf H)\in[0,1] \]</p>
+<ul class="vars"><li><strong>\(t_{\mathrm{low}},t_{\mathrm{high}}\)</strong> — cascade thresholds tuned on the train-holdout val set</li><li><strong>STOP</strong> — early exit that saves average latency</li></ul>
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">APK → Manifest → x^(S) → s1
+                          │
+                          ├─ s1 &lt; t_low  ──► BENIGN  (done, no dex read)
+                          ├─ s1 &gt; t_high ──► MALWARE (done, no dex read)
+                          └─ else → read dex → H → MLP(H) → s2
+                                  │
+                                  ├─ confident → done
+                                  └─ else → expensive models …</pre>
+<div class="fix"><strong>Correction M11 — exit rate.</strong> The “~70% exit after Step 1” figure is a <em>hypothesis</em>, not a measured result. Calibrate \(t_{\mathrm{low}},t_{\mathrm{high}}\) on the val holdout to hit a target false-omission rate, then <em>report the realized exit rate</em> in P6.</div>
+<div class="novelty"><strong>Why different from Mode A:</strong> interpretable staging (permission risk first, structural confirm second) and it reuses an existing shipped model — but it needs two thresholds and branch logic on-device.</div>
+</section>
+
+<section>
+<h2>6. Expected results (paper / code grounded) <span class="tag changed">honest framing</span></h2>
+<table>
+<tr><th>Model variant</th><th>Approx. dims</th><th>Manifest</th><th>Dex header</th><th>Evidence / role</th></tr>
+<tr><td>MLP(H) only (deployed)</td><td>104</td><td>No</td><td>Yes</td><td>Deployed base; structural signal, misses declared intent</td></tr>
+<tr><td>MLDP only</td><td>~16–25</td><td>Yes</td><td>No</td><td>#7: F ≈ 94–97% on their corpus; fastest semantic; misses structural anomalies</td></tr>
+<tr><td>LinRegDroid (full perms)</td><td>~135</td><td>Yes (full)</td><td>No</td><td>Noisy baseline</td></tr>
+<tr><td class="best"><strong>MLDP + H (this model)</strong></td><td class="best">~126 (Mode A) / staged (Mode B)</td><td class="best">Yes</td><td class="best">Yes</td><td class="best"><strong>Step-1 cascade / cheap filter</strong>: declared + structural risk in one cheap pass</td></tr>
+</table>
+<p><strong>Why combine:</strong> MLDP catches permission-heavy trojans; the header catches structurally anomalous dex with no permission signal. Together they approximate a large fraction of the cheap MSFDroid signal at a small fraction of a BoW model’s dimension.</p>
+<p><strong>Expected accuracy — be honest (related to M11):</strong> alone, each block is moderate; the purpose of this model is <em>latency and early-exit rate</em>, not peak F1. On the temporal 2022–2023 test split expect realistic, not headline, numbers — and sell the model on its tiny size and exit rate, pairing it with high-F1 models downstream. Report the realized Step-1 exit rate and the F1 at that operating point.</p>
+</section>
+
+<section>
+<h2>7. Full end-to-end pipeline summary</h2>
+<pre class="flow">OFFLINE (train split = 2020–2021)
+├─► MLDP (Variant 1): skew-correct → PRNR(135→95) → SPR(95→25) → PMAR(25→22) → freeze S   (|S|≈22)
+└─► Dex header: fit train-corpus min/max on sum-pooled /255 vectors → save normalization_header.json
+
+Mode A (single-pass fusion):
+  APK → Manifest → x^(S) (1×|S|)
+      → classes*.dex → /255 → sum-pool → min–max → H (1×104)
+      → x = [x^(S) ‖ H] (1×d, d≈126) → MLP(d→64→1) → ŷ → exit or escalate
+
+Mode B (cascade):
+  APK → x^(S) → s1 ─┬─ confident → DONE  (no dex read)
+                    └─ uncertain → H → MLP(H) 104→128→128→1 → s2 ─┬─ confident → DONE
+                                                                  └─ uncertain → ByteCNN / ASCNN / XGBoost …</pre>
+</section>
+
+<section class="prereq">
+<h2>8. Faithfulness ledger (paper-exact vs thesis-modified)</h2>
+<table>
+<tr><th>Aspect</th><th>Source</th><th>Status</th></tr>
+<tr><td>Binary presence permission vector</td><td>#7 §IV-B</td><td class="best">Exact</td></tr>
+<tr><td>MLDP pruning to ~16–22 perms (PRNR→SPR→PMAR)</td><td>#7 §II-D, Table I</td><td class="best">Exact (Variant 1 recommended)</td></tr>
+<tr><td>PRNR score \(R(P_j)=\tfrac{S_M-S_B}{S_M+S_B}\) + skew correction</td><td>#7 eq. 1/2/3</td><td class="best">Exact</td></tr>
+<tr><td>SVM + Decision Tree classifier</td><td>#7 §V</td><td>Kept as offline baseline</td></tr>
+<tr><td>Dex header = bytes 8–111 (104-d)</td><td>MSFDroid (via deployed MLP(H))</td><td class="best">Exact vs deployed code</td></tr>
+<tr><td>Per-byte /255 → sum-pool → corpus min–max</td><td>deployed <code>only_base1_model</code></td><td class="best">Exact vs deployed code (M4)</td></tr>
+<tr><td>MLP(H) 104→128→128→1 (BN+ReLU+sigmoid)</td><td>deployed <code>mlp_header.py</code></td><td class="best">Exact vs deployed code (M6)</td></tr>
+<tr><td>Multidex sum-pool (vs paper primary-only)</td><td>deployed default</td><td>Thesis modification (ablation kept)</td></tr>
+<tr><td>Fused tiny MLP / cascade thresholds + ONNX</td><td>—</td><td>Thesis modification (deployability, Task 2)</td></tr>
+<tr><td>Class-imbalance <code>pos_weight</code></td><td>#7 skew correction / deployed BM1</td><td>Adapted</td></tr>
+<tr><td>Temporal year split 2020–21 / 2022–23</td><td>Pipeline_full_concept.html</td><td>Thesis protocol (#7 used random 80/20)</td></tr>
+<tr><td>MSFDroid PDF cross-check</td><td>—</td><td><strong>Unavailable</strong>; grounded on deployed implementation instead</td></tr>
+</table>
+</section>
+
+</body>
+</html>

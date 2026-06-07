@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -29,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
 
     selected = run_mldp_selection(cfg, train_transactions=transactions, train_labels=labels)
     print(f"Selected |S|={len(selected)} permissions → {cfg.paths.selected_permissions}")
+
+    validation_path = cfg.paths.mldp_dir / "selection_validation.json"
+    if validation_path.is_file():
+        validation = json.loads(validation_path.read_text(encoding="utf-8"))
+        if not validation.get("passed", True):
+            print("  WARNING: MLDP selection validation did not pass — review selection_validation.json")
     return 0
 
 

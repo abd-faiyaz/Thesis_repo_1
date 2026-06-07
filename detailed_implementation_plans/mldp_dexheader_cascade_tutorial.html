@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLDP + Dex Header Cascade — Visual Tutorial</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root{
+    --bg:#0d1117; --card:#161b22; --card2:#1c2230; --text:#e6edf3; --muted:#8b949e;
+    --accent:#58a6ff; --green:#3fb950; --amber:#f0b429; --pink:#db61a2; --purple:#bc8cff;
+    --border:#30363d;
+    --permc:#1f6feb; --dexc:#bc8cff; --fusec:#9e6a03; --clsc:#8957e5;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);
+    line-height:1.7;max-width:1040px;margin:0 auto;padding:0 1.4rem 5rem;}
+  header.hero{background:linear-gradient(135deg,#2a1a4f 0%,#0d1117 65%);border-bottom:1px solid var(--border);
+    margin:0 -1.4rem 1.5rem;padding:2.4rem 1.6rem 2rem;}
+  header.hero h1{margin:0 0 .4rem;color:#fff;font-size:1.9rem;}
+  header.hero p{margin:.2rem 0;color:#c9d6e5;max-width:48rem;}
+  .pill{display:inline-block;font-size:.74rem;font-weight:700;padding:.18rem .6rem;border-radius:999px;margin:.25rem .3rem 0 0;}
+  .pill.p7{background:var(--permc);color:#fff;}
+  .pill.msf{background:var(--dexc);color:#241433;}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);margin:0 -1.4rem 1.6rem;padding:.6rem 1.4rem;overflow-x:auto;white-space:nowrap;}
+  nav.toc a{color:var(--accent);text-decoration:none;font-size:.85rem;margin-right:1.1rem;}
+  nav.toc a:hover{text-decoration:underline;}
+  h2{color:var(--accent);font-size:1.45rem;border-bottom:1px solid var(--border);padding-bottom:.4rem;margin-top:2.6rem;}
+  h3{color:#a5d6ff;font-size:1.1rem;margin-top:1.6rem;}
+  section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.3rem 1.5rem;margin:1.1rem 0;}
+  p{margin:.6rem 0;}
+  code{background:#21262d;padding:.1rem .35rem;border-radius:4px;font-size:.88em;}
+  .eli5{border-left:4px solid var(--green);background:#11231a;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .eli5 b{color:var(--green);}
+  .note{border-left:4px solid var(--amber);background:#241d10;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .note b{color:var(--amber);}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem;}
+  th,td{border:1px solid var(--border);padding:.5rem .7rem;text-align:left;vertical-align:top;}
+  th{background:#21262d;}
+
+  /* ---------- flowchart primitives ---------- */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:1.4rem 0;}
+  .row{display:flex;gap:1.1rem;justify-content:center;flex-wrap:wrap;align-items:stretch;}
+  .node{border-radius:10px;padding:.7rem 1rem;text-align:center;font-size:.86rem;font-weight:600;
+    border:1px solid var(--border);background:var(--card2);min-width:120px;box-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .node .sub{display:block;font-weight:400;font-size:.74rem;color:var(--muted);margin-top:.2rem;}
+  .node.apk{background:#30363d;color:#fff;}
+  .node.perm{border-color:var(--permc);background:#10243f;}
+  .node.dex{border-color:var(--dexc);background:#1d1430;}
+  .node.fuse{border-color:var(--fusec);background:#2a2110;}
+  .node.cls{border-color:var(--clsc);background:#221733;}
+  .node.out{border-color:var(--green);background:#10241a;color:#aff5c2;}
+  .node.benign{border-color:var(--green);background:#10241a;color:#aff5c2;}
+  .node.mal{border-color:var(--pink);background:#2a1320;color:#ffb3d1;}
+  .node.mini{min-width:92px;font-size:.78rem;padding:.5rem .6rem;}
+  .arrow{width:2px;height:24px;background:var(--muted);position:relative;margin:.15rem 0;}
+  .arrow::after{content:"";position:absolute;bottom:-2px;left:-4px;border:5px solid transparent;border-top-color:var(--muted);}
+  .arrow.h{width:30px;height:2px;align-self:center;}
+  .arrow.h::after{bottom:auto;top:-4px;right:-2px;left:auto;border:5px solid transparent;border-left-color:var(--muted);}
+  .lbl{font-size:.72rem;color:var(--muted);margin:.1rem 0;}
+  .bracket{display:flex;align-items:center;gap:.5rem;}
+  /* vector strip */
+  .vec{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:.3rem 0;font-family:monospace;font-size:.8rem;flex-wrap:wrap;}
+  .vec span{padding:.28rem .5rem;border-right:1px solid var(--border);}
+  .vec span:last-child{border-right:none;}
+  .vec .on{background:#1f6feb;color:#fff;}
+  .vec .ond{background:#7d52c4;color:#fff;}
+  .vec .off{background:#161b22;color:var(--muted);}
+  .legend{display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:.5rem 0;}
+  .legend span::before{content:"";display:inline-block;width:.8rem;height:.8rem;border-radius:3px;margin-right:.35rem;vertical-align:-1px;}
+  .legend .lp::before{background:var(--permc);}
+  .legend .ld::before{background:var(--dexc);}
+  .stepnum{counter-reset:s;list-style:none;padding-left:0;}
+  .stepnum>li{position:relative;padding-left:2.3rem;margin:.7rem 0;}
+  .stepnum>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;
+    width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent);color:#0d1117;font-weight:700;
+    text-align:center;line-height:1.7rem;font-size:.82rem;}
+  .funnel{display:flex;flex-direction:column;align-items:center;gap:.2rem;margin:1rem 0;}
+  .funnel .bar{border-radius:6px;padding:.5rem 1rem;text-align:center;font-size:.84rem;font-weight:600;color:#fff;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr;}}
+  .tagx{font-size:.7rem;font-weight:700;padding:.08rem .4rem;border-radius:4px;background:var(--amber);color:#3a2a05;margin-left:.4rem;}
+  .bytemap{display:flex;flex-wrap:wrap;gap:2px;margin:.6rem 0;font-family:monospace;font-size:.7rem;}
+  .bytemap div{padding:.2rem .35rem;border-radius:3px;text-align:center;}
+  .bm-magic{background:#6e2d2d;color:#ffd7d7;}
+  .bm-body{background:#1d1430;color:#cdb8ff;border:1px solid var(--dexc);}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>MLDP&nbsp;+&nbsp;Dex&nbsp;Header&nbsp;Cascade — Visual Tutorial</h1>
+  <p>A picture-first walkthrough of a cheap, on-device Android malware filter that mixes <b>pruned permissions</b> (what the app says it can do) with <b>Dex header bytes</b> (how its code is shaped) — and how it becomes an app on your phone.</p>
+  <div>
+    <span class="pill p7">Paper #7 — MLDP permission pruning (IJACSA 2020)</span>
+    <span class="pill msf">MSFDroid — Dex header / MLP(H)</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#big">Big picture</a>
+  <a href="#pre">Prerequisites</a>
+  <a href="#a">① MLDP permissions</a>
+  <a href="#b">② Dex header</a>
+  <a href="#modes">③ Two modes</a>
+  <a href="#math">Math in one place</a>
+  <a href="#pipe">Build pipeline P1–A4</a>
+  <a href="#why">Why it works</a>
+</nav>
+
+<section id="big">
+<h2>The big picture in one diagram</h2>
+<p>The model reads <b>two cheap things</b> from the APK — the <code>AndroidManifest.xml</code> (for permissions) and the first 112 bytes of each <code>classes*.dex</code> (the header) — turns them into numbers, and a tiny network outputs a malware probability. No bytecode is ever scanned.</p>
+
+<div class="flow">
+  <div class="node apk">📦 Raw APK<span class="sub">a .apk = a ZIP file</span></div>
+  <div class="arrow"></div>
+  <div class="lbl">read two cheap signals</div>
+  <div class="row">
+    <div class="node perm">📄 Manifest → ① MLDP permissions<span class="sub">x<sub>S</sub> — what the app <i>can do</i></span></div>
+    <div class="node dex">🧬 classes*.dex header → ② H<span class="sub">H — the <i>shape</i> of the code</span></div>
+  </div>
+  <div class="row"><div class="arrow"></div><div class="arrow"></div></div>
+  <div class="node fuse">③ Combine — fuse into one row, OR cascade (cheap-first)<span class="sub">Mode A: [ x<sub>S</sub> ‖ H ] · Mode B: x<sub>S</sub> first, H only if unsure</span></div>
+  <div class="arrow"></div>
+  <div class="node out">P(malware) ∈ [0, 1]  → exit early or escalate</div>
+</div>
+
+<div class="eli5"><b>ELI5:</b> Imagine triaging parcels. First you glance at the <i>shipping label</i> (permissions) — that's instant. If the label is obviously fine or obviously dodgy, you're done. Only for the <i>maybe</i> pile do you also weigh and X-ray the box (the Dex header). Most parcels never need the X-ray, so the line moves fast.</div>
+</section>
+
+<section id="pre">
+<h2>Prerequisites — plain-English concepts</h2>
+
+<h3>What is the AndroidManifest?</h3>
+<p>Every app ships a manifest declaring the permissions it wants. We never run the app — we just read the declaration. That's <b>static analysis</b>: cheap, fast, safe.</p>
+
+<h3>What is a "permission"?</h3>
+<div class="eli5"><b>ELI5:</b> A permission is a door key the app requests, e.g. <code>SEND_SMS</code> or <code>CAMERA</code>. More dangerous keys = more risk if the app is bad.</div>
+
+<h3>What is "MLDP"?</h3>
+<div class="eli5"><b>ELI5:</b> Android has ~135 permissions. Most are useless for spotting malware (almost every app wants <code>INTERNET</code>). <b>MLDP = Multi-Level Data Pruning</b>: a filtering funnel that throws away the useless permissions and keeps ~22 that actually separate good from bad apps.</div>
+
+<h3>What is a "Dex header"?</h3>
+<p>Your app's compiled code lives in <code>classes.dex</code> files. Each one begins with a fixed <b>112-byte header</b>: the first 8 bytes are a "magic" signature, and the next 104 bytes are numbers describing the code's structure (how many strings, where each section starts, total size…).</p>
+<div class="bytemap">
+  <div class="bm-magic">byte&nbsp;0</div><div class="bm-magic">1</div><div class="bm-magic">2</div><div class="bm-magic">3</div><div class="bm-magic">4</div><div class="bm-magic">5</div><div class="bm-magic">6</div><div class="bm-magic">7<br>magic</div>
+  <div class="bm-body">8</div><div class="bm-body">9</div><div class="bm-body">…</div><div class="bm-body">checksum · signature · sizes · offsets</div><div class="bm-body">…</div><div class="bm-body">111</div>
+</div>
+<div class="legend"><span style="color:#ffd7d7">■ bytes 0–7 = magic (skipped)</span> &nbsp; <span style="color:#cdb8ff">■ bytes 8–111 = our 104 features</span></div>
+<div class="eli5"><b>Why it helps:</b> malware often has a weird code layout (huge string pools, odd offsets, packers). The header reveals that "shape" instantly — even if the manifest looks innocent.</div>
+
+<h3>What is a cascade?</h3>
+<p>A <b>cascade</b> runs cheap checks first and only escalates to expensive ones when unsure. If the cheap score is very low → benign (stop). Very high → malware (stop). In-between → run the next stage.</p>
+
+<h3>What is a tiny MLP?</h3>
+<p>A <b>Multi-Layer Perceptron</b>: a mini neural network. Small enough (&lt;30 KB) to run on a phone in well under a millisecond.</p>
+</section>
+
+<!-- ===================== COMPONENT A ===================== -->
+<section id="a">
+<h2>① MLDP permission row <span style="font-size:.8rem;color:var(--muted)">(from Paper #7)</span></h2>
+<p>Goal: turn the manifest's permissions into a short, clean checkbox row using only the ~22 permissions that matter. The "which 22?" is decided <b>once, offline</b>, on the training apps, then frozen.</p>
+
+<h3>The pruning funnel (Variant 1: PRNR → SPR → PMAR)</h3>
+<div class="funnel">
+  <div class="bar" style="background:#1f6feb;width:100%;">135 permissions — everything Android offers</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#2563c9;width:74%;">≈ 95 — after <b>PRNR</b> (drop the ones used equally by good &amp; bad apps)</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#2f5fb0;width:42%;">≈ 25 — after <b>SPR</b> (keep the most frequently-used survivors)</div>
+  <div class="arrow"></div>
+  <div class="bar" style="background:#3a5a9c;width:30%;">≈ 22 — after <b>PMAR</b> (merge permissions that always travel together)</div>
+</div>
+
+<h3>Step 1 — PRNR (Permission Ranking with Negative Rate)</h3>
+<p>For each permission we measure how "lopsided" it is between malware and benign apps. Let \(S_M(P_j)\) and \(S_B(P_j)\) be the fraction of malware / benign apps that declare permission \(P_j\) (after correcting for class-size imbalance). Then:</p>
+<p>\[ R(P_j)=\frac{S_M(P_j)-S_B(P_j)}{S_M(P_j)+S_B(P_j)}\in[-1,1] \]</p>
+<div class="row" style="margin:.8rem 0;">
+  <div class="node mini" style="border-color:var(--pink);background:#2a1320;">R → +1<span class="sub">malware-only<br>e.g. SEND_SMS</span></div>
+  <div class="node mini">R ≈ 0<span class="sub">used by both<br>→ DROP</span></div>
+  <div class="node mini" style="border-color:var(--green);background:#102417;">R → −1<span class="sub">benign-only</span></div>
+</div>
+<div class="note"><b>Correction we made (M3):</b> the cascade rough plan gave no PRNR formula, and the sibling MLDP plan implied a one-sided ratio. Paper #7's actual score is the symmetric difference-over-sum above, and it keeps <b>both</b> ends (\(R\to+1\) and \(R\to-1\)) — a strongly-benign permission separates classes just as well. Only the middle (\(R\approx0\)) is dropped.</div>
+
+<h3>Step 2 — SPR (Support-based Permission Ranking)</h3>
+<p>Among the survivors, keep the ones that appear often enough to be statistically reliable (drop ultra-rare permissions). ~95 → ~25.</p>
+
+<h3>Step 3 — PMAR (Permission Mining with Association Rules)</h3>
+<p>Some permissions are redundant twins — e.g. <code>WRITE_SMS</code> nearly always appears with <code>READ_SMS</code>. Using the <b>Apriori</b> algorithm (confidence ≥ 96.5%, support ≥ 10%), we collapse such pairs to one. The paper removed 3. ~25 → <b>~22</b>. This frozen set is \(\mathcal S\).</p>
+
+<h3>At inference (per new app)</h3>
+<p>\[ x^{(S)}_j=\begin{cases}1 & \text{if }P_j\in\mathcal S\text{ and declared}\\ 0&\text{otherwise}\end{cases},\qquad \mathbf x^{(S)}\in\{0,1\}^{|\mathcal S|},\ |\mathcal S|\approx 22 \]</p>
+<div class="note"><b>Correction (M1 / M2):</b> the size is <b>~16–25 (≈22)</b>, not "20–40". And paper #7 has <i>two</i> methods — we use the deterministic PRNR→SPR→PMAR funnel (Table I = 22 perms), not the harder-to-reproduce PCA/Kaiser variant (which gives 16/20).</div>
+</section>
+
+<!-- ===================== COMPONENT B ===================== -->
+<section id="b">
+<h2>② Dex header row <span style="font-size:.8rem;color:var(--muted)">(MSFDroid / deployed MLP(H))</span></h2>
+<p>Goal: turn each <code>classes*.dex</code> header into 104 numbers, combine multidex files, and scale to [0,1]. This is exactly what the already-deployed MLP(H) model eats.</p>
+
+<h3>Three ordered steps <span class="tagx">M4</span></h3>
+<div class="flow">
+  <div class="node dex">bytes 8–111 of each dex<span class="sub">104 raw bytes (0–255)</span></div>
+  <div class="arrow"></div>
+  <div class="node dex">① ÷ 255<span class="sub">each byte → [0,1]</span></div>
+  <div class="arrow"></div>
+  <div class="node fuse">② sum-pool across classes*.dex<span class="sub">H<sub>raw</sub> ∈ [0, D]  (D = #dex)</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">③ corpus min–max (train stats)<span class="sub">H ∈ [0,1]<sup>104</sup></span></div>
+</div>
+
+<div class="note"><b>Correction (M4):</b> the rough plan said "bytes/255, min–max, sum-pooled" and wrote \(\mathbf H=\sum_d\mathbf h^{(d)}\in[0,1]^{104}\). Order matters! After summing across dex files the values can exceed 1 (range \([0,D]\)). The <b>min–max comes last</b>, using fixed mins/maxs measured once on the training set — never recomputed on a single phone APK (that would break parity).</div>
+
+<h3>The math</h3>
+<p>\[ h^{(d)}_b=\frac{\text{byte}^{(d)}_b}{255},\qquad \mathbf H_{\text{raw}}=\sum_{d=1}^{D_{\text{dex}}}\mathbf h^{(d)}\in[0,D_{\text{dex}}]^{104} \]</p>
+<p>\[ \mathbf H=\frac{\mathbf H_{\text{raw}}-\boldsymbol{\min}_{\text{train}}}{\boldsymbol{\max}_{\text{train}}-\boldsymbol{\min}_{\text{train}}}\in[0,1]^{104} \]</p>
+
+<div class="eli5"><b>ELI5 of multidex sum-pool:</b> big apps split their code into <code>classes.dex</code>, <code>classes2.dex</code>, … We add up each file's header numbers position-by-position so one combined row represents the whole app. (The original MSFDroid paper used only the first dex; our deployed code sums them — we keep "first only" as an optional comparison.)</div>
+<div class="note"><b>Correction (M10):</b> "header read is O(1)" is too strong — we still unzip and locate every dex. But we only read the <b>112-byte header</b> of each (no bytecode scan), so it stays very cheap.</div>
+</section>
+
+<!-- ===================== MODES ===================== -->
+<section id="modes">
+<h2>③ Two ways to combine them</h2>
+
+<h3>Mode A — Fusion (one pass)</h3>
+<p>Glue the two rows into one long row, then run a single tiny network. Simplest to deploy: one ONNX graph, one score.</p>
+<div class="flow">
+  <div class="row" style="align-items:center;">
+    <div class="bracket"><div class="vec"><span class="on">1</span><span class="off">0</span><span class="on">1</span><span class="off">0</span></div></div>
+    <div class="lbl">+</div>
+    <div class="bracket"><div class="vec"><span class="ond">.7</span><span class="ond">.1</span><span class="ond">.9</span><span class="off">0</span></div></div>
+  </div>
+  <div class="lbl">x<sub>S</sub> (perms, |S|≈22) &nbsp;‖&nbsp; H (dex, 104)</div>
+  <div class="arrow"></div>
+  <div class="node fuse">x = [ x<sub>S</sub> ‖ H ]  (1 × d,  d ≈ 126)</div>
+  <div class="arrow"></div>
+  <div class="node cls">Tiny MLP  d → 64 → 1</div>
+  <div class="arrow"></div>
+  <div class="node out">σ → P(malware)</div>
+</div>
+<p>\[ \mathbf x=[\mathbf x^{(S)}\,\|\,\mathbf H]\in\mathbb R^{d},\quad d=|\mathcal S|+104\approx126,\qquad \hat y=\sigma\!\big(\mathbf W_2\,\text{ReLU}(\mathbf W_1\mathbf x+\mathbf b_1)+b_2\big) \]</p>
+<div class="note"><b>Correction (M5):</b> the fused width is \(d=|\mathcal S|+104\approx126\) (range 120–134), <b>not "~150"</b>. Bias terms are not input dimensions.</div>
+
+<h3>Mode B — Cascade (cheap first)</h3>
+<p>Look at permissions first. Only if unsure do we bother reading the dex header. The second stage <b>reuses the already-deployed MLP(H) model</b> — no retraining.</p>
+<div class="flow">
+  <div class="node apk">📦 APK</div>
+  <div class="arrow"></div>
+  <div class="node perm">Manifest → x<sub>S</sub> → Stage 1: s₁ = σ(w·x<sub>S</sub> + b)</div>
+  <div class="arrow"></div>
+  <div class="row">
+    <div class="node benign">s₁ &lt; t<sub>low</sub><br>→ BENIGN<span class="sub">(no dex read)</span></div>
+    <div class="node mal">s₁ &gt; t<sub>high</sub><br>→ MALWARE<span class="sub">(no dex read)</span></div>
+    <div class="node fuse">in between →<br>read dex</div>
+  </div>
+  <div class="arrow"></div>
+  <div class="node dex">H → Stage 2: MLP(H) 104→128→128→1<span class="sub">reuse deployed model</span></div>
+  <div class="arrow"></div>
+  <div class="row">
+    <div class="node out">confident → DONE</div>
+    <div class="node cls">still unsure → ByteCNN / ASCNN / XGBoost …</div>
+  </div>
+</div>
+<p>\[ s_1=\sigma(\mathbf w_1^\top\mathbf x^{(S)}+b_1),\qquad s_2=\text{MLP}_H(\mathbf H)\in[0,1] \]</p>
+<div class="note"><b>Correction (M6 &amp; M11):</b> Stage 2 is literally the shipped <code>mlp_header</code> ONNX (\(104\to128\to128\to1\)), so Mode B's only new piece is the Stage-1 logistic head. And "~70% of apps exit at Stage 1" is a <b>hypothesis</b>: we tune \(t_{low},t_{high}\) on a validation set and then <b>report the real exit rate</b> — we don't assume it.</div>
+</section>
+
+<!-- ===================== MATH SUMMARY ===================== -->
+<section id="math">
+<h2>All the math on one page</h2>
+<table>
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td>\(S_M(P_j),\ S_B(P_j)\)</td><td>support (fraction) of permission \(P_j\) in malware / benign apps (after skew correction)</td></tr>
+<tr><td>\(R(P_j)=\dfrac{S_M-S_B}{S_M+S_B}\)</td><td>PRNR score \(\in[-1,1]\); drop if \(\approx 0\), keep both extremes</td></tr>
+<tr><td>\(\mathcal S\) (\(|\mathcal S|\approx 22\))</td><td>frozen MLDP permission set after PRNR→SPR→PMAR</td></tr>
+<tr><td>\(x^{(S)}_j\in\{0,1\}\)</td><td>presence bit for permission \(j\)</td></tr>
+<tr><td>\(h^{(d)}_b=\text{byte}^{(d)}_b/255\)</td><td>per-byte scaled header value (bytes 8–111)</td></tr>
+<tr><td>\(\mathbf H_{\text{raw}}=\sum_d\mathbf h^{(d)}\)</td><td>multidex sum-pool, range \([0,D_{\text{dex}}]\)</td></tr>
+<tr><td>\(\mathbf H=\dfrac{\mathbf H_{\text{raw}}-\min}{\max-\min}\)</td><td>final 104-d header, \([0,1]\) via train stats</td></tr>
+<tr><td>\(\mathbf x=[\mathbf x^{(S)}\|\mathbf H]\)</td><td>Mode A fused vector, length \(d=|\mathcal S|+104\approx126\)</td></tr>
+<tr><td>\(\hat y=\sigma(\mathbf W_2\,\text{ReLU}(\mathbf W_1\mathbf x+\mathbf b_1)+b_2)\)</td><td>Mode A malware probability</td></tr>
+<tr><td>\(s_1=\sigma(\mathbf w_1^\top\mathbf x^{(S)}+b_1)\)</td><td>Mode B Stage-1 score (perms only)</td></tr>
+<tr><td>\(s_2=\text{MLP}_H(\mathbf H)\)</td><td>Mode B Stage-2 score (reused deployed MLP(H))</td></tr>
+<tr><td>\(\mathcal L=-[w_+ y\log\hat y+(1-y)\log(1-\hat y)]\)</td><td>weighted BCE loss, \(w_+=N_{\text{neg}}/N_{\text{pos}}\)</td></tr>
+</table>
+</section>
+
+<!-- ===================== PIPELINE ===================== -->
+<section id="pipe">
+<h2>From paper to phone — the build pipeline (P1 → A4)</h2>
+<p>Two code bases cooperate: a <b>Python project</b> trains and exports; the <b>Android app</b> scans on-device. They must agree on features exactly — that's what the parity checks guard.</p>
+
+<div class="grid2">
+  <div>
+    <h3 style="color:var(--accent)">Offline — Python (P1–P8)</h3>
+    <ol class="stepnum">
+      <li><b>P1 Index</b> — list every APK with label, year; split train=2020–21, test=2022–23.</li>
+      <li><b>P2 Features</b> — parse manifests → MLDP funnel → freeze \(\mathcal S\); read dex headers → fit train min/max; write tensors. <span class="tagx">owns M1–M4</span></li>
+      <li><b>P3 DataLoaders</b> — feed \(x_S\), \(H\), \(x\) in batches.</li>
+      <li><b>P4 Model</b> — Mode A MLP (d→64→1), Mode B Stage-1 logistic; Stage-2 = load deployed MLP(H).</li>
+      <li><b>P5 Train</b> — fit with <code>pos_weight</code>; run ablations (perm-only / header-only / fused).</li>
+      <li><b>P6 Evaluate</b> — accuracy/F1/AUC on 2022–23; calibrate \(t_{low},t_{high}\) on val; report exit rate.</li>
+      <li><b>P7 Export</b> — Mode A onnx + Stage-1 onnx + copy of deployed MLP(H) + vocab + <code>normalization_header.json</code>.</li>
+      <li><b>P8 Parity</b> — PyTorch vs ONNX scores agree within 1e-4.</li>
+    </ol>
+  </div>
+  <div>
+    <h3 style="color:var(--green)">On-device — Android (A1–A4)</h3>
+    <ol class="stepnum">
+      <li><b>A1 Extractor</b> — Java builds the same \(x_S\) and \(H\), using the shipped vocab + the same min/max file.</li>
+      <li><b>A2 Inference</b> — ONNX Runtime runs Mode A, or Mode B (Stage 1 → maybe Stage 2).</li>
+      <li><b>A3 Orchestration</b> — log parse/dex/vectorize/inference time + scores; record if the dex read was skipped.</li>
+      <li><b>A4 Parity test</b> — device scores match Python within 1e-4 before release.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="flow" style="margin-top:1.4rem;">
+  <div class="node" style="border-color:var(--accent);">🖥️ Python: train + export ONNX</div>
+  <div class="arrow"></div>
+  <div class="node fuse">📦 export bundle<span class="sub">mode_a · mode_b · vocab · normalization_header.json · parity_samples</span></div>
+  <div class="arrow"></div>
+  <div class="node out" style="color:#aff5c2;">📱 Android app: scan APKs on-device</div>
+</div>
+<div class="note"><b>Golden rule (M9):</b> if the Java \(H\) uses different min/max than Python, your offline accuracy is meaningless. Ship one <code>normalization_header.json</code> and have both sides load it. For Mode B Stage 2, use the <i>deployed</i> MLP(H)'s own normalization (the stats it was trained with).</div>
+</section>
+
+<!-- ===================== WHY ===================== -->
+<section id="why">
+<h2>Why this hybrid is worth building</h2>
+<table>
+<tr><th>Variant</th><th>Dims</th><th>What it sees</th><th>Reality check</th></tr>
+<tr><td>MLDP permissions only</td><td>~16–25</td><td>declared capabilities</td><td>#7: F ≈ 94–97% on their corpus; misses structural anomalies</td></tr>
+<tr><td>Dex header only (MLP(H))</td><td>104</td><td>code shape</td><td>deployed structural baseline; misses declared intent</td></tr>
+<tr><td>LinRegDroid (full perms)</td><td>~135</td><td>all permissions</td><td>noisy baseline</td></tr>
+<tr style="background:#10241a;"><td><b>MLDP + H (this model)</b></td><td><b>~126 / staged</b></td><td><b>clean caps + code shape</b></td><td><b>best cheap-static balance; fast Step-1 filter</b></td></tr>
+</table>
+
+<div class="note"><b>Be honest in the thesis (M11):</b> alone each block is moderate; the point of this model is <b>speed and early-exit rate</b>, not a record F1. On the temporal 2022–23 test split, report realistic numbers and the <i>measured</i> Stage-1 exit rate — then let high-F1 models handle the "maybe" pile downstream.</div>
+
+<div class="eli5"><b>One-sentence takeaway:</b> keep the few permissions that matter (MLDP), add the cheap "code shape" fingerprint (Dex header), and either fuse them into one tiny network (Mode A) or check permissions first and only X-ray the dex when unsure (Mode B) — fast enough for any phone, and Mode B even reuses a model you already shipped.</div>
+</section>
+
+<p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:2rem;border-top:1px solid var(--border);padding-top:1rem;">
+Companion files: <code>mldp_dexheader_cascade_opus.html</code> (verified rough plan) ·
+<code>mldp_dexheader_cascade_full_impl_opus.md</code> (full P1–A4 plan) ·
+sources: paper #7 (IJACSA 2020), MSFDroid (PDF absent — grounded on deployed MLP(H)).
+</p>
+
+</body>
+</html>

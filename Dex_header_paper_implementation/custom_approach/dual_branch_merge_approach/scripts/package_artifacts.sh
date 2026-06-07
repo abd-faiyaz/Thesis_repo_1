@@ -18,6 +18,7 @@ REL_FILES=(
   "dataset_index.csv"
   "processed/manifest_train.json"
   "processed/manifest_val.json"
+  "processed/manifest_test.json"
   "checkpoints/best.pt"
   "checkpoints/latest.pt"
   "failed_apks.log"

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Broadcast + MLDP Permission Hybrid — Architecture (Opus, paper-verified)</title>
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <style>
+    :root { --bg: #0f1419; --card: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    nav.top { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    nav.top a { color: var(--accent); }
+    h1 { color: var(--accent); font-size: 1.85rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { margin-top: 2.25rem; color: #79c0ff; font-size: 1.4rem; }
+    h3.sub { margin-top: 1.35rem; color: #a5d6ff; font-size: 1.08rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.6rem; margin: 1.1rem 0; }
+    section.prereq { border-left: 4px solid var(--accent); }
+    section.toc ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    pre.flow { background: #0d1117; border: 1px solid var(--border); padding: 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; border-radius: 6px; white-space: pre; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: #21262d; }
+    .best { font-weight: 700; color: #3fb950; }
+    ul.vars { font-size: 0.92rem; color: var(--muted); margin: 0.4rem 0 1rem 1.2rem; }
+    ul.vars li { margin: 0.25rem 0; }
+    .novelty { background: #1a2e1a; border: 1px solid #238636; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .novelty strong { color: #3fb950; }
+    .fix { background: #2e2418; border: 1px solid #9e6a03; padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; }
+    .fix strong { color: #f0b429; }
+    .verified { background: #16221a; border: 1px solid #2ea043; padding: 0.5rem 0.9rem; border-radius: 6px; margin-top: 0.6rem; font-size: 0.9rem; }
+    .verified strong { color: #56d364; }
+    ol.steps { padding-left: 1.4rem; }
+    ol.steps li { margin: 0.45rem 0; }
+    p { margin: 0.65rem 0; }
+    code { background: #21262d; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+    .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 4px; vertical-align: middle; margin-left: 0.4rem; }
+    .tag.changed { background: #9e6a03; color: #fff; }
+    .tag.kept { background: #238636; color: #fff; }
+  </style>
+</head>
+<body>
+<nav class="top"><a href="../rough_model_explanations/index.html">← All models</a> · <span class="meta">verified against source PDFs #7 and #12</span></nav>
+<h1>Broadcast Receiver + MLDP Permission Hybrid <span style="font-size:1rem;color:var(--muted)">(Opus — paper-verified rough plan)</span></h1>
+<p class="meta">Cross-paper hybrid:
+  <strong>#7</strong> Ghasempour, Mohd Sani &amp; Abari, “Permission Extraction Framework for Android Malware Detection”, <em>IJACSA</em> 11(11), 2020 (MLDP / permission pruning)
+  +
+  <strong>#12</strong> Mohsen, Bisgin, Scott &amp; Strait, “Detecting Android Malwares By Mining Statically Registered Broadcast Receivers”, <em>IEEE CIC</em>, 2017 (broadcast receivers).
+</p>
+
+<section class="prereq">
+<h2>0. What changed vs the original rough plan (executive summary)</h2>
+<p>The original <code>rough_model_explanations/broadcast_mldp_hybrid.html</code> is <strong>directionally correct</strong> — the early-fusion <em>[MLDP permissions ‖ broadcast actions] → small classifier</em> idea is faithful to both papers. After reading both PDFs end-to-end, the following items needed correction or sharpening. Each is justified inline in the relevant section.</p>
+<table>
+<tr><th>#</th><th>Item</th><th>Original plan said</th><th>Corrected (paper-grounded)</th></tr>
+<tr><td>M1</td><td>Size of MLDP set \(|\mathcal S|\)</td><td>~20–40, flowchart “≈30”</td><td><strong>~16–25, typically ≈22</strong> (paper Table I = 22; Table VI = 16 “dangerous”)</td></tr>
+<tr><td>M2</td><td>Which MLDP algorithm</td><td>“PRNR → support → association rules” attributed to #7</td><td>Two variants exist in #7. That 3-layer chain is the <em>SigPID / Li</em> method quoted in the lit-review (→22). #7’s <em>own</em> framework is skew-correction → TF-IDF ranking → PCA → Kaiser/Cumulative (→16–20). Pick one explicitly.</td></tr>
+<tr><td>M3</td><td>Receiver vocabulary \(\mathcal A\)</td><td>“all <code>&lt;action&gt;</code> names under <code>&lt;receiver&gt;</code>”</td><td><strong>System actions only</strong>: Mohsen restricts to a compiled list of Android-OS broadcast actions, not arbitrary strings.</td></tr>
+<tr><td>M4</td><td>PRNR semantics</td><td>“keeps permissions that skew toward malware”</td><td>Keeps permissions discriminative on <em>both</em> ends \((R\!\to\!+1\) malware, \(R\!\to\!-1\) benign\()\); drops only \(R\!\approx\!0\).</td></tr>
+<tr><td>M5</td><td>Fused dimension \(d\)</td><td>~80–120</td><td><strong>~50–100</strong> given \(|\mathcal S|\!\approx\!22\), \(R\!\approx\!30\text{–}80\).</td></tr>
+<tr><td>M6</td><td>Classifier</td><td>tiny MLP only</td><td>Keep tiny MLP for ONNX, <strong>but add the paper-faithful C-SVM (RBF) baseline</strong> (γ=0.1, C=10 in #12).</td></tr>
+<tr><td>M7</td><td>Class imbalance</td><td>not mentioned</td><td>Both papers handle it (Mohsen = balanced undersampling ×10; #7 = data-skew support scaling). Add <code>pos_weight</code> / balanced training.</td></tr>
+<tr><td>M8</td><td>Math typo</td><td><code>\hat y = \text{MLP}(x)</code> rendered as <code>ext{MLP}</code></td><td>Fixed LaTeX.</td></tr>
+<tr><td>M9</td><td>Expected accuracy framing</td><td>“best balance”</td><td>True, but ground it: #12 combined = 97% on duplicate configs but only ~76–77% on the <em>independent/newer</em> test set — quote the honest temporal number.</td></tr>
+</table>
+<p class="verified"><strong>Verified unchanged:</strong> manifest-only inputs, binary presence encoding, early (feature-level) fusion, set-semantics dedup within an APK, “combined &gt; either alone”, offline-frozen vocabularies, ONNX-friendly small head.</p>
+</section>
+
+<section class="prereq">
+<h2>Prerequisites (beginner)</h2>
+<p><strong>MLDP-pruned permissions:</strong> Instead of the ~135-permission Android space, an offline procedure keeps only ~16–25 highly discriminative permissions. Paper #7 publishes the resulting list (e.g. <code>SEND_SMS</code>, <code>READ_SMS</code>, <code>RECEIVE_BOOT_COMPLETED</code>, <code>INSTALL_PACKAGES</code>, <code>READ_CONTACTS</code>, <code>CAMERA</code>, <code>DISABLE_KEYGUARD</code>, …). See <code>../rough_model_explanations/mldp_pruned_permission_classifier.html</code>.</p>
+<p><strong>Statically registered broadcast receiver (system action):</strong> a <code>&lt;receiver&gt;</code> declared in the manifest whose <code>&lt;intent-filter&gt;&lt;action&gt;</code> names a built-in Android system event (e.g. <code>android.intent.action.BOOT_COMPLETED</code>). It is an entry point the OS can invoke <em>even when the app is not running</em> — which is exactly why malware likes them (Mohsen 2017).</p>
+<p><strong>Concatenation</strong> <code>[a ‖ b]</code>: put vector <strong>a</strong> first, then <strong>b</strong>, forming one longer vector — <strong>early fusion</strong> (\([\mathbf{a} \,\|\, \mathbf{b}]\)).</p>
+<p><strong>Tiny MLP:</strong> a small neural net (e.g. \(d \to 64 \to 1\)) that learns mild nonlinear conjunctions like “SMS permission AND <code>SMS_RECEIVED</code> receiver together.” It is the ONNX-deployable stand-in for the papers’ RBF-SVM.</p>
+</section>
+
+<section class="toc">
+<h2>Table of contents</h2>
+<ol>
+<li>Overview</li>
+<li>Component A — MLDP permission sub-vector</li>
+<li>Component B — Broadcast receiver (system-action) sub-vector</li>
+<li>Component C — Early fusion</li>
+<li>Component D — Classifier head (tiny MLP + SVM baseline)</li>
+<li>Fusion mechanism</li>
+<li>Expected results (paper-grounded)</li>
+<li>Full end-to-end pipeline</li>
+<li>Faithfulness ledger</li>
+</ol>
+</section>
+
+<section>
+<h2>1. Overview</h2>
+<p>On the thesis corpus (year-split 2020–2021 train / 2022–2023 test), we want a <strong>manifest-only</strong> detector that is tiny enough for mid-range phones yet richer than permissions alone. The cross-paper hybrid concatenates a <strong>~16–25-dim MLDP-selected permission block</strong> (paper #7) with a <strong>~30–80-dim statically-registered broadcast <em>system-action</em> block</strong> (paper #12) into one vector of roughly <strong>50–100 dimensions</strong>, then classifies it.</p>
+<p><strong>Why combine them?</strong> Paper #12 empirically showed permissions and receiver actions are <em>complementary</em>: action items lift sensitivity (catching malware) when added to permissions, and “combined &gt; either alone” on its independent test set. Paper #7 showed that <em>pruning</em> the permission space removes noise that otherwise dilutes a linear separator and keeps accuracy stable as the dataset grows. The hybrid’s one genuine modification over #12 is swapping #12’s <em>full</em> permission vector for #7’s <em>pruned</em> one — fewer, cleaner dimensions for the same behavioral signal.</p>
+<div class="fix"><strong>Correction M5:</strong> with \(|\mathcal S|\approx 22\) and \(R\approx 30\text{–}80\), the fused width is \(d\approx 50\text{–}100\), not 80–120. No Dex decompilation, no 2500-d bag-of-words — two orthogonal manifest signals in one pass.</div>
+</section>
+
+<section>
+<h2>2. Component A — MLDP permission sub-vector <span class="tag changed">corrected</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>Only the permissions in the frozen MLDP set \(\mathcal{S}\), derived offline from the <strong>train split only</strong>.</p>
+<h3 class="sub">Why this input was chosen</h3>
+<p>The full ~135-permission space is redundant and noisy. #7 shows a small curated set keeps F-measure ≈94–97% even as the corpus grows to 60k apps, where unpruned permission models degrade. It is the compact “what can this app do?” signal.</p>
+
+<div class="fix"><strong>Correction M2 — which algorithm?</strong> Paper #7 actually describes <em>two</em> pruning pipelines and the original rough plan blended them:
+<ul>
+<li><strong>Variant 1 (SigPID / MLDP, lit-review §II-D, attributed to Li [10]):</strong> three layers —
+(i) <em>PRNR</em> Permission Ranking with Negative Rate, (ii) <em>SPR</em> Support-based Permission Ranking, (iii) <em>PMAR</em> Permission Mining with Association Rules. Reduction: <strong>135 → 95 (PRNR) → 25 (SPR) → 22 (PMAR)</strong>. The 22 permissions are listed in Table I.</li>
+<li><strong>Variant 2 (#7’s own “Proposed Framework”, §IV):</strong> data-skew correction → <em>TF-IDF</em> permission ranking → <em>PCA</em> → <em>Kaiser + Cumulative</em> factor analysis → intersect with Li’s list &amp; Google’s dangerous list. Result: <strong>16 dangerous permissions</strong> (Table VI), experiments report “20 selected permissions”.</li>
+</ul>
+<strong>Recommendation:</strong> implement <em>Variant 1 (PRNR→SPR→PMAR)</em> — it is deterministic, cheap, and reproducible on our own train split — and keep #7’s published 16/22-permission list as a fixed fallback / sanity baseline. Variant 2’s PCA+factor-analysis is harder to reproduce exactly and is not needed for a binary presence vector.</div>
+
+<h3 class="sub">Step-by-step (Variant 1, recommended)</h3>
+<ol class="steps">
+<li>Offline on <code>split=train</code> APKs build matrices \(M\) (malware) and \(B\) (benign), \(M_{ij},B_{ij}\in\{0,1\}\) = permission \(j\) declared by app \(i\).</li>
+<li><strong>Data-skew correction:</strong> scale the supports so class sizes are comparable (#7 eq. 1/3) before ranking.</li>
+<li><strong>PRNR:</strong> compute the negative-rate score \(R(P_j)\in[-1,1]\) (below); drop permissions with \(R(P_j)\approx 0\) (used equally by both classes). 135 → ~95.</li>
+<li><strong>SPR:</strong> rank survivors by overall support; keep the most-supported. ~95 → ~25.</li>
+<li><strong>PMAR (Apriori, conf ≥ 96.5%, min-sup 10%):</strong> collapse permissions that co-occur as rules (e.g. <code>WRITE_SMS</code>⇒<code>READ_SMS</code>). ~25 → <strong>~22</strong>. Freeze as \(\mathcal S\).</li>
+<li>At inference: parse manifest; \(x^{(S)}_j=1\) iff \(\text{perm}_j\in\mathcal S\) is declared.</li>
+</ol>
+
+<h3 class="sub">Mathematical formulation <span class="tag changed">M4 added the PRNR formula</span></h3>
+<p>Per-class support of permission \(P_j\) (fraction of class apps declaring it), with skew correction so \(|M|\) and \(|B|\) are comparable:</p>
+<p>\[ S_M(P_j)=\frac{1}{|M|}\sum_i M_{ij}, \qquad S_B(P_j)=\frac{1}{|B|}\sum_i B_{ij} \]</p>
+<p>Permission Ranking with Negative Rate (range \([-1,1]\)):</p>
+<p>\[ R(P_j)=\frac{S_M(P_j)-S_B(P_j)}{S_M(P_j)+S_B(P_j)} \]</p>
+<p>\(R\!\to\!+1\): malware-indicative (dangerous); \(R\!\to\!-1\): benign-indicative; \(R\!\approx\!0\): non-discriminative → dropped. <em>(Correction M4: the original plan said PRNR “keeps malware-skewed” permissions; in fact both extremes are kept because both help separate the classes — only \(R\approx0\) is pruned.)</em></p>
+<p>Final inference encoding:</p>
+<p>\[ x^{(S)}_j = \begin{cases} 1 & \text{if } \text{perm}_j \in \mathcal{S} \text{ and declared} \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}^{(S)} \in \{0,1\}^{|\mathcal{S}|},\ \ |\mathcal S|\approx 22 \]</p>
+<ul class="vars"><li><strong>\(\mathcal{S}\)</strong> — MLDP-frozen permission subset (train-only)</li><li><strong>\(\mathbf{x}^{(S)}\)</strong> — pruned permission feature block</li></ul>
+
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">OFFLINE (train split only)
+  M,B matrices → skew-correct → PRNR(135→95) → SPR(95→25) → PMAR(25→22) → freeze S
+INFERENCE
+  Manifest → x^(S)  (1×|S|)   e.g. 1×22</pre>
+<div class="novelty"><strong>Key novelty:</strong> curated permission dimensions (train-frozen) instead of #12’s full ~98–178-permission space — same capability signal, far less noise.</div>
+</section>
+
+<section>
+<h2>3. Component B — Broadcast receiver (system-action) sub-vector <span class="tag changed">corrected</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>The <code>android:name</code> of <code>&lt;action&gt;</code> elements under <strong>statically registered</strong> <code>&lt;receiver&gt;&lt;intent-filter&gt;</code> in the manifest.</p>
+
+<div class="fix"><strong>Correction M3 — system actions only.</strong> The original plan said “collect <em>all</em> <code>&lt;action&gt;</code> names”. Mohsen 2017 is explicit: <em>“we are only concerned with the receivers of the system actions. The set of system actions of Android OS releases are compiled in one file.”</em> So \(\mathcal A\) must be built against a fixed allow-list of Android system broadcast actions (the <code>android.intent.action.*</code>, <code>android.net.conn.*</code>, <code>android.provider.Telephony.*</code>, … families), <strong>not</strong> custom/third-party action strings. This matters for (a) faithfulness to #12 and (b) Python↔Java parity (same allow-list shipped to the device).</p>
+<p>Empirical grounding from #12: malware collectively used <strong>28</strong> distinct system actions, benign <strong>57</strong>; top malware actions = <code>BOOT_COMPLETED, USER_PRESENT, PHONE_STATE, SMS_RECEIVED, NEW_OUTGOING_CALL</code>. So \(R\approx 30\text{–}80\) is the right magnitude.</div>
+
+<h3 class="sub">Why this input was chosen</h3>
+<p>Receivers capture <em>event-driven</em> behavior orthogonal to permissions: statically registered receivers wake the app on system events without user interaction. #12 found 74% of malware vs 65% of benign declare a receiver, and 70% vs 46% declare one for a <em>system</em> action — the gap is the signal.</p>
+
+<h3 class="sub">Step-by-step</h3>
+<ol class="steps">
+<li>Parse the same <code>AndroidManifest.xml</code>.</li>
+<li>Collect <code>&lt;action&gt;</code> names under every static <code>&lt;receiver&gt;…&lt;intent-filter&gt;</code>.</li>
+<li><strong>Filter to the Android system-action allow-list</strong> (drop custom actions).</li>
+<li>Build vocabulary \(\mathcal{A}\) from the <strong>train split</strong> system actions (\(R\approx 30\text{–}80\)).</li>
+<li>Set \(x^{(R)}_k = 1\) iff system action \(k\in\mathcal A\) present in this APK (set semantics — duplicates collapse to one bit).</li>
+</ol>
+
+<h3 class="sub">Mathematical formulation</h3>
+<p>\[ x^{(R)}_k = \begin{cases} 1 & \text{if } \text{action}_k \in \mathcal{A}\ \cap\ \text{StaticReceivers}(\text{APK}) \\ 0 & \text{otherwise} \end{cases}, \quad \mathbf{x}^{(R)} \in \{0,1\}^{R} \]</p>
+<ul class="vars"><li><strong>\(\mathcal A\)</strong> — train-frozen Android system-action vocabulary</li><li><strong>\(R=|\mathcal A|\)</strong> — receiver-action vocabulary size (~30–80)</li></ul>
+
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">Manifest
+  └─► &lt;receiver&gt;/&lt;intent-filter&gt;/&lt;action&gt;
+         └─► keep only Android system actions (allow-list ∩ train vocab A)
+                └─► x^(R)  (1×R)   e.g. 1×50</pre>
+<div class="novelty"><strong>Key point (kept):</strong> receiver domain is unchanged from Mohsen — proven complementary to permissions — but we now enforce the system-action restriction the paper actually used.</div>
+</section>
+
+<section>
+<h2>4. Component C — Early fusion (concatenation) <span class="tag kept">faithful</span></h2>
+<h3 class="sub">What it analyzes</h3>
+<p>A single manifest feature vector combining the MLDP permission block and the receiver system-action block.</p>
+<h3 class="sub">Why</h3>
+<p>Mohsen’s “combined” scenario concatenated permissions + actions into one vector for a single SVM — i.e. <strong>early fusion</strong>. It lets the classifier learn cross-domain conjunctions (dangerous permission ∧ boot receiver) in one weight set.</p>
+<h3 class="sub">Mathematical formulation</h3>
+<p>\[ \mathbf{x} = [\mathbf{x}^{(S)} \,\|\, \mathbf{x}^{(R)}] \in \{0,1\}^{|\mathcal{S}| + R},\qquad d=|\mathcal S|+R\approx 50\text{–}100 \]</p>
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">x^(S) (1×|S|) ──┐
+                ├──► x (1×d)   e.g. 1×72  (22 + 50)
+x^(R) (1×R)   ──┘</pre>
+<div class="novelty"><strong>Key advantage:</strong> roughly 3× smaller than #12’s full perm+receiver vector while keeping both signal types; one classifier, one score, no late merge.</div>
+</section>
+
+<section>
+<h2>5. Component D — Classifier head <span class="tag changed">SVM baseline added</span></h2>
+<h3 class="sub">Deployment head — tiny MLP (ONNX)</h3>
+<p>\[ \mathbf{h} = \max(0,\ \mathbf{W}_1 \mathbf{x} + \mathbf{b}_1),\quad \mathbf{W}_1\in\mathbb R^{64\times d}; \qquad \hat{y} = \sigma(\mathbf{w}_2^\top \mathbf{h} + b_2) \]</p>
+<p>Trained with binary cross-entropy and a class-imbalance weight (Correction M7):</p>
+<p>\[ \mathcal{L} = -\,\big[\, w_+\, y \log \hat{y} + (1-y)\log(1-\hat{y})\,\big],\quad w_+ = \tfrac{N_\text{neg}}{N_\text{pos}} \]</p>
+<p>Architecture \(d\to 64\to 1\) (e.g. \(72\to64\to1\)); logistic regression \(d\to1\) is an even smaller alternative if it matches the MLP on validation.</p>
+
+<div class="fix"><strong>Correction M6 — paper-faithful baseline.</strong> Both source papers classify with an <strong>RBF-kernel C-SVM</strong>, not an MLP:
+\[ f(\mathbf{x})=\operatorname{sign}\!\Big(\textstyle\sum_{i\in SV}\alpha_i y_i K(\mathbf{x}_i,\mathbf{x})+b\Big),\quad K(\mathbf{x},\mathbf{x}')=e^{-\gamma\|\mathbf{x}-\mathbf{x}'\|_2^2}. \]
+#12 grid-searched \(C\in\{10^1..10^5\}\), \(\gamma\in\{10^{-6}..10^{-1}\}\) and reported the optimum at \(\gamma=0.1,\ C=10\); #7 used SVM + Decision Tree with an 80/20 split. <strong>Run the RBF-SVM as the reproducibility baseline</strong> (sklearn, offline only) and export the MLP/logistic to ONNX. The MLP is justified because RBF-SVM is nonlinear and a single hidden layer is the cheapest ONNX-friendly way to recover those conjunctions.</div>
+
+<h3 class="sub">Architecture flowchart</h3>
+<pre class="flow">x (1×d)  e.g. 1×72
+   │
+   ▼  Linear d→64 + ReLU
+   │
+   ▼  Linear 64→1 + σ
+   ▼
+P(malware) ∈ [0,1]      (offline twin: RBF-SVM, γ=0.1, C=10)</pre>
+<div class="novelty"><strong>Key advantage:</strong> model size typically &lt; 20 KB; inference &lt; 1 ms after manifest parse.</div>
+</section>
+
+<section>
+<h2>6. Fusion mechanism <span class="tag changed">typo fixed</span></h2>
+<p><strong>Early fusion</strong> at the feature level (not late fusion of two classifiers):</p>
+<p>\[ \mathbf{x} = [\mathbf{x}^{(S)} \,\|\, \mathbf{x}^{(R)}], \qquad \hat{y} = \text{MLP}(\mathbf{x}) \]</p>
+<p><em>(Correction M8: the original file rendered <code>\text{MLP}</code> as a stray <code>ext{MLP}</code>.)</em></p>
+<pre class="flow">Manifest parse
+      │
+ ┌────┴────┐
+ ▼         ▼
+x^(S)    x^(R)      MLDP perms (1×|S|) · system actions (1×R)
+ │         │
+ └────┬────┘
+      ▼
+  x (1×d)   d ≈ 50–100
+      ▼
+  Tiny MLP (d→64→1)        [offline baseline: RBF-SVM]
+      ▼
+  ŷ ∈ [0,1]</pre>
+<p>Offline, the MLDP cascade (PRNR→SPR→PMAR) and the receiver system-action vocabulary mining are <strong>independent</strong> and both freeze before deployment.</p>
+</section>
+
+<section>
+<h2>7. Expected results (paper-grounded) <span class="tag changed">honest numbers</span></h2>
+<table>
+<tr><th>Model variant</th><th>Approx. dims</th><th>Signals</th><th>Evidence / expected tradeoff</th></tr>
+<tr><td>MLDP only</td><td>~16–25</td><td>Curated permissions</td><td>#7: F-measure ≈94–97%, stable as corpus grows; misses event timing</td></tr>
+<tr><td>#12 full (perm + receiver)</td><td>~200–300</td><td>All perms + system actions</td><td>#12 combined: 97% (duplicate cfg) but <strong>~76–77%</strong> on independent/newer data; noisy perms</td></tr>
+<tr><td>Broadcast only</td><td>~30–80</td><td>System actions</td><td>#12: ~76–79% (own test), ~71–72% (new data); weaker alone, lifts sensitivity</td></tr>
+<tr><td class="best">Broadcast + MLDP hybrid</td><td class="best">~50–100</td><td class="best">Curated perms + system actions</td><td class="best">Target: ≥ best single block; ~3× fewer dims than #12-full (thesis recommendation)</td></tr>
+</table>
+<p><strong>Why the hybrid should win:</strong> MLDP removes the permission noise that drags down a linear/RBF separator (#7), while system-action receivers add the behavioral-timing signal #12 demonstrated empirically. Be honest in the thesis: #12’s headline 97% is on <em>duplicate</em> configurations; on the <em>independent, newer</em> dataset combined dropped to ~76–77% — which is the realistic expectation for our temporal 2022–2023 test split. The hybrid’s claim is <em>“best manifest-only balance per parameter,”</em> not “97%.”</p>
+</section>
+
+<section>
+<h2>8. Full end-to-end pipeline summary</h2>
+<pre class="flow">OFFLINE (train split = 2020–2021)
+├─► MLDP (Variant 1): skew-correct → PRNR(135→95) → SPR(95→25) → PMAR(25→22) → freeze S  (|S|≈22)
+└─► Receiver system-action scan (allow-list ∩ train)                          → freeze A  (R≈50)
+
+PER-APK INFERENCE
+┌─────────────┐
+│  Raw APK    │
+└──────┬──────┘
+       ▼
+┌─────────────────────────┐
+│ Parse AndroidManifest   │
+└──────┬──────────┬───────┘
+       ▼          ▼
+  x^(S) (1×|S|)  x^(R) (1×R)   e.g. 1×22 , 1×50   (system actions only)
+       │          │
+       └────┬─────┘
+            ▼
+      x (1×d)                  d ≈ 50–100  (e.g. 1×72)
+            ▼
+      MLP: d → 64 → 1          (offline twin: RBF-SVM γ=0.1, C=10)
+            ▼
+      P(malware) ∈ [0,1]</pre>
+</section>
+
+<section class="prereq">
+<h2>9. Faithfulness ledger (what is paper-exact vs thesis-modified)</h2>
+<table>
+<tr><th>Aspect</th><th>Source</th><th>Status</th></tr>
+<tr><td>Binary presence permission vector</td><td>#7 §IV-B, #12 §III-B2</td><td class="best">Exact</td></tr>
+<tr><td>MLDP pruning to ~16–22 perms</td><td>#7 Tables I / VI</td><td class="best">Exact (Variant 1 recommended)</td></tr>
+<tr><td>Statically-registered receiver <em>system actions</em> only</td><td>#12 §III-B1</td><td class="best">Exact</td></tr>
+<tr><td>Early-fusion concat → one classifier</td><td>#12 §IV (“combined”)</td><td class="best">Exact</td></tr>
+<tr><td>Class-imbalance handling</td><td>#12 (balanced ×10), #7 (skew correction)</td><td>Adapted → <code>pos_weight</code></td></tr>
+<tr><td>RBF-SVM classifier</td><td>#7, #12</td><td>Kept as offline baseline</td></tr>
+<tr><td>Tiny MLP / logistic head + ONNX</td><td>—</td><td>Thesis modification (deployability)</td></tr>
+<tr><td>MLDP perms replacing #12 full perms</td><td>cross-paper</td><td>Intended hybrid novelty</td></tr>
+<tr><td>Temporal year split 2020–21 / 2022–23</td><td>Pipeline_full_concept.html</td><td>Thesis protocol (papers used random/80-20)</td></tr>
+</table>
+</section>
+
+</body>
+</html>

@@ -149,7 +149,7 @@ def run_evaluation(
     metrics_out: Path | None = None,
 ) -> dict[str, Any]:
     from src.config import ensure_artifact_dirs
-    from src.data.dataloaders import build_dataloaders_from_config
+    from src.data.dataloaders import build_dataloaders_from_config, build_test_loader_from_config
     from src.models.combined_net import build_combined_net_from_config
     from src.training.checkpoint import load_checkpoint, load_model_from_checkpoint
     from src.training.losses import build_criterion
@@ -157,7 +157,12 @@ def run_evaluation(
 
     ensure_artifact_dirs(cfg)
     train_loader, val_loader, _, _ = build_dataloaders_from_config(cfg)
-    loader = val_loader if split == "val" else train_loader
+    if split == "test":
+        loader, _, _ = build_test_loader_from_config(cfg)
+    elif split == "val":
+        loader = val_loader
+    else:
+        loader = train_loader
 
     ckpt_path = checkpoint_path or cfg.paths.best_checkpoint
     if not ckpt_path.is_file():
@@ -207,9 +212,19 @@ def run_evaluation(
     }
     print(f"Evaluation ({split}) — loss={val_loss:.4f} {format_metrics(metrics)}")
 
-    out = metrics_out or (cfg.paths.checkpoint_dir / f"metrics_{split}.json")
+    if split == "test" and metrics_out is None:
+        out = cfg.paths.checkpoint_dir / "test_results.json"
+    else:
+        out = metrics_out or (cfg.paths.checkpoint_dir / f"metrics_{split}.json")
     write_local_metrics_json(out, result)
     print(f"  metrics written → {out}")
+
+    try:
+        from src.thesis_archive import after_eval
+
+        after_eval(out)
+    except ImportError:
+        pass
 
     settings = get_pipeline_settings(cfg)
     export_offline_evaluation(
@@ -232,7 +247,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, default=None)
-    parser.add_argument("--split", choices=("val", "train"), default="val")
+    parser.add_argument("--split", choices=("val", "train", "test"), default="test")
     parser.add_argument(
         "--metrics-out",
         type=Path,
