@@ -1,0 +1,52 @@
+{
+  "model_id": "dexheader_broadcast_fusion",
+  "split": "test",
+  "train_years": [
+    2020,
+    2021
+  ],
+  "test_years": [
+    2022,
+    2023
+  ],
+  "n_samples": 764,
+  "feature_dims": {
+    "dex_header": 104,
+    "receiver": 70,
+    "d_R": 32,
+    "fused": 160
+  },
+  "metrics": {
+    "accuracy": 0.9698952879581152,
+    "f1": 0.9503239740820735,
+    "roc_auc": 0.9794461048017533
+  },
+  "confusion_matrix": [
+    [
+      521,
+      4
+    ],
+    [
+      19,
+      220
+    ]
+  ],
+  "threshold": 0.6,
+  "ablations": {
+    "header_only": {
+      "f1": null,
+      "note": "ref: deployed mlp_header measured metrics (BM1)"
+    },
+    "receivers_only": {
+      "f1": null
+    },
+    "fusion": {
+      "f1": 0.9503239740820735
+    }
+  },
+  "paper_baseline": {
+    "svm_rbf_concat": {
+      "f1": 0.9388646288209607
+    }
+  }
+}

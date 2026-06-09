@@ -91,7 +91,7 @@ def build_test_loader_from_config(
     if not cfg.paths.manifest_test.is_file():
         raise FileNotFoundError(
             f"Test manifest not found: {cfg.paths.manifest_test}. "
-            "Run preprocessing with temporal_year split and extract --split all."
+            "Run preprocessing with temporal_holdout split and extract --split all."
         )
     test_ds = DualBranchDataset.from_manifest(cfg.paths.manifest_test)
     loader = build_eval_loader(

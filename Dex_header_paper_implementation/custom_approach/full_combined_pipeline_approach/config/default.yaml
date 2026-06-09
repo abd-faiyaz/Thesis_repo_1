@@ -31,13 +31,12 @@ preprocessing:
   bow_encoding: multihot
   manifest_parser: pyaxmlparser
   cache_format: shard_npz
-  # temporal_year: train on train_years, val holdout from train_years, test on test_years
-  split_mode: temporal_year
+  # temporal_holdout: train on train_years; val+test are a disjoint split of holdout_years.
+  split_mode: temporal_holdout
   train_years: [2020, 2021]
-  test_years: [2022, 2023]
-  val_fraction: 0.1
-  train_ratio: 0.9
-  seed: 42
+  holdout_years: [2022, 2023]
+  val_fraction_of_holdout: 0.5
+  random_seed: 42
 
 data:
   batch_size: 16
@@ -71,8 +70,13 @@ training:
   pos_weight: null
   auto_pos_weight: true
 
+cascade:
+  target_false_omission_rate: 0.02
+  target_false_alarm_at_thigh: 0.02
+
 evaluation:
   threshold: 0.5
+  tune_threshold_on_val: true
   metrics:
     - accuracy
     - f1
@@ -81,9 +85,9 @@ evaluation:
 # VigiDroid thesis pipeline (Phase 3+) — see patternA_specifics.md § Pipeline integration
 pipeline:
   enabled: true
-  model_id: pattern_a_combined
+  model_id: early_fusion_dex_manifest
   domain: dex_header_manifest
   export_offline_json: true
-  use_shared_splits: false
+  use_shared_splits: true
   shared_splits_dir: Shared_pipeline_Files/data/splits
   shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv

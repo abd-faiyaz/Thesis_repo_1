@@ -38,9 +38,9 @@ class TestTemporalYearSplit(unittest.TestCase):
             val_fraction=0.5,
             seed=42,
         )
-        self.assertEqual({r.apk_id for r in test}, {"e", "f"})
-        self.assertEqual(len(train) + len(val), 4)
-        self.assertEqual({r.apk_id for r in train} | {r.apk_id for r in val}, {"a", "b", "c", "d"})
+        self.assertEqual({r.apk_id for r in train}, {"a", "b", "c", "d"})
+        self.assertEqual({r.apk_id for r in val} | {r.apk_id for r in test}, {"e", "f"})
+        self.assertEqual(len(val) + len(test), 2)
 
     def test_rejects_overlap(self) -> None:
         with self.assertRaises(ValueError):

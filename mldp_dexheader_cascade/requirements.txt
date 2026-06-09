@@ -1,4 +1,5 @@
 # Direct deps for mldp_dexheader_cascade (install via repo-root thesis_venv)
+-e ../shared_calibration
 torch>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0

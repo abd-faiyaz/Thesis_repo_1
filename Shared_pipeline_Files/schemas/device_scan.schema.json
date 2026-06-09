@@ -5,7 +5,9 @@
   "type": "object",
   "required": ["scan_id", "device", "apk", "trigger", "stages", "totals"],
   "properties": {
+    "record_type": { "type": "string", "const": "scan" },
     "scan_id": { "type": "string" },
+    "session_id": { "type": "string" },
     "timestamp_ms": { "type": "integer" },
     "device": {
       "type": "object",
@@ -23,22 +25,31 @@
         "name": { "type": "string" },
         "path": { "type": "string" },
         "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "sha256_short": { "type": "string" }
       }
     },
-    "trigger": { "type": "string", "enum": ["manual", "download", "scheduled", "install"] },
+    "trigger": { "type": "string", "enum": ["manual", "download"] },
+    "ground_truth": { "type": "string", "enum": ["benign", "malware", "unknown"] },
+    "dedup_skipped": { "type": "boolean" },
+    "cascade_enabled": { "type": "boolean" },
     "stages": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["domain", "inference_ms", "score"],
+        "required": ["domain", "model_id", "status", "inference_ms"],
         "properties": {
           "domain": { "type": "string" },
+          "model_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["ok", "skipped", "error"] },
+          "error_message": { "type": "string" },
           "parse_ms": { "type": "number" },
           "vectorize_ms": { "type": "number" },
           "inference_ms": { "type": "number" },
+          "cpu_ms": { "type": "number" },
           "score": { "type": "number" },
-          "mem_delta_bytes": { "type": "integer" }
+          "mem_delta_bytes": { "type": "integer" },
+          "battery_pct_delta": { "type": ["number", "null"] }
         }
       }
     },
@@ -50,12 +61,30 @@
         "policy": { "type": "string" }
       }
     },
+    "cascade": {
+      "type": "object",
+      "properties": {
+        "policy": { "type": "string" },
+        "exit_tier": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "exit_reason": {
+          "type": "string",
+          "enum": ["low_confident_benign", "high_confident_malware", "final_verdict"]
+        },
+        "models_run": { "type": "array", "items": { "type": "string" } },
+        "models_skipped": { "type": "array", "items": { "type": "string" } },
+        "final_score": { "type": "number" },
+        "decision": { "type": "string", "enum": ["benign", "malware", "uncertain"] }
+      }
+    },
     "totals": {
       "type": "object",
       "properties": {
         "wall_ms": { "type": "number" },
         "cpu_ms": { "type": "number" },
         "mem_delta_bytes": { "type": "integer" },
+        "java_heap_used_bytes": { "type": "integer", "minimum": 0 },
+        "peak_total_pss_kb": { "type": "integer", "minimum": 0 },
+        "shared_parse_ms": { "type": "number", "minimum": 0 },
         "battery_pct_delta": { "type": ["number", "null"] }
       }
     }

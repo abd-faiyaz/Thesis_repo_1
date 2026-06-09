@@ -1,0 +1,33 @@
+{
+  "model_id": "dexheader_broadcast_fusion",
+  "count": 13528,
+  "splits": {
+    "train": {
+      "benign": 9000,
+      "malware": 3000,
+      "total": 12000
+    },
+    "val": {
+      "benign": 525,
+      "malware": 239,
+      "total": 764
+    },
+    "test": {
+      "benign": 525,
+      "malware": 239,
+      "total": 764
+    }
+  },
+  "split_policy": {
+    "train_years": [
+      2020,
+      2021
+    ],
+    "holdout_years": [
+      2022,
+      2023
+    ],
+    "val_fraction_of_holdout": 0.5,
+    "random_seed": 42
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "policy_name": "cascade_v1",
+  "tier3_pattern_model": "early_fusion_dex_manifest",
+  "tiers": [
+    {
+      "tier": 1,
+      "models": ["mldp_pruned_permission", "broadcast_mldp_hybrid"],
+      "aggregation": "weighted_avg",
+      "conservative_malware_or": true
+    },
+    {
+      "tier": 2,
+      "models": ["mldp_dexheader_cascade_mode_b"],
+      "mlp_header_fallback": true
+    },
+    {
+      "tier": 3,
+      "models": ["early_fusion_dex_manifest", "manifest_xgb"]
+    },
+    {
+      "tier": 4,
+      "models": ["bytecnn"],
+      "final": true
+    }
+  ]
+}

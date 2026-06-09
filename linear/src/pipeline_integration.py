@@ -77,20 +77,16 @@ def get_pipeline_settings(cfg: PipelineConfig) -> PipelineSettings:
 
 def resolve_split_settings(cfg: PipelineConfig) -> dict[str, Any]:
     """Summarize split policy for metrics JSON (thesis eval protocol)."""
-    pre = cfg.preprocessing
-    split_mode = str(pre.get("split_mode", "stratified_development"))
-    dev_years = pre.get("development_years", [2020, 2021])
-    holdout_years = pre.get("temporal_holdout_years", [2022, 2023])
+    from shared_splits import resolve_split_config
+
+    split_cfg = resolve_split_config(cfg.preprocessing)
     return {
-        "split_mode": split_mode,
-        "train_years": list(dev_years),
-        "test_years": list(holdout_years),
-        "development_years": list(dev_years),
-        "temporal_holdout_years": list(holdout_years),
-        "train_ratio": pre.get("train_ratio"),
-        "val_ratio": pre.get("val_ratio"),
-        "dev_test_ratio": pre.get("dev_test_ratio"),
-        "seed": pre.get("random_seed", 42),
+        "split_mode": split_cfg.split_mode,
+        "train_years": list(split_cfg.train_years),
+        "holdout_years": list(split_cfg.holdout_years),
+        "test_years": list(split_cfg.holdout_years),
+        "val_fraction_of_holdout": split_cfg.val_fraction_of_holdout,
+        "seed": split_cfg.random_seed,
         "splits_dir": str(cfg.paths.splits_dir),
     }
 

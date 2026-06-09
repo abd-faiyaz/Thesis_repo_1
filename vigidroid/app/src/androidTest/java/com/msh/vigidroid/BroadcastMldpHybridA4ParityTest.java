@@ -70,10 +70,9 @@ public class BroadcastMldpHybridA4ParityTest {
 
   @Test
   public void manifestExtraction_matchesPcParityVectors_allTenSamples() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     BroadcastMldpHybridExtractor extractor = BroadcastMldpHybridExtractor.fromAssets(context);
-    JSONObject root =
-        new JSONObject(ModelAssetHelper.readAssetText(context, EXTRACTION_FIXTURES_ASSET));
+    JSONObject root = new JSONObject(TestAssetHelper.readTestAssetText(EXTRACTION_FIXTURES_ASSET));
     assertEquals(BroadcastMldpHybridOnnxRunner.MODEL_ID, root.getString("model_id"));
     assertEquals(BroadcastMldpHybridOnnxRunner.DOMAIN, root.getString("domain"));
 
@@ -85,8 +84,7 @@ public class BroadcastMldpHybridA4ParityTest {
       String sampleId = fixture.getString("sample_id");
       float[] expected = jsonRowToFloats(fixture.getJSONArray("expected_vector"));
 
-      try (InputStream is =
-          context.getAssets().open(MANIFEST_ASSET_PREFIX + sampleId + ".xml")) {
+      try (InputStream is = TestAssetHelper.openTestAsset(MANIFEST_ASSET_PREFIX + sampleId + ".xml")) {
         BroadcastMldpHybridExtractor.ExtractionResult result = extractor.extractManifest(is);
         assertEquals(BroadcastMldpHybridExtractor.FEATURE_DIM, result.vector.length);
         assertArrayEquals(
@@ -97,12 +95,11 @@ public class BroadcastMldpHybridA4ParityTest {
 
   @Test
   public void endToEnd_extractAndInfer_matchesExpectedProb_allTenSamples() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     BroadcastMldpHybridExtractor extractor = BroadcastMldpHybridExtractor.fromAssets(context);
     OrtEnvironment env = OrtEnvironment.getEnvironment();
     BroadcastMldpHybridOnnxRunner runner = BroadcastMldpHybridOnnxRunner.create(context, env);
-    JSONObject root =
-        new JSONObject(ModelAssetHelper.readAssetText(context, EXTRACTION_FIXTURES_ASSET));
+    JSONObject root = new JSONObject(TestAssetHelper.readTestAssetText(EXTRACTION_FIXTURES_ASSET));
     JSONArray fixtures = root.getJSONArray("fixtures");
 
     try {
@@ -112,8 +109,7 @@ public class BroadcastMldpHybridA4ParityTest {
         String sampleId = fixture.getString("sample_id");
         double expectedProb = fixture.getDouble("expected_malware_probability");
 
-        try (InputStream is =
-            context.getAssets().open(MANIFEST_ASSET_PREFIX + sampleId + ".xml")) {
+        try (InputStream is = TestAssetHelper.openTestAsset(MANIFEST_ASSET_PREFIX + sampleId + ".xml")) {
           BroadcastMldpHybridExtractor.ExtractionResult extraction = extractor.extractManifest(is);
           float score = runner.predict(extraction.vector);
           double diff = Math.abs(score - expectedProb);

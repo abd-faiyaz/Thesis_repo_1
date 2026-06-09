@@ -94,10 +94,6 @@ def resolve_split_settings(cfg: PipelineConfig | None = None, **overrides: Any) 
             if not splits_dir.is_absolute():
                 splits_dir = (cfg.root / splits_dir).resolve()
 
-    split_mode = overrides.get(
-        "split_mode",
-        pre.get("split_mode", data.get("split_mode", "stratified_random")),
-    )
     splits_dir_raw = overrides.get("splits_dir", splits_dir)
     splits_dir_str: str | None
     if splits_dir_raw is None:
@@ -105,18 +101,33 @@ def resolve_split_settings(cfg: PipelineConfig | None = None, **overrides: Any) 
     else:
         splits_dir_str = str(splits_dir_raw)
 
-    test_years = overrides.get("test_years", pre.get("test_years", pre.get("val_years", [2022, 2023])))
-    val_fraction = overrides.get(
-        "val_fraction",
-        pre.get("val_fraction", data.get("val_fraction", 0.1)),
+    test_years = overrides.get(
+        "holdout_years",
+        overrides.get("test_years", pre.get("holdout_years", pre.get("test_years", [2022, 2023]))),
     )
+    val_fraction = overrides.get(
+        "val_fraction_of_holdout",
+        overrides.get(
+            "val_fraction",
+            pre.get("val_fraction_of_holdout", pre.get("val_fraction", 0.5)),
+        ),
+    )
+    split_mode_raw = overrides.get(
+        "split_mode",
+        pre.get("split_mode", data.get("split_mode", "stratified_random")),
+    )
+    split_mode = str(split_mode_raw)
+    if split_mode == "temporal_year":
+        split_mode = "temporal_holdout"
 
     return {
-        "split_mode": str(split_mode),
+        "split_mode": split_mode,
         "train_years": overrides.get("train_years", pre.get("train_years", [2020, 2021])),
+        "holdout_years": test_years,
         "test_years": test_years,
+        "val_fraction_of_holdout": float(val_fraction),
         "val_fraction": float(val_fraction),
-        "seed": int(overrides.get("seed", data.get("random_seed", 42))),
+        "seed": int(overrides.get("seed", pre.get("random_seed", data.get("random_seed", 42)))),
         "splits_dir": splits_dir_str,
     }
 
@@ -130,13 +141,13 @@ def resolve_split_indices(
     val_fraction: float = 0.1,
     seed: int = 42,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
-    if split_mode == "temporal_year":
+    if split_mode in {"temporal_holdout", "temporal_year"}:
         train_idx, val_idx, test_idx = temporal_three_way_split_indices(
             bundle.paths,
             bundle.labels,
             train_years=train_years or [2020, 2021],
-            test_years=test_years or [2022, 2023],
-            val_fraction=val_fraction,
+            holdout_years=test_years or [2022, 2023],
+            val_fraction_of_holdout=val_fraction,
             seed=seed,
         )
         return train_idx, val_idx, test_idx
@@ -148,7 +159,7 @@ def resolve_split_indices(
         )
         return train_idx, val_idx, None
     raise ValueError(
-        f"Unknown split_mode={split_mode!r}; use 'temporal_year' or 'stratified_random'"
+        f"Unknown split_mode={split_mode!r}; use 'temporal_holdout' or 'stratified_random'"
     )
 
 
@@ -227,10 +238,11 @@ def build_dataloaders_from_config(
     if split["splits_dir"]:
         splits_dir = Path(split["splits_dir"])
     data_cfg = cfg.data
-    if split["split_mode"] == "temporal_year":
+    if split["split_mode"] in {"temporal_holdout", "temporal_year"}:
         print(
-            f"Temporal year split: train_years={split['train_years']} "
-            f"test_years={split['test_years']} val_fraction={split['val_fraction']}"
+            f"Temporal holdout split: train_years={split['train_years']} "
+            f"holdout_years={split['holdout_years']} "
+            f"val_fraction_of_holdout={split['val_fraction_of_holdout']}"
         )
     else:
         print(
@@ -241,8 +253,8 @@ def build_dataloaders_from_config(
         bundle,
         split_mode=split["split_mode"],
         train_years=split["train_years"],
-        test_years=split["test_years"],
-        val_fraction=split["val_fraction"],
+        test_years=split["holdout_years"],
+        val_fraction=split["val_fraction_of_holdout"],
         seed=split["seed"],
         batch_size=int(data_cfg.get("batch_size", 16)),
         num_workers=int(data_cfg.get("num_workers", 4)),
@@ -259,15 +271,15 @@ def build_test_loader_from_config(
     bundle = load_processed_bundle(processed_path)
     split = resolve_split_settings(cfg)
 
-    if split["split_mode"] != "temporal_year":
-        raise ValueError("Test split is only defined for split_mode='temporal_year'")
+    if split["split_mode"] not in {"temporal_holdout", "temporal_year"}:
+        raise ValueError("Test split is only defined for split_mode='temporal_holdout'")
 
     _, _, test_idx = resolve_split_indices(
         bundle,
         split_mode=split["split_mode"],
         train_years=split["train_years"],
-        test_years=split["test_years"],
-        val_fraction=split["val_fraction"],
+        test_years=split["holdout_years"],
+        val_fraction=split["val_fraction_of_holdout"],
         seed=split["seed"],
     )
     if test_idx is None:

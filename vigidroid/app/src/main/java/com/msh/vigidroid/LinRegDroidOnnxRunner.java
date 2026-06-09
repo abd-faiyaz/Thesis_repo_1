@@ -6,7 +6,6 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
 import java.util.Collections;
 import java.util.Map;
 
@@ -33,27 +32,37 @@ public final class LinRegDroidOnnxRunner implements Closeable {
   private final OrtEnvironment environment;
   private final OrtSession session;
   private final String inputName;
+  private final String outputName;
+  private final int featureDim;
   private final ModelThresholds thresholds;
 
   private LinRegDroidOnnxRunner(
       OrtEnvironment environment,
       OrtSession session,
       String inputName,
+      String outputName,
+      int featureDim,
       ModelThresholds thresholds) {
     this.environment = environment;
     this.session = session;
     this.inputName = inputName;
+    this.outputName = outputName;
+    this.featureDim = featureDim;
     this.thresholds = thresholds;
   }
 
   public static LinRegDroidOnnxRunner create(Context context, OrtEnvironment sharedEnv)
       throws Exception {
-    String manifestJson = ModelAssetHelper.readAssetText(context, MANIFEST_ASSET);
-    JSONObject manifest = new JSONObject(manifestJson);
+    JSONObject manifest = new JSONObject(ModelAssetHelper.readAssetText(context, MANIFEST_ASSET));
     String inputName = OnnxManifestIo.inputName(manifest, "permissions");
+    String outputName = OnnxManifestIo.malwareOutputName(manifest);
+    int featureDim = manifest.getInt("feature_dim");
     ModelThresholds thresholds = ModelThresholds.fromAsset(context, THRESHOLDS_ASSET);
     java.io.File modelFile = ModelAssetHelper.copyAssetToCache(context, MODEL_ASSET, CACHE_FILE);
-    OrtSession session = sharedEnv.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
+    OrtSession session =
+        sharedEnv.createSession(
+            modelFile.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OnnxSessionDiagnostics.logSingleIo(TAG, MODEL_ID, session, inputName, outputName);
     Log.i(
         TAG,
         "Loaded LinRegDroid ONNX (variant="
@@ -62,7 +71,8 @@ public final class LinRegDroidOnnxRunner implements Closeable {
             + thresholds.getMalwareThreshold()
             + ") from "
             + modelFile.getAbsolutePath());
-    return new LinRegDroidOnnxRunner(sharedEnv, session, inputName, thresholds);
+    return new LinRegDroidOnnxRunner(
+        sharedEnv, session, inputName, outputName, featureDim, thresholds);
   }
 
   public ModelThresholds getThresholds() {
@@ -71,20 +81,15 @@ public final class LinRegDroidOnnxRunner implements Closeable {
 
   /** Returns clamped malware probability in [0, 1] from ONNX output malware_probability. */
   public float predict(float[] permissions) throws OrtException {
-    if (permissions.length != LinRegPermissionExtractor.FEATURE_DIM) {
+    if (permissions.length != featureDim) {
       throw new IllegalArgumentException(
-          "Expected "
-              + LinRegPermissionExtractor.FEATURE_DIM
-              + " permissions, got "
-              + permissions.length);
+          "Expected " + featureDim + " permissions, got " + permissions.length);
     }
-    long[] shape = new long[] {1, permissions.length};
-    try (OnnxTensor tensor =
-        OnnxTensor.createTensor(environment, FloatBuffer.wrap(permissions), shape)) {
+    long[] shape = OnnxTensorFactory.batchRowShape(permissions.length);
+    try (OnnxTensor tensor = OnnxTensorFactory.createFloatTensor(environment, permissions, shape)) {
       Map<String, OnnxTensor> inputs = Collections.singletonMap(inputName, tensor);
       try (OrtSession.Result result = session.run(inputs)) {
-        Object value = result.get(0).getValue();
-        return readProbability(value);
+        return OnnxProbabilityReader.readFromResult(result, outputName);
       }
     }
   }
@@ -92,22 +97,6 @@ public final class LinRegDroidOnnxRunner implements Closeable {
   /** LinRegDroid1: malware when clamped probability >= threshold. */
   public boolean isMalware(float malwareProbability) {
     return thresholds.isMalware(malwareProbability);
-  }
-
-  private static float readProbability(Object value) {
-    if (value instanceof float[][]) {
-      return ((float[][]) value)[0][0];
-    }
-    if (value instanceof float[]) {
-      return ((float[]) value)[0];
-    }
-    if (value instanceof double[][]) {
-      return (float) ((double[][]) value)[0][0];
-    }
-    if (value instanceof double[]) {
-      return (float) ((double[]) value)[0];
-    }
-    throw new IllegalStateException("Unexpected ONNX output type: " + value.getClass().getName());
   }
 
   @Override

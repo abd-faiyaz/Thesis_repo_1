@@ -1,7 +1,7 @@
-# Pattern A (`pattern_a_combined`) — Android steps A1 → A4
+# Pattern A (`early_fusion_dex_manifest`) — Android steps A1 → A4
 
 **Model:** Dex header + manifest BoW → single ASCNN (`concat(H, I)`)  
-**Model ID:** `pattern_a_combined`  
+**Model ID:** `early_fusion_dex_manifest`  
 **Status:** **Not implemented** in `vigidroid/`. Complete BM1 first (shared Dex header code).
 
 **Rule:** Do **not** remove or change existing ByteCNN / XGBoost wiring. Add Pattern A as a **new** `stages[]` entry.
@@ -14,8 +14,8 @@
 
 | What | Path |
 |------|------|
-| PC export bundle | `Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/pattern_a_combined/` |
-| Android assets target | `vigidroid/app/src/main/assets/models/pattern_a_combined/` |
+| PC export bundle | `Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/early_fusion_dex_manifest/` |
+| Android assets target | `vigidroid/app/src/main/assets/models/early_fusion_dex_manifest/` |
 | Python reference | `.../full_combined_pipeline_approach/src/features/` |
 
 ---
@@ -25,12 +25,12 @@
 ```bash
 cd /mnt/Files/thesis_vigidroid
 
-mkdir -p vigidroid/app/src/main/assets/models/pattern_a_combined
+mkdir -p vigidroid/app/src/main/assets/models/early_fusion_dex_manifest
 
-cp -r Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/pattern_a_combined/* \
-  vigidroid/app/src/main/assets/models/pattern_a_combined/
+cp -r Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/early_fusion_dex_manifest/* \
+  vigidroid/app/src/main/assets/models/early_fusion_dex_manifest/
 
-ls vigidroid/app/src/main/assets/models/pattern_a_combined/
+ls vigidroid/app/src/main/assets/models/early_fusion_dex_manifest/
 # model.onnx  export_manifest.json  thresholds.json  features/  parity_samples/
 ```
 
@@ -39,7 +39,7 @@ ls vigidroid/app/src/main/assets/models/pattern_a_combined/
 ```bash
 cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach
 ../../../thesis_venv/bin/python scripts/parity_check_onnx.py \
-  --bundle artifacts/export/pattern_a_combined
+  --bundle artifacts/export/early_fusion_dex_manifest
 ```
 
 ---
@@ -62,7 +62,7 @@ cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/f
     - Permissions → normalized tokens
     - Intent actions → normalized tokens
     - Multihot: index `i` = 1.0 if token in vocab else UNK bucket
-  - Load frozen `assets/models/pattern_a_combined/features/vocab.json` (4380 + UNK → length 4381)
+  - Load frozen `assets/models/early_fusion_dex_manifest/features/vocab.json` (4380 + UNK → length 4381)
 - [ ] **A1.3** JVM unit tests: known manifest → expected sparse indices (compare one APK against Python offline if needed)
 
 **Reference Python:**
@@ -79,7 +79,7 @@ cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/f
 ### Tasks to implement in `vigidroid/`
 
 - [ ] **A2.1** New `PatternAOnnxRunner.java`
-  - Load `assets/models/pattern_a_combined/model.onnx`
+  - Load `assets/models/early_fusion_dex_manifest/model.onnx`
   - Inputs (from `export_manifest.json`):
     - `header`: `[1, 104]` float32
     - `bow`: `[1, 4381]` float32
@@ -105,7 +105,7 @@ cd /mnt/Files/thesis_vigidroid/vigidroid
   thesis_venv/bin/python - <<'PY'
   import json, numpy as np
   from pathlib import Path
-  p = Path("Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/pattern_a_combined/parity_samples")
+  p = Path("Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/early_fusion_dex_manifest/parity_samples")
   d = np.load(p / "sample_vectors.npz")
   # Keys may include header_vectors, bow_vectors — inspect: print(d.files)
   out = {k: d[k].tolist() if hasattr(d[k], 'tolist') else d[k] for k in d.files}
@@ -114,8 +114,8 @@ cd /mnt/Files/thesis_vigidroid/vigidroid
   (p / "parity_vectors.json").write_text(json.dumps(out))
   print("keys:", list(d.files))
   PY
-  cp Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/pattern_a_combined/parity_samples/parity_vectors.json \
-     vigidroid/app/src/main/assets/models/pattern_a_combined/parity_samples/
+  cp Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/export/early_fusion_dex_manifest/parity_samples/parity_vectors.json \
+     vigidroid/app/src/main/assets/models/early_fusion_dex_manifest/parity_samples/
   ```
 - [ ] **A4.2** Instrumented test `PatternAParityTest.java` — 8 samples, tolerance `1e-4`
 
@@ -134,7 +134,7 @@ cd /mnt/Files/thesis_vigidroid/vigidroid
 
 ### Tasks to implement in `vigidroid/`
 
-- [ ] **A3.1** Register `model_id`: `pattern_a_combined`, `domain`: `dex_header_manifest`
+- [ ] **A3.1** Register `model_id`: `early_fusion_dex_manifest`, `domain`: `dex_header_manifest`
 - [ ] **A3.2** Per APK in scan loop: extract header + bow → ONNX → append `stages[]` with timings + score
 - [ ] **A3.3** Keep ByteCNN / XGBoost stages unchanged
 
@@ -161,7 +161,7 @@ bash Shared_pipeline_Files/tools/pull_device_metrics.sh
 
 ## Done checklist
 
-- [ ] Bundle in `assets/models/pattern_a_combined/`
+- [ ] Bundle in `assets/models/early_fusion_dex_manifest/`
 - [ ] A1 header matches BM1; BoW matches Python vocab
 - [ ] A4 passes on device (8/8)
 - [ ] A3 logs Pattern A stages in `all_scan_metrics.json`

@@ -35,11 +35,11 @@ cd "$REPO/permission_extractor"
 rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/mldp artifacts/transactions artifacts/export/mldp_pruned_permission artifacts/splits output_archives
 rm -f artifacts/dataset_index.csv artifacts/failed_apks.log
 export MLDP_ARCHIVE=1 MLDP_RUN_ID="run_${DATE_TAG}_mldp"
-FRESH_TRAIN=1 ./run_mldp.sh
+FRESH_TRAIN=1 ./run_mldp_pruned_perm_cl.sh
 
 # 6 Broadcast hybrid
 cd "$REPO/broadcast_mldp_hybrid"
 rm -rf artifacts/processed artifacts/checkpoints artifacts/metrics artifacts/export/broadcast_mldp_hybrid artifacts/splits artifacts/manifests output_archives
 rm -f artifacts/failed_index.log artifacts/failed_apks.log
 export BMH_ARCHIVE=1 BMH_RUN_ID="run_${DATE_TAG}_bmh"
-FRESH_TRAIN=1 ./run_broadcast_mldp_hybrid.sh
+FRESH_TRAIN=1 ./run_brd_mldp_hybrid.sh

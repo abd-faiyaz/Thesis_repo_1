@@ -1,4 +1,4 @@
-"""Live archive mirroring when MLDP_RUN_ID is set (see run_mldp.sh MLDP_ARCHIVE=1)."""
+"""Live archive mirroring when MLDP_RUN_ID is set (see run_mldp_pruned_perm_cl.sh MLDP_ARCHIVE=1)."""
 
 from __future__ import annotations
 

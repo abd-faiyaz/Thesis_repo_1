@@ -2,14 +2,14 @@
   "model_id": "mldp_dexheader_cascade",
   "mode": "B",
   "domain": "manifest_mldp_perm_dex_header",
-  "exported_at": "2026-06-07T14:16:54.059548+00:00",
+  "exported_at": "2026-06-08T10:20:59.639312+00:00",
   "opset": 14,
   "stage1_checkpoint": "/mnt/Files/thesis_vigidroid/mldp_dexheader_cascade/artifacts/checkpoints/stage1_best.pt",
   "stage1_head": "tiny_mlp",
   "stage2_source": "/mnt/Files/thesis_vigidroid/vigidroid/app/src/main/assets/models/mlp_header/model.onnx",
-  "stage2_sha256": "7fc914f1053eddd44b6e24fc7ed0aea555828b7f5eaa14ddc6590a3346df8188",
-  "config_hash": "f5e39d6eb6b77bb7",
-  "preprocessing_version": "9e7b20a",
+  "stage2_sha256": "7bb1b97ac4db5c17da581e2aef81f31a90a0c2e85d6ee622a4960f4b0f846b38",
+  "config_hash": "726526be1c144fcf",
+  "preprocessing_version": "eb44039",
   "multidex_mode": "sum",
   "feature_extraction": {
     "apk_parts": [
@@ -85,9 +85,11 @@
       1,
       1
     ],
-    "test_output_value": 0.25218456983566284,
+    "test_output_value": 0.16882267594337463,
     "onnx_size_bytes": 3744,
     "onnx_size_kb": 3.66
   },
-  "stage2_onnx_size_bytes": 126300
+  "stage2_onnx_size_bytes": 126300,
+  "val_f1": 0.8609865470852018,
+  "val_accuracy": 0.918848167539267
 }

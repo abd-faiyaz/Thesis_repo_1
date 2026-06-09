@@ -1,6 +1,6 @@
 import torch
 import pandas as pd
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from pathlib import Path
 from model.bytecnn import ByteCNN
 from logger import get_logger
@@ -84,13 +84,18 @@ def evaluate_model(year_dir, model_path, report_path, byte_length=1024, threshol
 
     y_true = df["true_label"]
     y_pred = df["predicted_label"]
+    y_score = df["bad_p"]
 
     metrics = {
         "accuracy": accuracy_score(y_true, y_pred),
         "precision": precision_score(y_true, y_pred, zero_division=0),
         "recall": recall_score(y_true, y_pred, zero_division=0),
-        "f1": f1_score(y_true, y_pred, zero_division=0)
+        "f1": f1_score(y_true, y_pred, zero_division=0),
     }
+    if y_true.nunique() > 1:
+        metrics["roc_auc"] = roc_auc_score(y_true, y_score)
+    else:
+        metrics["roc_auc"] = None
 
     return metrics
 

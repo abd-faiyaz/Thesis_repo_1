@@ -11,7 +11,8 @@
 #   P6  evaluate on val/test split (ACC, F1, AUC)
 #   P7  export ONNX bundle (artifacts/export/mlp_header/)
 #   P8  PyTorch vs ONNX parity on parity_samples
-#   +   figures, archive finalize, THESIS_SNIPPET when BM1_ARCHIVE=1
+#   +   figures, archive finalize, THESIS_SNIPPET (default on; BM1_ARCHIVE=0 or SKIP_ARCHIVE=1 to disable)
+#   +   Android asset staging by default (set STAGE_ANDROID=0 to skip)
 #
 # Usage examples:
 #   ./run_base_model_1.sh
@@ -33,6 +34,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ROOT is the Base Model 1 package root (where src/, config/, artifacts/ live)
 ROOT="$SCRIPT_DIR"
+REPO_ROOT="$(cd "$ROOT/../.." && pwd)"
 
 # All following commands run from ROOT so relative paths in config work
 cd "$ROOT"
@@ -77,7 +79,9 @@ SKIP_EXPORT_ONNX="${SKIP_EXPORT_ONNX:-0}"
 # SKIP_PARITY: if 1, skip P8 PyTorch vs ONNX parity
 SKIP_PARITY="${SKIP_PARITY:-0}"
 
-# SKIP_PLOTS: if 1, skip thesis figures (requires BM1_ARCHIVE=1)
+# SKIP_ARCHIVE: if 1, disable run archive + figures + thesis snippet
+SKIP_ARCHIVE="${SKIP_ARCHIVE:-0}"
+# SKIP_PLOTS: if 1, skip thesis figures (archive must be enabled)
 SKIP_PLOTS="${SKIP_PLOTS:-0}"
 
 # FRESH_TRAIN: if 1, pass --fresh to training (ignore existing checkpoint)
@@ -86,9 +90,15 @@ FRESH_TRAIN="${FRESH_TRAIN:-0}"
 # PREPROCESS_LIMIT: if set (e.g. 100), only process first N APKs (smoke test)
 PREPROCESS_LIMIT="${PREPROCESS_LIMIT:-}"
 
-# BM1_ARCHIVE: if 1, tee logs + mirror JSON metrics to output_archives/${BM1_RUN_ID}/
-BM1_ARCHIVE="${BM1_ARCHIVE:-0}"
+# BM1_ARCHIVE: default 1 — tee logs + mirror JSON metrics to output_archives/${BM1_RUN_ID}/
+BM1_ARCHIVE="${BM1_ARCHIVE:-1}"
 BM1_RUN_ID="${BM1_RUN_ID:-}"
+if [[ "$SKIP_ARCHIVE" == "1" ]]; then
+  BM1_ARCHIVE=0
+fi
+
+# STAGE_ANDROID: default 1 — copy P7 export bundle into vigidroid/assets; set 0 to skip
+STAGE_ANDROID="${STAGE_ANDROID:-1}"
 
 # --- Python import path ------------------------------------------------------
 # Tell Python to import `src.*` from this package root
@@ -128,12 +138,14 @@ echo "SKIP_EVAL:       $SKIP_EVAL"
 echo "SKIP_VERIFY_DL:  $SKIP_VERIFY_DATALOADER"
 echo "SKIP_EXPORT:     $SKIP_EXPORT_ONNX"
 echo "SKIP_PARITY:     $SKIP_PARITY"
+echo "SKIP_ARCHIVE:    $SKIP_ARCHIVE"
 echo "SKIP_PLOTS:      $SKIP_PLOTS"
 echo "FRESH_TRAIN:     $FRESH_TRAIN"
 echo "INSTALL_DEPS:    $INSTALL_DEPS"
 echo "VERIFY_SETUP:    $VERIFY_SETUP"
 echo "BM1_ARCHIVE:     $BM1_ARCHIVE"
 echo "BM1_RUN_ID:      ${BM1_RUN_ID:-<auto when BM1_ARCHIVE=1>}"
+echo "STAGE_ANDROID:   $STAGE_ANDROID"
 SPLIT_MODE="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('split_mode','?'))")"
 TRAIN_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); print(c.get('preprocessing',{}).get('train_years','?'))")"
 TEST_YEARS="$("$PYTHON" -c "import yaml; c=yaml.safe_load(open('$CONFIG')); p=c.get('preprocessing',{}); print(p.get('test_years', p.get('val_years','?')))")"
@@ -283,9 +295,10 @@ fi
 if [[ "$BM1_ARCHIVE" == "1" ]]; then
   if [[ "$SKIP_PLOTS" != "1" ]]; then
     section "Step 8a: Thesis figures"
-    PLOT_ARGS=(--checkpoint "$CHECKPOINT")
-    [[ -n "$CONFIG" ]] && PLOT_ARGS+=(--config "$CONFIG")
-    "$PYTHON" "$ROOT/scripts/plot_bm1_results.py" "${PLOT_ARGS[@]}"
+    "$PYTHON" "$REPO_ROOT/scripts/plot_thesis_results.py" \
+      --profile mlp_header \
+      --root "$ROOT" \
+      --run-id "$BM1_RUN_ID"
   else
     echo ""
     echo "(Skipping figures; SKIP_PLOTS=1)"
@@ -298,7 +311,12 @@ if [[ "$BM1_ARCHIVE" == "1" ]]; then
   "$PYTHON" "$ROOT/scripts/generate_thesis_snippet.py"
 else
   echo ""
-  echo "(Skipping figures/archive finalize/thesis snippet; set BM1_ARCHIVE=1 to enable)"
+  echo "(Skipping figures/archive finalize/thesis snippet; BM1_ARCHIVE=0 or SKIP_ARCHIVE=1)"
+fi
+
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  section "Stage Android assets (P7 → vigidroid/)"
+  bash "$REPO_ROOT/Android_Works/stage_mlp_header.sh"
 fi
 
 # --- Done ---------------------------------------------------------------------
@@ -313,6 +331,9 @@ if [[ "$BM1_ARCHIVE" == "1" ]]; then
   echo "Run archive:        $ROOT/output_archives/$BM1_RUN_ID"
   echo "  RUN_MANIFEST:     $ROOT/output_archives/$BM1_RUN_ID/RUN_MANIFEST.json"
   echo "  THESIS_SNIPPET:   $ROOT/output_archives/$BM1_RUN_ID/THESIS_SNIPPET.md"
+fi
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  echo "Android assets:     $REPO_ROOT/vigidroid/app/src/main/assets/models/mlp_header/"
 fi
 echo ""
 echo "Done."

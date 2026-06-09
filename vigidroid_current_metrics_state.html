@@ -354,7 +354,7 @@
         </tr>
         <tr>
           <td><code>dex_header_manifest</code></td>
-          <td><em>(none — should be <code>pattern_a_combined</code>)</em></td>
+          <td><em>(none — should be <code>early_fusion_dex_manifest</code>)</em></td>
           <td>DEX header extraction (same as BM1)</td>
           <td>Manifest bag-of-words extract + vectorize (combined into one field)</td>
           <td>Pattern A fused ONNX</td>
@@ -362,7 +362,7 @@
         </tr>
         <tr>
           <td><code>dex_header_manifest_dual</code></td>
-          <td><em>(none — should be <code>pattern_b_dual_branch</code>)</em></td>
+          <td><em>(none — should be <code>dual_branch_dex_manifest</code>)</em></td>
           <td>DEX header extraction</td>
           <td>Manifest BoW extract + vectorize</td>
           <td>Pattern B dual-branch fused ONNX</td>
@@ -636,14 +636,14 @@
           <td><strong>Pattern A (ASCNN C)</strong></td>
           <td>—</td>
           <td>Dex header + manifest BoW (~4.5K-d)</td>
-          <td class="impl-yes">✅ <code>pattern_a_combined</code></td>
+          <td class="impl-yes">✅ <code>early_fusion_dex_manifest</code></td>
         </tr>
         <tr class="tier-3">
           <td></td><td></td>
           <td><strong>Pattern B (dual-branch)</strong></td>
           <td>—</td>
           <td>Same domains as A; two towers; slightly heavier</td>
-          <td class="impl-yes">✅ <code>pattern_b_dual_branch</code></td>
+          <td class="impl-yes">✅ <code>dual_branch_dex_manifest</code></td>
         </tr>
         <tr class="tier-3">
           <td></td><td></td>
@@ -717,7 +717,7 @@
         </tr>
         <tr class="tier-3">
           <td>Heavy fallback</td>
-          <td><code>pattern_a_combined</code> or <code>pattern_b_dual_branch</code><br><code>manifest_xgb</code></td>
+          <td><code>early_fusion_dex_manifest</code> or <code>dual_branch_dex_manifest</code><br><code>manifest_xgb</code></td>
           <td><code>dex_header_manifest</code> / <code>dex_header_manifest_dual</code><br><code>manifest_xgb</code></td>
           <td>Pick one Pattern variant as default; XGB for max structural signal</td>
         </tr>

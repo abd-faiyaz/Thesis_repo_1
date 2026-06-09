@@ -6,7 +6,6 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
 import java.util.Collections;
 import java.util.Map;
 
@@ -33,6 +32,7 @@ public final class MldpPrunedOnnxRunner implements Closeable {
   private final OrtEnvironment environment;
   private final OrtSession session;
   private final String inputName;
+  private final String outputName;
   private final ModelThresholds thresholds;
   private final String modelType;
 
@@ -40,20 +40,22 @@ public final class MldpPrunedOnnxRunner implements Closeable {
       OrtEnvironment environment,
       OrtSession session,
       String inputName,
+      String outputName,
       ModelThresholds thresholds,
       String modelType) {
     this.environment = environment;
     this.session = session;
     this.inputName = inputName;
+    this.outputName = outputName;
     this.thresholds = thresholds;
     this.modelType = modelType;
   }
 
   public static MldpPrunedOnnxRunner create(Context context, OrtEnvironment sharedEnv)
       throws Exception {
-    String manifestJson = ModelAssetHelper.readAssetText(context, MANIFEST_ASSET);
-    JSONObject manifest = new JSONObject(manifestJson);
+    JSONObject manifest = new JSONObject(ModelAssetHelper.readAssetText(context, MANIFEST_ASSET));
     String inputName = OnnxManifestIo.inputName(manifest, "permissions");
+    String outputName = OnnxManifestIo.malwareOutputName(manifest);
     String modelType = manifest.optString("model_type", "linear_svc");
     ModelThresholds thresholds = ModelThresholds.fromAsset(context, THRESHOLDS_ASSET);
     if (!thresholds.getModelType().isEmpty()) {
@@ -63,7 +65,10 @@ public final class MldpPrunedOnnxRunner implements Closeable {
       throw new IllegalStateException("Unsupported MLDP model_type: " + modelType);
     }
     java.io.File modelFile = ModelAssetHelper.copyAssetToCache(context, MODEL_ASSET, CACHE_FILE);
-    OrtSession session = sharedEnv.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
+    OrtSession session =
+        sharedEnv.createSession(
+            modelFile.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OnnxSessionDiagnostics.logSingleIo(TAG, MODEL_ID, session, inputName, outputName);
     Log.i(
         TAG,
         "Loaded MLDP ONNX (model_type="
@@ -72,7 +77,8 @@ public final class MldpPrunedOnnxRunner implements Closeable {
             + thresholds.getMalwareThreshold()
             + ") from "
             + modelFile.getAbsolutePath());
-    return new MldpPrunedOnnxRunner(sharedEnv, session, inputName, thresholds, modelType);
+    return new MldpPrunedOnnxRunner(
+        sharedEnv, session, inputName, outputName, thresholds, modelType);
   }
 
   public ModelThresholds getThresholds() {
@@ -92,13 +98,11 @@ public final class MldpPrunedOnnxRunner implements Closeable {
               + " permissions, got "
               + permissions.length);
     }
-    long[] shape = new long[] {1, permissions.length};
-    try (OnnxTensor tensor =
-        OnnxTensor.createTensor(environment, FloatBuffer.wrap(permissions), shape)) {
+    long[] shape = OnnxTensorFactory.batchRowShape(permissions.length);
+    try (OnnxTensor tensor = OnnxTensorFactory.createFloatTensor(environment, permissions, shape)) {
       Map<String, OnnxTensor> inputs = Collections.singletonMap(inputName, tensor);
       try (OrtSession.Result result = session.run(inputs)) {
-        Object value = result.get(0).getValue();
-        return readProbability(value);
+        return OnnxProbabilityReader.readFromResult(result, outputName);
       }
     }
   }
@@ -106,22 +110,6 @@ public final class MldpPrunedOnnxRunner implements Closeable {
   /** MLDP: malware when sigmoid probability >= threshold. */
   public boolean isMalware(float malwareProbability) {
     return thresholds.isMalware(malwareProbability);
-  }
-
-  private static float readProbability(Object value) {
-    if (value instanceof float[][]) {
-      return ((float[][]) value)[0][0];
-    }
-    if (value instanceof float[]) {
-      return ((float[]) value)[0];
-    }
-    if (value instanceof double[][]) {
-      return (float) ((double[][]) value)[0][0];
-    }
-    if (value instanceof double[]) {
-      return (float) ((double[]) value)[0];
-    }
-    throw new IllegalStateException("Unexpected ONNX output type: " + value.getClass().getName());
   }
 
   @Override

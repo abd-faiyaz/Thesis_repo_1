@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from src.config import PipelineConfig
 
@@ -84,6 +85,10 @@ def discover_apks(apk_root: Path) -> list[Path]:
     return sorted(p for p in apk_root.rglob("*.apk") if p.is_file())
 
 
+def _index_progress(items, *, desc: str):
+    return tqdm(items, desc=desc, unit="apk", dynamic_ncols=True)
+
+
 def _label_to_int(label_raw: str) -> int:
     key = label_raw.strip().lower()
     if key in {"benign", "goodware", "clean", "good", "0"}:
@@ -150,13 +155,20 @@ def scan_apk_rows(
         shared_rows = load_shared_manifest_rows(cfg.paths.shared_manifest_csv, root)
 
     if shared_rows:
+        print(
+            f"P1 index: {len(shared_rows)} rows from shared manifest "
+            f"({cfg.paths.shared_manifest_csv})",
+            flush=True,
+        )
         candidate_rows = shared_rows
     else:
+        print(f"P1 index: discovering APKs under {root} ...", flush=True)
         candidate_rows = []
         apks = discover_apks(root)
         if limit:
             apks = apks[:limit]
-        for apk_path in apks:
+        print(f"P1 index: hashing {len(apks)} APKs ...", flush=True)
+        for apk_path in _index_progress(apks, desc="P1 hash"):
             label = infer_label_from_parent(
                 apk_path, root, benign_names=benign, malicious_names=malicious
             )
@@ -189,7 +201,8 @@ def scan_apk_rows(
 
     seen: dict[str, IndexRow] = {}
     rows: list[IndexRow] = []
-    for row in candidate_rows:
+    dedupe_desc = "P1 validate" if shared_rows else "P1 finalize"
+    for row in _index_progress(candidate_rows, desc=dedupe_desc):
         apk = Path(row.apk_path)
         if not apk.is_file():
             failed.append(f"missing_file\t{row.apk_path}")
@@ -220,45 +233,19 @@ def scan_apk_rows(
 
 
 def assign_splits(cfg: PipelineConfig, rows: list[IndexRow]) -> list[IndexRow]:
-    """
-    BM1-style temporal split:
-      train_years → stratified train + val holdout
-      test_years  → all samples → test (never used during training)
-    """
-    split_cfg = cfg.splits
-    train_years = {int(y) for y in split_cfg.get("train_years", [2020, 2021])}
-    test_years = {int(y) for y in split_cfg.get("test_years", [2022, 2023])}
-    val_frac = float(split_cfg.get("val_fraction_of_train", 0.1))
-    seed = int(split_cfg.get("random_seed", 42))
+    """Train on train_years; val+test are a disjoint stratified split of holdout_years."""
+    from shared_splits import resolve_split_config, temporal_holdout_partition
 
-    if not 0.0 < val_frac < 1.0:
-        raise ValueError(f"val_fraction_of_train must be in (0, 1), got {val_frac}")
-
-    overlap = train_years & test_years
-    if overlap:
-        raise ValueError(f"train_years and test_years overlap: {sorted(overlap)}")
-
-    dev_rows = [r for r in rows if r.year in train_years]
-    test_rows = [r for r in rows if r.year in test_years]
-    other_rows = [r for r in rows if r.year not in train_years and r.year not in test_years]
-
-    if not dev_rows:
-        raise ValueError(f"No APKs for train_years={sorted(train_years)}")
-    if not test_rows:
-        raise ValueError(f"No APKs for test_years={sorted(test_years)}")
-
-    dev_labels = np.array([r.label for r in dev_rows])
-    train_rows, val_rows = train_test_split(
-        dev_rows,
-        test_size=val_frac,
-        stratify=dev_labels,
-        random_state=seed,
+    split_cfg = resolve_split_config(cfg.splits)
+    train_rows, val_rows, test_rows, other_rows = temporal_holdout_partition(
+        rows,
+        [r.label for r in rows],
+        get_year=lambda row: row.year,
+        train_years=split_cfg.train_years,
+        holdout_years=split_cfg.holdout_years,
+        val_fraction_of_holdout=split_cfg.val_fraction_of_holdout,
+        seed=split_cfg.random_seed,
     )
-
-    train_paths = {r.apk_path for r in train_rows}
-    val_paths = {r.apk_path for r in val_rows}
-    if train_paths & val_paths:
-        raise RuntimeError("train/val overlap detected after stratified split")
 
     def tag(split_name: str, items: list[IndexRow]) -> list[IndexRow]:
         return [replace(r, split=split_name) for r in items]
@@ -299,20 +286,17 @@ def year_label_split_summary(rows: list[IndexRow]) -> list[tuple[int | None, str
 
 
 def year_split_crosscheck(rows: list[IndexRow], cfg: PipelineConfig) -> list[str]:
-    """Return error messages if temporal split policy is violated."""
-    train_years = {int(y) for y in cfg.splits.get("train_years", [2020, 2021])}
-    test_years = {int(y) for y in cfg.splits.get("test_years", [2022, 2023])}
-    errors: list[str] = []
-    for row in rows:
-        if row.split in {"train", "val"} and row.year in test_years:
-            errors.append(
-                f"{row.split} split contains test year {row.year}: {row.apk_path}"
-            )
-        if row.split == "test" and row.year in train_years:
-            errors.append(f"test split contains train year {row.year}: {row.apk_path}")
-        if row.split == "train" and row.year in test_years:
-            errors.append(f"train split contains test year {row.year}: {row.apk_path}")
-    return errors
+    from shared_splits import crosscheck_temporal_holdout, resolve_split_config
+
+    split_cfg = resolve_split_config(cfg.splits)
+    return crosscheck_temporal_holdout(
+        rows,
+        get_split=lambda row: row.split,
+        get_year=lambda row: row.year,
+        get_path=lambda row: row.apk_path,
+        train_years=split_cfg.train_years,
+        holdout_years=split_cfg.holdout_years,
+    )
 
 
 def write_index_csv(path: Path, rows: list[IndexRow]) -> None:

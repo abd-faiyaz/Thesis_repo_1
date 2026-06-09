@@ -12,8 +12,8 @@
       "apk_basename": "E3D93C677FB91326FF01297A1053A94273D72BDCDE61075061713366C5DF7475.apk",
       "permissions": [
         "permissions::internet",
-        "permissions::read_external_storage",
-        "permissions::vibrate"
+        "permissions::vibrate",
+        "permissions::read_external_storage"
       ],
       "receiver_actions": [],
       "expected_vector": [
@@ -110,7 +110,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.09264317899942398,
+      "expected_malware_probability": 0.07571808248758316,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -118,13 +118,13 @@
       "val_index": 585,
       "apk_basename": "CE818FFC9A153AEBB992DBF693C75CFFD3C6502DC640DC0642807142511AE3CA.apk",
       "permissions": [
-        "permissions::write_external_storage",
-        "permissions::access_wifi_state",
-        "permissions::access_fine_location",
-        "permissions::access_network_state",
         "permissions::internet",
-        "permissions::record_audio",
-        "permissions::wake_lock"
+        "permissions::access_wifi_state",
+        "permissions::access_network_state",
+        "permissions::wake_lock",
+        "permissions::write_external_storage",
+        "permissions::access_fine_location",
+        "permissions::record_audio"
       ],
       "receiver_actions": [],
       "expected_vector": [
@@ -221,7 +221,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.1048746332526207,
+      "expected_malware_probability": 0.08303242921829224,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -326,7 +326,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.20642292499542236,
+      "expected_malware_probability": 0.11681220680475235,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -431,7 +431,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.20642292499542236,
+      "expected_malware_probability": 0.11681220680475235,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -439,15 +439,15 @@
       "val_index": 332,
       "apk_basename": "216F8484A2BE5DEA5A81C01ED0AC499E25BF244F452DEE6D81EAD923EEEBC2D4.apk",
       "permissions": [
-        "permissions::get_tasks",
-        "permissions::write_external_storage",
-        "permissions::read_phone_state",
-        "permissions::com_android_launcher_permission_install_shortcut",
+        "permissions::internet",
         "permissions::access_wifi_state",
         "permissions::access_network_state",
-        "permissions::internet",
+        "permissions::com_android_launcher_permission_install_shortcut",
+        "permissions::get_tasks",
+        "permissions::read_phone_state",
+        "permissions::wake_lock",
         "permissions::access_coarse_location",
-        "permissions::wake_lock"
+        "permissions::write_external_storage"
       ],
       "receiver_actions": [],
       "expected_vector": [
@@ -544,7 +544,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.7336698770523071,
+      "expected_malware_probability": 0.8221475481987,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -650,7 +650,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.1568785160779953,
+      "expected_malware_probability": 0.12319894134998322,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -658,23 +658,23 @@
       "val_index": 531,
       "apk_basename": "1B16CE42B83C8AB10737E27D07ABFCB248CEABFB1154AE8D36330D1AF42FF009.apk",
       "permissions": [
-        "permissions::request_install_packages",
-        "permissions::write_external_storage",
-        "permissions::read_external_storage",
-        "permissions::com_google_android_gms_permission_ad_id",
-        "permissions::com_google_android_c2dm_permission_receive",
-        "permissions::access_wifi_state",
-        "permissions::access_network_state",
-        "permissions::change_network_state",
-        "permissions::request_delete_packages",
         "permissions::internet",
-        "permissions::change_wifi_state",
-        "permissions::manage_external_storage",
         "permissions::read_media_images",
-        "permissions::package_usage_stats",
+        "permissions::access_wifi_state",
         "permissions::com_google_android_finsky_permission_bind_get_install_referrer_service",
         "permissions::foreground_service",
-        "permissions::wake_lock"
+        "permissions::access_network_state",
+        "permissions::request_delete_packages",
+        "permissions::read_external_storage",
+        "permissions::com_google_android_gms_permission_ad_id",
+        "permissions::package_usage_stats",
+        "permissions::request_install_packages",
+        "permissions::manage_external_storage",
+        "permissions::change_network_state",
+        "permissions::com_google_android_c2dm_permission_receive",
+        "permissions::wake_lock",
+        "permissions::write_external_storage",
+        "permissions::change_wifi_state"
       ],
       "receiver_actions": [
         "android.intent.action.BOOT_COMPLETED"
@@ -773,7 +773,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.45288705825805664,
+      "expected_malware_probability": 0.758643627166748,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -781,14 +781,14 @@
       "val_index": 71,
       "apk_basename": "EFD71B73591BF8DA0B14EAC3D07F104A0C5EE86D1F4157FB9B5904669D222C59.apk",
       "permissions": [
-        "permissions::write_external_storage",
-        "permissions::read_external_storage",
-        "permissions::read_phone_state",
-        "permissions::access_network_state",
         "permissions::internet",
         "permissions::foreground_service",
+        "permissions::access_network_state",
+        "permissions::read_external_storage",
         "permissions::receive_boot_completed",
-        "permissions::wake_lock"
+        "permissions::read_phone_state",
+        "permissions::wake_lock",
+        "permissions::write_external_storage"
       ],
       "receiver_actions": [
         "android.intent.action.ACTION_POWER_CONNECTED",
@@ -892,7 +892,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.5007160902023315,
+      "expected_malware_probability": 0.3921929597854614,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -900,24 +900,24 @@
       "val_index": 153,
       "apk_basename": "315B200AF5BF40A6F886C79B53D49479FBCC4715A788AD9AB41DED7D3BB80567.apk",
       "permissions": [
-        "permissions::request_install_packages",
-        "permissions::write_external_storage",
-        "permissions::read_external_storage",
-        "permissions::com_asus_msa_supplementarydid_access",
-        "permissions::vibrate",
-        "permissions::access_wifi_state",
-        "permissions::access_network_state",
-        "permissions::change_network_state",
-        "permissions::query_all_packages",
         "permissions::internet",
-        "permissions::change_wifi_state",
-        "permissions::reorder_tasks",
-        "permissions::com_hmz_koudaiwriting_dynamic_receiver_not_exported_permission",
-        "permissions::freemme_permission_msa_security_access",
-        "permissions::mount_unmount_filesystems",
-        "permissions::com_hmz_koudaiwriting_openadsdk_permission_tt_pangolin",
         "permissions::freemme_permission_msa",
-        "permissions::wake_lock"
+        "permissions::access_wifi_state",
+        "permissions::com_hmz_koudaiwriting_openadsdk_permission_tt_pangolin",
+        "permissions::mount_unmount_filesystems",
+        "permissions::access_network_state",
+        "permissions::com_asus_msa_supplementarydid_access",
+        "permissions::read_external_storage",
+        "permissions::freemme_permission_msa_security_access",
+        "permissions::vibrate",
+        "permissions::com_hmz_koudaiwriting_dynamic_receiver_not_exported_permission",
+        "permissions::request_install_packages",
+        "permissions::query_all_packages",
+        "permissions::reorder_tasks",
+        "permissions::change_network_state",
+        "permissions::wake_lock",
+        "permissions::write_external_storage",
+        "permissions::change_wifi_state"
       ],
       "receiver_actions": [],
       "expected_vector": [
@@ -1014,7 +1014,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.7891797423362732,
+      "expected_malware_probability": 0.884480893611908,
       "max_diff_vs_parity_vector": 0.0
     },
     {
@@ -1022,42 +1022,42 @@
       "val_index": 652,
       "apk_basename": "D6198746357ABE36A62B60D56C7381EE7FBA449C158B9B48D911E9596715FB6C.apk",
       "permissions": [
-        "permissions::broadcast_package_replaced",
+        "permissions::internet",
+        "permissions::com_android_launcher_permission_read_settings",
+        "permissions::broadcast_package_changed",
+        "permissions::vibrate",
+        "permissions::request_install_packages",
+        "permissions::reorder_tasks",
+        "permissions::camera",
+        "permissions::write_external_storage",
+        "permissions::com_duoduo_child_story_openadsdk_permission_tt_pangolin",
+        "permissions::access_wifi_state",
+        "permissions::com_coloros_mcs_permission_recieve_mcs_message",
         "permissions::com_asus_msa_supplementarydid_access",
         "permissions::com_android_launcher_permission_install_shortcut",
         "permissions::query_all_packages",
-        "permissions::internet",
-        "permissions::wake_lock",
-        "permissions::request_install_packages",
-        "permissions::read_external_storage",
-        "permissions::broadcast_package_install",
-        "permissions::flashlight",
-        "permissions::com_miui_systemadsolution_adswitch_provider",
-        "permissions::com_coloros_mcs_permission_recieve_mcs_message",
-        "permissions::system_alert_window",
-        "permissions::com_android_launcher_permission_read_settings",
-        "permissions::use_credentials",
-        "permissions::broadcast_package_added",
-        "permissions::system_overlay_window",
-        "permissions::write_external_storage",
-        "permissions::access_coarse_updates",
-        "permissions::access_wifi_state",
-        "permissions::com_duoduo_child_story_permission_mipush_receive",
-        "permissions::record_audio",
-        "permissions::read_settings",
-        "permissions::reorder_tasks",
-        "permissions::com_android_launcher_permission_write_settings",
         "permissions::com_heytap_mcs_permission_recieve_mcs_message",
-        "permissions::broadcast_package_changed",
-        "permissions::vibrate",
-        "permissions::com_vivo_notification_permission_badge_icon",
         "permissions::read_phone_state",
-        "permissions::com_duoduo_child_story_openadsdk_permission_tt_pangolin",
-        "permissions::access_network_state",
+        "permissions::use_credentials",
+        "permissions::read_settings",
+        "permissions::com_vivo_notification_permission_badge_icon",
+        "permissions::flashlight",
+        "permissions::broadcast_package_install",
         "permissions::change_network_state",
+        "permissions::wake_lock",
         "permissions::change_wifi_state",
+        "permissions::com_miui_systemadsolution_adswitch_provider",
+        "permissions::system_alert_window",
+        "permissions::broadcast_package_replaced",
+        "permissions::access_network_state",
         "permissions::change_wifi_multicast_state",
-        "permissions::camera"
+        "permissions::read_external_storage",
+        "permissions::broadcast_package_added",
+        "permissions::com_android_launcher_permission_write_settings",
+        "permissions::access_coarse_updates",
+        "permissions::com_duoduo_child_story_permission_mipush_receive",
+        "permissions::system_overlay_window",
+        "permissions::record_audio"
       ],
       "receiver_actions": [
         "android.intent.action.DOWNLOAD_COMPLETE",
@@ -1158,7 +1158,7 @@
         0.0,
         0.0
       ],
-      "expected_malware_probability": 0.9985044002532959,
+      "expected_malware_probability": 0.9929435849189758,
       "max_diff_vs_parity_vector": 0.0
     }
   ]

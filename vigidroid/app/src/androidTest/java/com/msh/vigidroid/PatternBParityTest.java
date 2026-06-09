@@ -23,7 +23,7 @@ public class PatternBParityTest {
 
   private static final double TOLERANCE = 1e-4;
   private static final String PARITY_ASSET =
-      "models/pattern_b_dual_branch/parity_samples/parity_vectors.json";
+      "models/dual_branch_dex_manifest/parity_samples/parity_vectors.json";
 
   @Test
   public void paritySamples_matchPcExport() throws Exception {

@@ -24,11 +24,12 @@ preprocessing:
   labels_csv: null                  # e.g. data/labels.csv when label_mode=csv
   benign_names: [benign, goodware, clean, good, "0"]
   malicious_names: [malware, malicious, virus, bad, "1"]
-  # Temporal protocol: train on train_years, val holdout from train_years, test on test_years
-  split_mode: temporal_year       # temporal_year | stratified_random
+  # Temporal holdout: train on train_years; val+test are a disjoint split of holdout_years.
+  split_mode: temporal_holdout       # temporal_holdout | stratified_random
   train_years: [2020, 2021]
-  test_years: [2022, 2023]
-  val_fraction: 0.1               # stratified holdout from train_years (early stopping / best.pt)
+  holdout_years: [2022, 2023]
+  val_fraction_of_holdout: 0.5
+  random_seed: 42
 
 data:
   batch_size: 16                  # paper
@@ -51,8 +52,13 @@ training:
   checkpoint_every_epoch: true
   device: cuda                     # fallback to cpu if unavailable
 
+cascade:
+  target_false_omission_rate: 0.02
+  target_false_alarm_at_thigh: 0.02
+
 evaluation:
   threshold: 0.5
+  tune_threshold_on_val: true
   metrics:
     - accuracy
     - f1

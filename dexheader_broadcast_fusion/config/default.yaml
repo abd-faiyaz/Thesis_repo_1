@@ -1,0 +1,83 @@
+model_id: dexheader_broadcast_fusion
+domain: dex_header_receiver_actions
+
+paths:
+  apk_root: /mnt/Files/thesis_full_dataset
+  artifacts: artifacts
+  manifests_dir: artifacts/manifests
+  dataset_index: artifacts/manifests/apk_index.csv
+  splits_dir: artifacts/splits
+  processed: artifacts/processed
+  checkpoints: artifacts/checkpoints
+  metrics: artifacts/metrics
+  export: artifacts/export/dexheader_broadcast_fusion
+  failed_index_log: artifacts/failed_index.log
+  failed_apks_log: artifacts/failed_apks.log
+  system_actions_file: assets/system_actions.json
+  deployed_mlp_header_bundle: ../vigidroid/app/src/main/assets/models/mlp_header
+  deployed_mlp_header_checkpoint: ../Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth
+
+splits:
+  train_years: [2020, 2021]
+  holdout_years: [2022, 2023]
+  val_fraction_of_holdout: 0.5
+  random_seed: 42
+
+indexing:
+  label_mode: parent_folder
+  benign_names: [benign, goodware, clean, good, "0"]
+  malicious_names: [malware, malicious, virus, bad, "1"]
+  collect_apk_metadata: true
+
+features:
+  manifest_backend: pyaxmlparser
+  receiver_scope: static_manifest_only
+  receiver_system_actions_only: true
+  system_actions_file: assets/system_actions.json
+  receiver_action_min_doc_freq: 1
+  dex:
+    header_size: 112
+    magic_len: 8
+    feature_dim: 104
+    multidex_mode: sum
+    dex_pattern: "^classes(\\d*)\\.dex$"
+    max_dex: 3
+  normalization_header_source: deployed_mlp_header  # reuse BM1 shipped stats (5B)
+
+model:
+  header_hidden: 128
+  header_warm_start: true
+  receiver_embed_dim: 32
+  fusion_hidden: 64
+  fusion_head: mlp  # mlp | logistic
+
+training:
+  batch_size: 64
+  epochs: 60
+  smoke_epochs: 2
+  optimizer: adamw
+  learning_rate: 0.005
+  weight_decay: 0.0001
+  pos_weight: auto
+  early_stop_patience: 6
+  seed: 42
+
+baseline:
+  paper_svm: true
+  svm_C: 10.0
+  svm_gamma: 0.1
+  svm_kernel: rbf
+
+export:
+  onnx_opset: 14
+  parity_num_samples: 10
+  parity_max_delta: 1.0e-4
+
+evaluation:
+  threshold: 0.5
+  tune_threshold_on_val: true
+
+data:
+  batch_size: 64
+  num_workers: 4
+  pin_memory: true

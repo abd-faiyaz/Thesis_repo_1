@@ -25,6 +25,8 @@ public class MldpPrunedParityTest {
   private static final double TOLERANCE = 1e-4;
   private static final String PARITY_ASSET =
       "models/mldp_pruned_permission/parity_samples/parity_vectors.json";
+  private static final String MANIFEST_ASSET =
+      "models/mldp_pruned_permission/export_manifest.json";
 
   @Test
   public void paritySamples_matchPcExport() throws Exception {
@@ -42,8 +44,11 @@ public class MldpPrunedParityTest {
     MldpPrunedPermissionExtractor.fromAssets(context);
     OrtEnvironment env = OrtEnvironment.getEnvironment();
     MldpPrunedOnnxRunner runner = MldpPrunedOnnxRunner.create(context, env);
+    String expectedModelType =
+        new JSONObject(ModelAssetHelper.readAssetText(context, MANIFEST_ASSET))
+            .getString("model_type");
     try {
-      assertEquals("linear_svc", runner.getModelType());
+      assertEquals(expectedModelType, runner.getModelType());
       double maxDiff = 0.0;
       for (int i = 0; i < vectors.length(); i++) {
         float[] features = jsonRowToFloats(vectors.getJSONArray(i));

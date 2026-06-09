@@ -24,11 +24,18 @@ from src.training.ablation import (
     sliced_input_dim,
 )
 from src.training.checkpoint import load_best_checkpoint, load_frozen_vocabs, restore_model_weights
+from shared_calibration import (
+    build_val_thresholds_payload,
+    find_repo_root,
+    format_cascade_band_summary,
+    write_split_scores_bundle,
+    write_thresholds,
+)
+
 from src.training.metrics import (
     build_confusion_matrix,
     compute_metrics,
     format_metrics,
-    tune_threshold,
 )
 from src.training.setup import resolve_device
 
@@ -190,24 +197,59 @@ def run_test_evaluation(
     full_model = load_ablation_model(cfg, mode="full_fusion", input_dim=total_dim)
     full_model.to(device)
 
-    tuned_threshold = default_threshold
-    if do_tune:
-        y_true_val, _, val_scores = collect_predictions(
-            full_model, val_loader_full, device, threshold=default_threshold
-        )
-        tuned_threshold = tune_threshold(y_true_val, val_scores)
-
-    thresholds_payload = {
-        "default": default_threshold,
-        "tuned_val": tuned_threshold,
-    }
-    thresholds_path = cfg.paths.metrics / "thresholds.json"
-    thresholds_path.write_text(
-        json.dumps(thresholds_payload, indent=2) + "\n",
-        encoding="utf-8",
+    y_true_val, _, val_scores = collect_predictions(
+        full_model, val_loader_full, device, threshold=default_threshold
     )
+    thresholds_payload = build_val_thresholds_payload(
+        model_id=cfg.model_id,
+        y_true=y_true_val,
+        scores=val_scores,
+        default=default_threshold,
+        tune=do_tune,
+        calibrate_bands=True,
+        cascade_targets=cfg.raw.get("cascade", {}),
+        extra={
+            "model_type": str(cfg.classifier.get("deployment", "tiny_mlp")),
+            "description": "Predict malware when malware_prob >= tuned_val (val-tuned threshold)",
+        },
+    )
+    tuned_threshold = float(thresholds_payload["tuned_val"])
+    thresholds_path = cfg.paths.metrics / "thresholds.json"
+    write_thresholds(thresholds_path, thresholds_payload)
+    band_summary = format_cascade_band_summary(thresholds_payload)
+    if band_summary:
+        print(f"  cascade bands: {band_summary}")
+
+    repo_root = find_repo_root(cfg.root)
+    val_score_path = write_split_scores_bundle(
+        model_id=cfg.model_id,
+        split="val",
+        metrics_dir=cfg.paths.metrics,
+        apk_ids=val_shard.sha256,
+        labels=y_true_val,
+        scores=val_scores,
+        threshold=tuned_threshold,
+        repo_root=repo_root,
+    )
+    print(f"  val scores → {val_score_path}")
 
     threshold = tuned_threshold if do_tune else default_threshold
+    y_test, _, test_scores = collect_predictions(
+        full_model, test_loader_full, device, threshold=threshold
+    )
+    test_score_path = write_split_scores_bundle(
+        model_id=cfg.model_id,
+        split="test",
+        metrics_dir=cfg.paths.metrics,
+        apk_ids=test_shard.sha256,
+        labels=y_test,
+        scores=test_scores,
+        threshold=threshold,
+        repo_root=repo_root,
+        sync_val_to_workspace=False,
+    )
+    print(f"  test scores → {test_score_path}")
+
     primary = evaluate_model_on_loader(
         full_model, test_loader_full, device, threshold=threshold
     )

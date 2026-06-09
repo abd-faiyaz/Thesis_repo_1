@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model_thresholds.schema.json",
+  "title": "Model bundle thresholds",
+  "description": "Per-model decision cutoff and optional cascade uncertain band (canonical shape for thesis pipelines).",
+  "type": "object",
+  "required": ["model_id", "default", "tuned_val"],
+  "properties": {
+    "model_id": { "type": "string" },
+    "default": { "type": "number", "minimum": 0, "maximum": 1 },
+    "tuned_val": { "type": "number", "minimum": 0, "maximum": 1 },
+    "malware_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+    "model_type": { "type": "string" },
+    "decision_variant": { "type": "string" },
+    "description": { "type": "string" },
+    "cascade": {
+      "type": "object",
+      "required": [
+        "t_low",
+        "t_high",
+        "val_false_omission_rate_at_t_low",
+        "val_false_alarm_rate_at_t_high",
+        "val_step1_exit_rate"
+      ],
+      "properties": {
+        "t_low": { "type": "number", "minimum": 0, "maximum": 1 },
+        "t_high": { "type": "number", "minimum": 0, "maximum": 1 },
+        "val_false_omission_rate_at_t_low": { "type": "number", "minimum": 0, "maximum": 1 },
+        "val_false_alarm_rate_at_t_high": { "type": "number", "minimum": 0, "maximum": 1 },
+        "val_step1_exit_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "cascade_targets": {
+      "type": "object",
+      "required": ["target_false_omission_rate", "target_false_alarm_at_thigh"],
+      "properties": {
+        "target_false_omission_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "target_false_alarm_at_thigh": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "mode_a": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "number" },
+        "tuned_val": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "mode_b": {
+      "type": "object",
+      "properties": {
+        "stage1_t_low": { "type": "number" },
+        "stage1_t_high": { "type": "number" },
+        "val_false_omission_rate_at_t_low": { "type": "number" },
+        "val_false_alarm_rate_at_t_high": { "type": "number" },
+        "val_step1_exit_rate": { "type": "number" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

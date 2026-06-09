@@ -2,54 +2,54 @@
   "num_samples": 10,
   "samples": [
     {
-      "index": 83,
+      "index": 65,
       "label": 0,
-      "expected_malware_probability": 0.34290263056755066
+      "expected_malware_probability": 0.028392361477017403
     },
     {
-      "index": 748,
+      "index": 585,
       "label": 0,
-      "expected_malware_probability": 0.36525166034698486
+      "expected_malware_probability": 0.028392361477017403
     },
     {
-      "index": 86,
+      "index": 67,
       "label": 0,
-      "expected_malware_probability": 0.28732016682624817
+      "expected_malware_probability": 0.028392361477017403
     },
     {
-      "index": 633,
+      "index": 495,
       "label": 0,
-      "expected_malware_probability": 0.3145255744457245
+      "expected_malware_probability": 0.028392361477017403
     },
     {
-      "index": 425,
-      "label": 0,
-      "expected_malware_probability": 0.28732016682624817
-    },
-    {
-      "index": 420,
-      "label": 0,
-      "expected_malware_probability": 0.3218286633491516
-    },
-    {
-      "index": 678,
-      "label": 0,
-      "expected_malware_probability": 0.2823565602302551
-    },
-    {
-      "index": 91,
+      "index": 332,
       "label": 1,
-      "expected_malware_probability": 0.905746340751648
+      "expected_malware_probability": 0.3776238262653351
     },
     {
-      "index": 196,
+      "index": 328,
       "label": 0,
-      "expected_malware_probability": 0.28732016682624817
+      "expected_malware_probability": 0.028392361477017403
     },
     {
-      "index": 833,
+      "index": 531,
       "label": 0,
-      "expected_malware_probability": 0.3145255744457245
+      "expected_malware_probability": 0.9964452385902405
+    },
+    {
+      "index": 71,
+      "label": 0,
+      "expected_malware_probability": 0.028392361477017403
+    },
+    {
+      "index": 153,
+      "label": 1,
+      "expected_malware_probability": 0.9999604225158691
+    },
+    {
+      "index": 652,
+      "label": 1,
+      "expected_malware_probability": 1.0
     }
   ]
 }

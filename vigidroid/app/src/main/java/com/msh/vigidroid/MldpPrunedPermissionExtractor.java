@@ -58,9 +58,18 @@ public final class MldpPrunedPermissionExtractor {
     long t0 = System.nanoTime();
     List<String> tokens = PermissionNormalizer.readNormalizedPermissions(apkFile);
     long t1 = System.nanoTime();
+    return vectorizePermissions(tokens, t1 - t0);
+  }
+
+  public ExtractionResult extract(FeatureContext ctx) {
+    return vectorizePermissions(ctx.normalizedPermissions(), 0L);
+  }
+
+  private ExtractionResult vectorizePermissions(List<String> tokens, long parseNanos) {
+    long t1 = System.nanoTime();
     float[] vector = buildBinaryVector(tokens);
     long t2 = System.nanoTime();
-    return new ExtractionResult(vector, tokens.size(), t1 - t0, t2 - t1);
+    return new ExtractionResult(vector, tokens.size(), parseNanos, t2 - t1);
   }
 
   float[] buildBinaryVector(List<String> normalizedTokens) {

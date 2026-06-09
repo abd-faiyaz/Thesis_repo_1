@@ -1,4 +1,4 @@
-"""Live archive mirroring when BMH_RUN_ID is set (see run_broadcast_mldp_hybrid.sh)."""
+"""Live archive mirroring when BMH_RUN_ID is set (see run_brd_mldp_hybrid.sh)."""
 
 from __future__ import annotations
 

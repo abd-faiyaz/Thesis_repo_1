@@ -16,6 +16,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VigiDroid">
 
+        <activity
+            android:name=".ModelHealthActivity"
+            android:exported="false" />
+
         <activity android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
@@ -24,13 +28,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Broadcast Receiver for new APK downloads -->
+        <!-- Broadcast receiver for DownloadManager completion (A3 incremental scan). -->
         <receiver android:name=".ApkDownloadReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE"/>
-                <data android:scheme="content"/>
-                <data android:mimeType="application/vnd.android.package-archive" />
             </intent-filter>
         </receiver>
 

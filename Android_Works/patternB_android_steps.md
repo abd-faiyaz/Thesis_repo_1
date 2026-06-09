@@ -1,7 +1,7 @@
-# Pattern B (`pattern_b_dual_branch`) — Android steps A1 → A4
+# Pattern B (`dual_branch_dex_manifest`) — Android steps A1 → A4
 
 **Model:** MLP(header) + ASCNN(manifest) fused inside one ONNX (late fusion exported as single graph)  
-**Model ID:** `pattern_b_dual_branch`  
+**Model ID:** `dual_branch_dex_manifest`  
 **Status:** **Not implemented** in `vigidroid/`. Complete BM1 first; Pattern A BoW extractor is reusable.
 
 **Rule:** Do **not** change existing ByteCNN / XGBoost. Add Pattern B as a **new** `stages[]` entry.
@@ -16,8 +16,8 @@
 
 | What | Path |
 |------|------|
-| PC export bundle | `Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch/` |
-| Android assets target | `vigidroid/app/src/main/assets/models/pattern_b_dual_branch/` |
+| PC export bundle | `Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/dual_branch_dex_manifest/` |
+| Android assets target | `vigidroid/app/src/main/assets/models/dual_branch_dex_manifest/` |
 | Python reference | `.../dual_branch_merge_approach/src/features/` |
 
 ---
@@ -27,12 +27,12 @@
 ```bash
 cd /mnt/Files/thesis_vigidroid
 
-mkdir -p vigidroid/app/src/main/assets/models/pattern_b_dual_branch
+mkdir -p vigidroid/app/src/main/assets/models/dual_branch_dex_manifest
 
-cp -r Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch/* \
-  vigidroid/app/src/main/assets/models/pattern_b_dual_branch/
+cp -r Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/dual_branch_dex_manifest/* \
+  vigidroid/app/src/main/assets/models/dual_branch_dex_manifest/
 
-ls vigidroid/app/src/main/assets/models/pattern_b_dual_branch/
+ls vigidroid/app/src/main/assets/models/dual_branch_dex_manifest/
 ```
 
 **Optional PC parity check:**
@@ -40,7 +40,7 @@ ls vigidroid/app/src/main/assets/models/pattern_b_dual_branch/
 ```bash
 cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach
 ../../../thesis_venv/bin/python scripts/parity_check_onnx.py \
-  --bundle artifacts/export/pattern_b_dual_branch
+  --bundle artifacts/export/dual_branch_dex_manifest
 ```
 
 ---
@@ -53,7 +53,7 @@ cd /mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/custom_approach/d
 
 - [ ] **A1.1** Reuse `DexHeaderFeatureExtractor` from BM1
 - [ ] **A1.2** Reuse `ManifestBowExtractor` from Pattern A but load vocab from:
-  - `assets/models/pattern_b_dual_branch/features/vocab.json`
+  - `assets/models/dual_branch_dex_manifest/features/vocab.json`
 - [ ] **A1.3** Do **not** reimplement fusion in Java — fusion is inside ONNX
 
 If Pattern A A1 is done, Pattern B A1 is mostly **pointing at Pattern B asset paths**.
@@ -65,7 +65,7 @@ If Pattern A A1 is done, Pattern B A1 is mostly **pointing at Pattern B asset pa
 ### Tasks to implement in `vigidroid/`
 
 - [ ] **A2.1** New `PatternBOnnxRunner.java` (or generic runner keyed by `model_id`)
-  - Load `assets/models/pattern_b_dual_branch/model.onnx`
+  - Load `assets/models/dual_branch_dex_manifest/model.onnx`
   - Inputs: `header` `[1,104]`, `bow` `[1,4381]`
   - Output: `malware_probability`
 - [ ] **A2.2** Independent from Pattern A session (separate model file)
@@ -89,15 +89,15 @@ cd /mnt/Files/thesis_vigidroid/vigidroid
   thesis_venv/bin/python - <<'PY'
   import json, numpy as np
   from pathlib import Path
-  p = Path("Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch/parity_samples")
+  p = Path("Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/dual_branch_dex_manifest/parity_samples")
   d = np.load(p / "sample_vectors.npz")
   out = {k: d[k].tolist() for k in d.files}
   out["index"] = json.loads((p / "index.json").read_text())
   (p / "parity_vectors.json").write_text(json.dumps(out))
   print("keys:", list(d.files))
   PY
-  cp Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/pattern_b_dual_branch/parity_samples/parity_vectors.json \
-     vigidroid/app/src/main/assets/models/pattern_b_dual_branch/parity_samples/
+  cp Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/export/dual_branch_dex_manifest/parity_samples/parity_vectors.json \
+     vigidroid/app/src/main/assets/models/dual_branch_dex_manifest/parity_samples/
   ```
 - [ ] **A4.2** `PatternBParityTest.java` — 8 samples, tolerance `1e-4`
 
@@ -116,7 +116,7 @@ cd /mnt/Files/thesis_vigidroid/vigidroid
 
 ### Tasks to implement in `vigidroid/`
 
-- [ ] **A3.1** Register `model_id`: `pattern_b_dual_branch`, `domain`: `dex_header_manifest_dual`
+- [ ] **A3.1** Register `model_id`: `dual_branch_dex_manifest`, `domain`: `dex_header_manifest_dual`
 - [ ] **A3.2** Per APK: header + bow → Pattern B ONNX → append `stages[]`
 - [ ] **A3.3** Legacy ByteCNN / XGBoost unchanged
 
@@ -153,7 +153,7 @@ You can enable **one model at a time** in scans (config flag) or run all registe
 
 ## Done checklist
 
-- [ ] Bundle in `assets/models/pattern_b_dual_branch/`
+- [ ] Bundle in `assets/models/dual_branch_dex_manifest/`
 - [ ] A4 passes (8/8) on POCO F3
 - [ ] A3 writes Pattern B stages to `all_scan_metrics.json`
 - [ ] CNN/XGB unaffected

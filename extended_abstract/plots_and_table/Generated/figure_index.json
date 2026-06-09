@@ -1,0 +1,7 @@
+{
+  "figures": [
+    "inferenceTime_vs_apkSize.png",
+    "sample_model_vs_accuracy_resources.png"
+  ],
+  "out_dir": "/mnt/Files/thesis_vigidroid/extended_abstract/plots_and_table/Generated"
+}

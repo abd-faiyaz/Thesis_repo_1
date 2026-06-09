@@ -26,6 +26,18 @@ public class ModelRegistryTest {
   }
 
   @Test
+  public void dexheaderBroadcastFusion_assetsMatchExportManifest() {
+    assertEquals(
+        "dexheader_broadcast_fusion", ModelRegistry.DEXHEADER_BROADCAST_FUSION.modelId);
+    assertEquals(
+        DexheaderBroadcastFusionOnnxRunner.DOMAIN,
+        ModelRegistry.DEXHEADER_BROADCAST_FUSION.domain);
+    assertTrue(
+        ModelRegistry.DEXHEADER_BROADCAST_FUSION.assetsPrefix.contains(
+            "dexheader_broadcast_fusion"));
+  }
+
+  @Test
   public void mldpDexheaderCascade_assetsMatchExportManifest() {
     assertEquals(
         "mldp_dexheader_cascade_mode_a", ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.modelId);
@@ -35,6 +47,19 @@ public class ModelRegistryTest {
         MldpDexHeaderModeAOnnxRunner.DOMAIN, ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.domain);
     assertTrue(
         ModelRegistry.MLDP_DEXHEADER_CASCADE_MODE_A.assetsPrefix.contains("mldp_dexheader_cascade"));
+  }
+
+  @Test
+  public void allScanStages_includesDexBroadcastFusion() {
+    assertEquals(11, ModelRegistry.ALL_SCAN_STAGES.length);
+    boolean found = false;
+    for (ModelRegistry.Entry entry : ModelRegistry.ALL_SCAN_STAGES) {
+      if (ModelRegistry.DEXHEADER_BROADCAST_FUSION.modelId.equals(entry.modelId)) {
+        found = true;
+        break;
+      }
+    }
+    assertTrue(found);
   }
 
   @Test

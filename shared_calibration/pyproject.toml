@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shared-calibration"
+version = "0.1.0"
+description = "Shared threshold tuning and cascade band calibration for thesis pipelines"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24.0",
+  "scikit-learn>=1.3.0",
+]
+
+[tool.setuptools]
+package-dir = {"shared_calibration" = "."}
+packages = ["shared_calibration"]

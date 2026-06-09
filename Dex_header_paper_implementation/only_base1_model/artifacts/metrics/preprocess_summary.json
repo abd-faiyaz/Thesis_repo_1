@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-06T19:36:14.775212+00:00",
-  "run_id": "run_20260607_val_test_fix",
+  "timestamp": "2026-06-08T10:09:26.505691+00:00",
+  "run_id": null,
   "apk_root": "/mnt/Files/thesis_full_dataset",
   "total_apks": 13528,
   "successful": 13528,

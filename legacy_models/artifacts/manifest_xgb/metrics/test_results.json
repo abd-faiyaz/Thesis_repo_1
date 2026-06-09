@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-06-08T14:37:24.520394+00:00",
+  "model_id": "manifest_xgb",
+  "domain": "manifest_xgb",
+  "split": "test",
+  "n_samples": 764,
+  "metrics": {
+    "accuracy": 0.93717277486911,
+    "f1": 0.8883720930232558,
+    "roc_auc": 0.9913369197051206
+  },
+  "threshold": 0.5,
+  "confusion_matrix": [
+    [
+      525,
+      0
+    ],
+    [
+      48,
+      191
+    ]
+  ],
+  "checkpoint": "/mnt/Files/thesis_vigidroid/vigidroid/app/src/main/assets/mh1m_2500_rp_XGBoost.onnx",
+  "class_counts": {
+    "benign": 525,
+    "malware": 239
+  },
+  "apk_root": "/mnt/Files/thesis_full_dataset",
+  "split_file": "Shared_pipeline_Files/data/splits/test.txt",
+  "missing_apks": 0
+}

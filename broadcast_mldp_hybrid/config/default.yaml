@@ -73,6 +73,10 @@ export:
   parity_num_samples: 10
   parity_max_delta: 1.0e-4
 
+cascade:
+  target_false_omission_rate: 0.02
+  target_false_alarm_at_thigh: 0.02
+
 evaluation:
   threshold: 0.5
   tune_threshold_on_val: true

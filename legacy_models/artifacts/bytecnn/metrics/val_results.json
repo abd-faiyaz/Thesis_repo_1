@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-06-08T14:37:50.883542+00:00",
+  "model_id": "bytecnn",
+  "domain": "bytecnn",
+  "split": "val",
+  "n_samples": 764,
+  "metrics": {
+    "accuracy": 0.9109947643979057,
+    "f1": 0.8617886178861789,
+    "roc_auc": 0.9620482167762502
+  },
+  "threshold": 0.5,
+  "confusion_matrix": [
+    [
+      484,
+      41
+    ],
+    [
+      27,
+      212
+    ]
+  ],
+  "checkpoint": "/mnt/Files/thesis_vigidroid/1dcnn/bytecnn_basemodel_2020.onnx",
+  "class_counts": {
+    "benign": 525,
+    "malware": 239
+  },
+  "apk_root": "/mnt/Files/thesis_full_dataset",
+  "split_file": "Shared_pipeline_Files/data/splits/val.txt",
+  "missing_apks": 0
+}

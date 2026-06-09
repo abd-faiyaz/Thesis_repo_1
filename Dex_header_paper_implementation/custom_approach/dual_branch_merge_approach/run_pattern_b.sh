@@ -2,20 +2,22 @@
 # =============================================================================
 # run_pattern_b.sh — End-to-end Pattern B (Dual-Branch Merge) pipeline
 #
-# Phases 2 → 6:
-#   1. Optional: install dependencies
-#   2. Optional: verify environment
-#   3. Preprocess APKs → per-APK shards + manifests
-#   4. Compute class balance → artifacts/class_balance.json
-#   5. Train DualBranchNet (resume-safe)
-#   6. Evaluate best/latest checkpoint (ACC, F1, AUC)
-#   7. Optional: package portable artifacts tarball
+# Pipeline:
+#   P0  verify_setup (+ optional pip install)
+#   P2  preprocess APKs → per-APK shards + manifests
+#   P5  train DualBranchNet (resume-safe)
+#   P6  evaluate best/latest checkpoint (ACC, F1, AUC)
+#   P7  export ONNX bundle (artifacts/export/dual_branch_dex_manifest/)
+#   P8  PyTorch vs ONNX parity
+#   +   figures, archive finalize, THESIS_SNIPPET (default on; PB_ARCHIVE=0 or SKIP_ARCHIVE=1 to disable)
+#   +   Android asset staging by default (set STAGE_ANDROID=0 to skip)
 #
 # Usage:
 #   ./run_pattern_b.sh
 #   APK_ROOT=/data/apks ./run_pattern_b.sh
 #   SKIP_PREPROCESS=1 ./run_pattern_b.sh
 #   PREPROCESS_LIMIT=200 EPOCHS=2 ./run_pattern_b.sh   # smoke test
+#   STAGE_ANDROID=0 ./run_pattern_b.sh
 # =============================================================================
 
 set -euo pipefail
@@ -29,7 +31,7 @@ cd "$ROOT"
 source "$ROOT/scripts/activate_thesis_env.sh"
 
 ARCHIVE_PY="$REPO_ROOT/scripts/thesis_run_archive.py"
-PROFILE="pattern_b_dual_branch"
+PROFILE="dual_branch_dex_manifest"
 
 APK_ROOT="${APK_ROOT:-$ROOT/data/apks}"
 CONFIG="${CONFIG:-$ROOT/config/default.yaml}"
@@ -39,15 +41,22 @@ VERIFY_SETUP="${VERIFY_SETUP:-1}"
 SKIP_PREPROCESS="${SKIP_PREPROCESS:-0}"
 SKIP_TRAIN="${SKIP_TRAIN:-0}"
 SKIP_EVAL="${SKIP_EVAL:-0}"
+SKIP_EXPORT_ONNX="${SKIP_EXPORT_ONNX:-0}"
+SKIP_PARITY="${SKIP_PARITY:-0}"
 SKIP_PACKAGE="${SKIP_PACKAGE:-0}"
+SKIP_ARCHIVE="${SKIP_ARCHIVE:-0}"
 SKIP_PLOTS="${SKIP_PLOTS:-0}"
 FRESH_TRAIN="${FRESH_TRAIN:-0}"
 PREPROCESS_LIMIT="${PREPROCESS_LIMIT:-}"
 EXTRACT_LIMIT="${EXTRACT_LIMIT:-}"
 PIPELINE_LOG="${PIPELINE_LOG:-$ROOT/artifacts/pipeline.log}"
 
-PB_ARCHIVE="${PB_ARCHIVE:-0}"
+PB_ARCHIVE="${PB_ARCHIVE:-1}"
 PB_RUN_ID="${PB_RUN_ID:-}"
+STAGE_ANDROID="${STAGE_ANDROID:-1}"
+if [[ "$SKIP_ARCHIVE" == "1" ]]; then
+  PB_ARCHIVE=0
+fi
 
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -85,7 +94,12 @@ echo "CONFIG:           $CONFIG"
 echo "SKIP_PREPROCESS:  $SKIP_PREPROCESS"
 echo "SKIP_TRAIN:       $SKIP_TRAIN"
 echo "SKIP_EVAL:        $SKIP_EVAL"
+echo "SKIP_EXPORT:      $SKIP_EXPORT_ONNX"
+echo "SKIP_PARITY:      $SKIP_PARITY"
 echo "SKIP_PACKAGE:     $SKIP_PACKAGE"
+echo "STAGE_ANDROID:    $STAGE_ANDROID"
+echo "SKIP_ARCHIVE:     $SKIP_ARCHIVE"
+echo "SKIP_PLOTS:       $SKIP_PLOTS"
 echo "FRESH_TRAIN:      $FRESH_TRAIN"
 echo "PB_ARCHIVE:       $PB_ARCHIVE"
 echo "PB_RUN_ID:        ${PB_RUN_ID:-<auto when PB_ARCHIVE=1>}"
@@ -168,13 +182,36 @@ if [[ ! -f "$BEST_CKPT" ]] && [[ ! -f "$LATEST_CKPT" ]]; then
 fi
 
 if [[ "$SKIP_EVAL" != "1" ]]; then
-  section "Evaluate (ACC, F1, AUC)"
+  section "P6: Evaluate (ACC, F1, AUC)"
   EVAL_ARGS=(--split test)
   [[ -n "$CONFIG" ]] && EVAL_ARGS+=(--config "$CONFIG")
   [[ -f "$BEST_CKPT" ]] && EVAL_ARGS+=(--checkpoint "$BEST_CKPT")
   "$PYTHON" -m src.training.evaluate "${EVAL_ARGS[@]}"
 else
   echo "(Skipping eval; SKIP_EVAL=1)"
+fi
+
+EXPORT_CKPT="$BEST_CKPT"
+[[ -f "$EXPORT_CKPT" ]] || EXPORT_CKPT="$LATEST_CKPT"
+
+if [[ "$SKIP_EXPORT_ONNX" != "1" ]]; then
+  section "P7: ONNX export"
+  EXPORT_ARGS=()
+  [[ -n "$CONFIG" ]] && EXPORT_ARGS+=(--config "$CONFIG")
+  EXPORT_ARGS+=(--checkpoint "$EXPORT_CKPT")
+  "$PYTHON" "$ROOT/scripts/export_onnx.py" "${EXPORT_ARGS[@]}"
+else
+  echo "(Skipping ONNX export; SKIP_EXPORT_ONNX=1)"
+fi
+
+if [[ "$SKIP_PARITY" != "1" ]]; then
+  section "P8: ONNX parity check"
+  PARITY_ARGS=()
+  [[ -n "$CONFIG" ]] && PARITY_ARGS+=(--config "$CONFIG")
+  PARITY_ARGS+=(--checkpoint "$EXPORT_CKPT")
+  "$PYTHON" "$ROOT/scripts/parity_check_onnx.py" "${PARITY_ARGS[@]}"
+else
+  echo "(Skipping parity; SKIP_PARITY=1)"
 fi
 
 if [[ "$SKIP_PACKAGE" != "1" ]]; then
@@ -194,15 +231,24 @@ if [[ "$PB_ARCHIVE" == "1" ]]; then
   "$PYTHON" "$ARCHIVE_PY" snippet --profile "$PROFILE" --root "$ROOT" --run-id "$PB_RUN_ID"
 fi
 
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  section "Stage Android assets (P7 → vigidroid/)"
+  bash "$REPO_ROOT/Android_Works/stage_dual_branch_dex_manifest.sh"
+fi
+
 section "Pattern B pipeline finished"
 echo "Manifests:  $MANIFEST_TRAIN"
 echo "Best ckpt:  $BEST_CKPT"
 echo "Latest:     $LATEST_CKPT"
+echo "ONNX bundle: $ROOT/artifacts/export/dual_branch_dex_manifest/"
 echo "Failed log: $ROOT/artifacts/failed_apks.log"
 echo "Log:        ${PIPELINE_LOG}"
 if [[ "$PB_ARCHIVE" == "1" ]]; then
   echo "Run archive: $ROOT/output_archives/$PB_RUN_ID"
   echo "  THESIS_SNIPPET: $ROOT/output_archives/$PB_RUN_ID/THESIS_SNIPPET.md"
+fi
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  echo "Android assets: $REPO_ROOT/vigidroid/app/src/main/assets/models/dual_branch_dex_manifest/"
 fi
 echo ""
 echo "Done."

@@ -14,14 +14,16 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Pattern A manifest BoW: permissions + intent actions/categories → multihot vector.
+ * Early-fusion Dex+manifest BoW: permissions + intent actions/categories → multihot vector.
  * Matches Python full_combined_pipeline_approach src/features/manifest_bow.py.
  */
 public final class ManifestBowExtractor {
 
   public static final int BOW_DIM = 4381;
-  public static final String PATTERN_A_VOCAB_ASSET = "models/pattern_a_combined/features/vocab.json";
-  public static final String PATTERN_B_VOCAB_ASSET = "models/pattern_b_dual_branch/features/vocab.json";
+  public static final String EARLY_FUSION_DEX_MANIFEST_VOCAB_ASSET =
+      "models/early_fusion_dex_manifest/features/vocab.json";
+  public static final String DUAL_BRANCH_DEX_MANIFEST_VOCAB_ASSET =
+      "models/dual_branch_dex_manifest/features/vocab.json";
 
   private final Map<String, Integer> tokenToIndex;
   private final int unkIndex;
@@ -48,7 +50,7 @@ public final class ManifestBowExtractor {
   }
 
   public static ManifestBowExtractor fromAssets(Context context) throws Exception {
-    return fromAssets(context, PATTERN_A_VOCAB_ASSET);
+    return fromAssets(context, EARLY_FUSION_DEX_MANIFEST_VOCAB_ASSET);
   }
 
   public static ManifestBowExtractor fromAssets(Context context, String vocabAsset) throws Exception {
@@ -73,9 +75,18 @@ public final class ManifestBowExtractor {
     long t0 = System.nanoTime();
     List<String> tokens = readManifestTokens(apkFile);
     long t1 = System.nanoTime();
+    return vectorizeTokens(tokens, t1 - t0);
+  }
+
+  public ExtractionResult extract(FeatureContext ctx) throws Exception {
+    return vectorizeTokens(ctx.manifestBowTokens(), 0L);
+  }
+
+  private ExtractionResult vectorizeTokens(List<String> tokens, long parseNanos) {
+    long t1 = System.nanoTime();
     float[] bow = buildMultihot(tokens);
     long t2 = System.nanoTime();
-    return new ExtractionResult(bow, tokens.size(), t1 - t0, t2 - t1);
+    return new ExtractionResult(bow, tokens.size(), parseNanos, t2 - t1);
   }
 
   List<String> readManifestTokens(File apkFile) throws Exception {

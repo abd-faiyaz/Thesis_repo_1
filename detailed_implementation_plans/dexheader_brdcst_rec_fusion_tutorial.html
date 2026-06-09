@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dex Header + Broadcast Receiver Fusion — Visual Tutorial</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root{
+    --bg:#0d1117; --card:#161b22; --card2:#1c2230; --text:#e6edf3; --muted:#8b949e;
+    --accent:#58a6ff; --green:#3fb950; --amber:#f0b429; --pink:#db61a2; --purple:#bc8cff;
+    --border:#30363d;
+    --dexc:#bc8cff; --recc:#f0b429; --fusec:#9e6a03; --clsc:#8957e5;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);
+    line-height:1.7;max-width:1040px;margin:0 auto;padding:0 1.4rem 5rem;}
+  header.hero{background:linear-gradient(135deg,#2a1a4f 0%,#3a2a08 50%,#0d1117 100%);border-bottom:1px solid var(--border);
+    margin:0 -1.4rem 1.5rem;padding:2.4rem 1.6rem 2rem;}
+  header.hero h1{margin:0 0 .4rem;color:#fff;font-size:1.9rem;}
+  header.hero p{margin:.2rem 0;color:#c9d6e5;max-width:50rem;}
+  .pill{display:inline-block;font-size:.74rem;font-weight:700;padding:.18rem .6rem;border-radius:999px;margin:.25rem .3rem 0 0;}
+  .pill.msf{background:var(--dexc);color:#241433;}
+  .pill.rec{background:var(--recc);color:#3a2a05;}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);margin:0 -1.4rem 1.6rem;padding:.6rem 1.4rem;overflow-x:auto;white-space:nowrap;}
+  nav.toc a{color:var(--accent);text-decoration:none;font-size:.85rem;margin-right:1.1rem;}
+  nav.toc a:hover{text-decoration:underline;}
+  h2{color:var(--accent);font-size:1.45rem;border-bottom:1px solid var(--border);padding-bottom:.4rem;margin-top:2.6rem;}
+  h3{color:#a5d6ff;font-size:1.1rem;margin-top:1.6rem;}
+  section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.3rem 1.5rem;margin:1.1rem 0;}
+  p{margin:.6rem 0;}
+  code{background:#21262d;padding:.1rem .35rem;border-radius:4px;font-size:.88em;}
+  .eli5{border-left:4px solid var(--green);background:#11231a;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .eli5 b{color:var(--green);}
+  .note{border-left:4px solid var(--amber);background:#241d10;padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0;}
+  .note b{color:var(--amber);}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem;}
+  th,td{border:1px solid var(--border);padding:.5rem .7rem;text-align:left;vertical-align:top;}
+  th{background:#21262d;}
+
+  /* ---------- flowchart primitives ---------- */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:1.4rem 0;}
+  .row{display:flex;gap:1.1rem;justify-content:center;flex-wrap:wrap;align-items:stretch;}
+  .node{border-radius:10px;padding:.7rem 1rem;text-align:center;font-size:.86rem;font-weight:600;
+    border:1px solid var(--border);background:var(--card2);min-width:120px;box-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .node .sub{display:block;font-weight:400;font-size:.74rem;color:var(--muted);margin-top:.2rem;}
+  .node.apk{background:#30363d;color:#fff;}
+  .node.dex{border-color:var(--dexc);background:#1d1430;}
+  .node.rec{border-color:var(--recc);background:#2a2110;}
+  .node.fuse{border-color:var(--fusec);background:#2a2110;}
+  .node.cls{border-color:var(--clsc);background:#221733;}
+  .node.out{border-color:var(--green);background:#10241a;color:#aff5c2;}
+  .node.benign{border-color:var(--green);background:#10241a;color:#aff5c2;}
+  .node.mal{border-color:var(--pink);background:#2a1320;color:#ffb3d1;}
+  .node.mini{min-width:92px;font-size:.78rem;padding:.5rem .6rem;}
+  .arrow{width:2px;height:24px;background:var(--muted);position:relative;margin:.15rem 0;}
+  .arrow::after{content:"";position:absolute;bottom:-2px;left:-4px;border:5px solid transparent;border-top-color:var(--muted);}
+  .lbl{font-size:.72rem;color:var(--muted);margin:.1rem 0;}
+  .bracket{display:flex;align-items:center;gap:.5rem;}
+  /* vector strip */
+  .vec{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:.3rem 0;font-family:monospace;font-size:.8rem;flex-wrap:wrap;}
+  .vec span{padding:.28rem .5rem;border-right:1px solid var(--border);}
+  .vec span:last-child{border-right:none;}
+  .vec .ond{background:#7d52c4;color:#fff;}
+  .vec .onr{background:#b5870f;color:#fff;}
+  .vec .off{background:#161b22;color:var(--muted);}
+  .legend{display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:.5rem 0;}
+  .legend span::before{content:"";display:inline-block;width:.8rem;height:.8rem;border-radius:3px;margin-right:.35rem;vertical-align:-1px;}
+  .legend .ld::before{background:var(--dexc);}
+  .legend .lr::before{background:var(--recc);}
+  .stepnum{counter-reset:s;list-style:none;padding-left:0;}
+  .stepnum>li{position:relative;padding-left:2.3rem;margin:.7rem 0;}
+  .stepnum>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;
+    width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent);color:#0d1117;font-weight:700;
+    text-align:center;line-height:1.7rem;font-size:.82rem;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr;}}
+  .tagx{font-size:.7rem;font-weight:700;padding:.08rem .4rem;border-radius:4px;background:var(--amber);color:#3a2a05;margin-left:.4rem;}
+  .bytemap{display:flex;flex-wrap:wrap;gap:2px;margin:.6rem 0;font-family:monospace;font-size:.7rem;}
+  .bytemap div{padding:.2rem .35rem;border-radius:3px;text-align:center;}
+  .bm-magic{background:#6e2d2d;color:#ffd7d7;}
+  .bm-body{background:#1d1430;color:#cdb8ff;border:1px solid var(--dexc);}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Dex&nbsp;Header&nbsp;+&nbsp;Broadcast&nbsp;Receiver&nbsp;Fusion — Visual Tutorial</h1>
+  <p>A picture-first walkthrough of an on-device Android malware detector that fuses the <b>shape of an app's compiled code</b> (the Dex header) with the <b>system events the app wakes up for</b> (broadcast receivers) — and how it becomes an app on your phone.</p>
+  <div>
+    <span class="pill msf">MSFDroid — Dex header / MLP(H)</span>
+    <span class="pill rec">Paper #12 — broadcast receivers (IEEE CIC 2017)</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#big">Big picture</a>
+  <a href="#pre">Prerequisites</a>
+  <a href="#a">① Dex header</a>
+  <a href="#b">② Receiver actions</a>
+  <a href="#towers">③ Two towers</a>
+  <a href="#fuse">④ Fusion</a>
+  <a href="#math">Math in one place</a>
+  <a href="#pipe">Build pipeline P0–A4</a>
+  <a href="#why">Why it works</a>
+</nav>
+
+<section id="big">
+<h2>The big picture in one diagram</h2>
+<p>The model reads <b>two cheap things</b> from the APK — the first 112 bytes of each <code>classes*.dex</code> (the header) and the <code>&lt;receiver&gt;</code> entries in <code>AndroidManifest.xml</code> — turns each into numbers, runs each through its own little network ("tower"), glues the two results together, and a final head outputs a malware probability. No bytecode is ever executed or fully scanned.</p>
+
+<div class="flow">
+  <div class="node apk">📦 Raw APK<span class="sub">a .apk = a ZIP file</span></div>
+  <div class="arrow"></div>
+  <div class="lbl">read two cheap signals</div>
+  <div class="row">
+    <div class="node dex">🧬 classes*.dex header → H<span class="sub">the <i>shape</i> of the code (104 numbers)</span></div>
+    <div class="node rec">📡 Manifest receivers → R<span class="sub">which system events wake the app</span></div>
+  </div>
+  <div class="row"><div class="arrow"></div><div class="arrow"></div></div>
+  <div class="row">
+    <div class="node cls">Header tower → z<sub>H</sub><span class="sub">128 numbers</span></div>
+    <div class="node cls">Receiver tower → z<sub>R</sub><span class="sub">~64 numbers</span></div>
+  </div>
+  <div class="arrow"></div>
+  <div class="node fuse">④ Glue: z = [ z<sub>H</sub> ‖ z<sub>R</sub> ] → small head</div>
+  <div class="arrow"></div>
+  <div class="node out">P(malware) ∈ [0, 1]</div>
+</div>
+
+<div class="eli5"><b>ELI5:</b> Two experts look at the same suspicious app. One is a <i>structural engineer</i> who only studies the building's blueprint dimensions (the Dex header). The other is a <i>behaviour analyst</i> who only asks "what alarms does this thing react to?" (the receivers — boot, SMS, calls). Each writes a short summary. A manager reads both summaries together and makes the final call. Neither expert alone is as good as both combined.</div>
+</section>
+
+<section id="pre">
+<h2>Prerequisites — plain-English concepts</h2>
+
+<h3>What is an APK?</h3>
+<p>An Android app ships as a <code>.apk</code> file, which is just a ZIP. Inside are the compiled code (<code>classes*.dex</code>) and a manifest (<code>AndroidManifest.xml</code>). We never run the app — we just read these files. That's <b>static analysis</b>: cheap, fast, safe.</p>
+
+<h3>What is a "Dex header"?</h3>
+<p>Your app's compiled code lives in <code>classes.dex</code> files. Each begins with a fixed <b>112-byte header</b>: the first 8 bytes are a "magic" signature, and the next 104 bytes are numbers describing the code's structure (how many strings, where each section starts, total size…).</p>
+<div class="bytemap">
+  <div class="bm-magic">byte&nbsp;0</div><div class="bm-magic">1</div><div class="bm-magic">2</div><div class="bm-magic">3</div><div class="bm-magic">4</div><div class="bm-magic">5</div><div class="bm-magic">6</div><div class="bm-magic">7<br>magic</div>
+  <div class="bm-body">8</div><div class="bm-body">9</div><div class="bm-body">…</div><div class="bm-body">checksum · signature · sizes · offsets</div><div class="bm-body">…</div><div class="bm-body">111</div>
+</div>
+<div class="legend"><span style="color:#ffd7d7">■ bytes 0–7 = magic (skipped)</span> &nbsp; <span style="color:#cdb8ff">■ bytes 8–111 = our 104 features</span></div>
+<div class="eli5"><b>Why it helps:</b> malware often has a weird code layout (huge string pools, odd offsets, packers). The header reveals that "shape" instantly — even if the manifest looks innocent.</div>
+
+<h3>What is a "broadcast receiver"?</h3>
+<p>A broadcast receiver is a hook that runs code when a system event fires — phone booted, SMS arrived, a call started. When it is declared <b>statically</b> in the manifest (<code>&lt;receiver&gt;</code>), Android can wake the app <b>even when it isn't running</b>.</p>
+<div class="eli5"><b>ELI5:</b> Think of receivers as tripwires the app sets. A flashlight app tripwired to "SMS received" and "phone booted" is suspicious; those tripwires are how spyware silently springs to life.</div>
+
+<h3>What is a "system action"?</h3>
+<div class="note"><b>Correction (M4):</b> we only count <b>system actions</b> — the official Android event names like <code>android.intent.action.BOOT_COMPLETED</code>. Paper #12 is explicit: it compiles all Android-OS broadcast actions into one allow-list and ignores custom/app-specific actions. The rough plan said "all <code>&lt;action&gt;</code> names" — we restrict to the allow-list, and we ship the <i>same</i> <code>system_actions.json</code> to both the trainer and the phone so they always agree.</div>
+
+<h3>What is a "tower" and "fusion"?</h3>
+<p>A <b>tower</b> is a small neural network branch dedicated to one input type. <b>Fusion</b> means combining the towers' outputs. Here we use <b>embedding fusion</b>: each tower turns its input into a short list of numbers (an "embedding"), we glue the two lists end-to-end, and a final mini-network reads the combined list.</p>
+<div class="note"><b>Correction (M6):</b> the rough plan called this "late fusion". Strictly, "late fusion" means training two separate classifiers and averaging their <i>scores</i>. We instead glue the two <i>embeddings</i> before a single head — that's <b>intermediate / embedding fusion</b>, which lets the head learn combinations like "weird header AND boot receiver".</div>
+</section>
+
+<!-- ===================== COMPONENT A ===================== -->
+<section id="a">
+<h2>① Dex header row <span style="font-size:.8rem;color:var(--muted)">(MSFDroid / deployed MLP(H))</span></h2>
+<p>Goal: turn each <code>classes*.dex</code> header into 104 numbers, combine multidex files, and scale to [0,1]. This is exactly what the already-deployed MLP(H) model eats.</p>
+
+<h3>Three ordered steps <span class="tagx">M1</span></h3>
+<div class="flow">
+  <div class="node dex">bytes 8–111 of each dex<span class="sub">104 raw bytes (0–255)</span></div>
+  <div class="arrow"></div>
+  <div class="node dex">① ÷ 255<span class="sub">each byte → [0,1]</span></div>
+  <div class="arrow"></div>
+  <div class="node fuse">② sum-pool across classes*.dex<span class="sub">H<sub>raw</sub> ∈ [0, D]  (D = #dex)</span></div>
+  <div class="arrow"></div>
+  <div class="node cls">③ corpus min–max (frozen train stats)<span class="sub">H ∈ [0,1]<sup>104</sup></span></div>
+</div>
+
+<div class="note"><b>Correction (M1 / M2):</b> the rough plan listed the steps as "÷255 → min–max → sum-pool" and wrote \(\mathbf H=\sum_d\mathbf h^{(d)}\in[0,1]^{104}\). <b>Order matters!</b> The deployed code sums <i>first</i>, so after summing \(D\) files the values can exceed 1 (range \([0,D]\)). The <b>min–max comes LAST</b>, using fixed mins/maxs measured once on the training set — never recomputed on a single phone APK (that would break parity, M3).</div>
+
+<h3>The math</h3>
+<p>\[ h^{(d)}_b=\frac{\text{byte}^{(d)}_b}{255},\qquad \mathbf H_{\text{raw}}=\sum_{d=1}^{D_{\text{dex}}}\mathbf h^{(d)}\in[0,D_{\text{dex}}]^{104} \]</p>
+<p>\[ \mathbf H=\frac{\mathbf H_{\text{raw}}-\boldsymbol{\min}_{\text{train}}}{\boldsymbol{\max}_{\text{train}}-\boldsymbol{\min}_{\text{train}}}\in[0,1]^{104} \]</p>
+
+<div class="eli5"><b>ELI5 of multidex sum-pool:</b> big apps split their code into <code>classes.dex</code>, <code>classes2.dex</code>, … We add up each file's header numbers position-by-position so one combined row represents the whole app. (The original MSFDroid paper used only the first dex; our deployed code sums them — we keep "first only" as an optional comparison, M11.)</div>
+<div class="note"><b>Correction (M10):</b> "header read is O(1)" is too strong — we still unzip and locate every dex. But we only read the <b>112-byte header</b> of each (no bytecode scan), so it stays very cheap.</div>
+</section>
+
+<!-- ===================== COMPONENT B ===================== -->
+<section id="b">
+<h2>② Broadcast receiver row <span style="font-size:.8rem;color:var(--muted)">(from Paper #12)</span></h2>
+<p>Goal: turn the manifest's static receiver events into a short checkbox row, using only the system actions in our frozen allow-list \(\mathcal A\) (~30–80 of them, decided once on the training apps).</p>
+
+<div class="flow">
+  <div class="node rec">AndroidManifest.xml<span class="sub">&lt;receiver&gt;/&lt;intent-filter&gt;/&lt;action&gt;</span></div>
+  <div class="arrow"></div>
+  <div class="node fuse">keep only Android system actions<span class="sub">∩ system_actions.json allow-list (M4)</span></div>
+  <div class="arrow"></div>
+  <div class="node rec">set a 1 for each present action<span class="sub">R ∈ {0,1}<sup>R</sup></span></div>
+</div>
+
+<h3>What the row looks like</h3>
+<div class="row" style="align-items:center;">
+  <div class="bracket"><div class="vec">
+    <span class="onr">BOOT</span><span class="off">SMS</span><span class="onr">USER_PRESENT</span><span class="off">CONNECTIVITY</span><span class="off">TIME_SET</span>
+  </div></div>
+</div>
+<div class="lbl">1 = the app statically listens for that system event, 0 = it doesn't</div>
+
+<h3>The math</h3>
+<p>\[ R_k=\begin{cases}1 & \text{if action}_k\in\mathcal A\ \cap\ \text{StaticReceivers}(\text{APK})\\ 0&\text{otherwise}\end{cases},\qquad \mathbf R\in\{0,1\}^{R} \]</p>
+
+<div class="eli5"><b>Why it works (from #12's data):</b> 74% of malware vs 65% of benign declare a receiver; 70% vs 46% declare one for a <i>system</i> event. Malware's favourite events are <code>BOOT_COMPLETED</code>, <code>USER_PRESENT</code>, <code>PHONE_STATE</code>, <code>SMS_RECEIVED</code>, <code>NEW_OUTGOING_CALL</code> — the privacy-sensitive ones. Benign apps lean on package install/update events instead.</div>
+<div class="note"><b>Honest caveat (M9):</b> receivers alone are a <i>weak</i> detector — #12 reports ~76–79% on its own test and ~71–72% on newer apps. Their value is <b>complementary</b>: they catch event-driven behaviour the header can't see.</div>
+</section>
+
+<!-- ===================== TOWERS ===================== -->
+<section id="towers">
+<h2>③ Two towers turn rows into embeddings</h2>
+
+<div class="grid2">
+  <div>
+    <h3 style="color:var(--purple)">Header tower (reuse MLP(H) trunk) <span class="tagx">M5</span></h3>
+    <div class="flow">
+      <div class="node dex">H (1×104)</div>
+      <div class="arrow"></div>
+      <div class="node cls">Linear 104→128 · BN · ReLU</div>
+      <div class="arrow"></div>
+      <div class="node cls">Linear 128→128 · BN · ReLU</div>
+      <div class="arrow"></div>
+      <div class="node dex">z<sub>H</sub> (1×128)</div>
+    </div>
+    <div class="note"><b>Correction (M5):</b> the rough plan invented a generic <code>104→h1→128</code> tower. We instead reuse the <i>exact</i> deployed MLP(H) trunk (<code>104→128→128</code> with BatchNorm), take the 128-d activation as z<sub>H</sub>, and <b>drop its final <code>→1→sigmoid</code> head</b> (we don't need a per-branch decision, just an embedding). We can even <b>warm-start</b> from the shipped weights.</div>
+  </div>
+  <div>
+    <h3 style="color:var(--amber)">Receiver tower</h3>
+    <div class="flow">
+      <div class="node rec">R (1×R)</div>
+      <div class="arrow"></div>
+      <div class="node cls">Linear R→d<sub>R</sub> · ReLU</div>
+      <div class="arrow"></div>
+      <div class="node rec">z<sub>R</sub> (1×d<sub>R</sub>)<span class="sub">d<sub>R</sub> ≈ 32–64</span></div>
+    </div>
+    <div class="note"><b>Correction (M7):</b> keep d<sub>R</sub> ≈ 32–64 so the 104-byte structural side doesn't swamp the sparse receiver side. The receiver vector is mostly zeros, so a small embedding is plenty — pick the size on a validation set.</div>
+  </div>
+</div>
+
+<div class="eli5"><b>ELI5 of an embedding:</b> a tower squeezes its raw input into a short list of learned "summary numbers". Two very different inputs (104 header bytes vs a sparse on/off receiver row) both become fixed-length lists that the final head can compare and combine fairly.</div>
+</section>
+
+<!-- ===================== FUSION ===================== -->
+<section id="fuse">
+<h2>④ Fusion — glue the two summaries, then decide</h2>
+<p>Concatenate the two embeddings into one row and run a small head. One ONNX graph, one score.</p>
+<div class="flow">
+  <div class="row" style="align-items:center;">
+    <div class="bracket"><div class="vec"><span class="ond">.7</span><span class="ond">.1</span><span class="ond">.9</span><span class="ond">.3</span></div></div>
+    <div class="lbl">‖</div>
+    <div class="bracket"><div class="vec"><span class="onr">.4</span><span class="off">0</span><span class="onr">.8</span></div></div>
+  </div>
+  <div class="lbl">z<sub>H</sub> (header, 128) &nbsp;‖&nbsp; z<sub>R</sub> (receivers, d<sub>R</sub>)</div>
+  <div class="arrow"></div>
+  <div class="node fuse">z = [ z<sub>H</sub> ‖ z<sub>R</sub> ]  (1 × (128+d<sub>R</sub>))</div>
+  <div class="arrow"></div>
+  <div class="node cls">FC (128+d<sub>R</sub>) → 64 → 1</div>
+  <div class="arrow"></div>
+  <div class="row">
+    <div class="node benign">σ low → BENIGN</div>
+    <div class="node mal">σ high → MALWARE</div>
+  </div>
+</div>
+<p>\[ \mathbf z=[\mathbf z_H\,\|\,\mathbf z_R]\in\mathbb R^{128+d_R},\qquad \hat y=\sigma\!\big(\mathbf w_2^\top\,\text{ReLU}(\mathbf W_1\mathbf z+\mathbf b_1)+b_2\big) \]</p>
+<div class="note"><b>Correction (M7):</b> the rough plan used a single bare linear layer on z. A one-hidden-layer head <code>(128+d<sub>R</sub>)→64→1</code> can learn nonlinear "this AND that" combinations a bare linear cannot — at almost no size cost. Bare linear stays as the smallest fallback.</div>
+<div class="eli5"><b>Training detail (M8):</b> malware and benign counts are unequal, so we weight the loss with \(w_+=N_{\text{neg}}/N_{\text{pos}}\) so the model doesn't just predict the majority class.</div>
+</section>
+
+<!-- ===================== MATH SUMMARY ===================== -->
+<section id="math">
+<h2>All the math on one page</h2>
+<table>
+<tr><th>Symbol</th><th>Meaning</th></tr>
+<tr><td>\(h^{(d)}_b=\text{byte}^{(d)}_b/255\)</td><td>per-byte scaled header value (bytes 8–111 of dex \(d\))</td></tr>
+<tr><td>\(\mathbf H_{\text{raw}}=\sum_d\mathbf h^{(d)}\)</td><td>multidex sum-pool, range \([0,D_{\text{dex}}]\)</td></tr>
+<tr><td>\(\mathbf H=\dfrac{\mathbf H_{\text{raw}}-\min}{\max-\min}\)</td><td>final 104-d header, \([0,1]\) via frozen train stats (min–max LAST)</td></tr>
+<tr><td>\(\mathcal A\) (\(R\approx30\text{–}80\))</td><td>frozen receiver system-action vocabulary (∩ allow-list, train only)</td></tr>
+<tr><td>\(R_k\in\{0,1\}\)</td><td>presence bit for system action \(k\)</td></tr>
+<tr><td>\(\mathbf z_H=\text{trunk}_{\text{MLP}(H)}(\mathbf H)\)</td><td>header embedding (128-d penultimate activation)</td></tr>
+<tr><td>\(\mathbf z_R=\text{ReLU}(\mathbf W_R\mathbf R+\mathbf b_R)\)</td><td>receiver embedding (\(d_R\approx32\text{–}64\))</td></tr>
+<tr><td>\(\mathbf z=[\mathbf z_H\|\mathbf z_R]\)</td><td>fused vector, length \(128+d_R\)</td></tr>
+<tr><td>\(\hat y=\sigma(\mathbf w_2^\top\text{ReLU}(\mathbf W_1\mathbf z+\mathbf b_1)+b_2)\)</td><td>malware probability</td></tr>
+<tr><td>\(\mathcal L=-[w_+ y\log\hat y+(1-y)\log(1-\hat y)]\)</td><td>weighted BCE loss, \(w_+=N_{\text{neg}}/N_{\text{pos}}\)</td></tr>
+</table>
+</section>
+
+<!-- ===================== PIPELINE ===================== -->
+<section id="pipe">
+<h2>From paper to phone — the build pipeline (P0 → A4)</h2>
+<p>Two code bases cooperate: a <b>Python project</b> trains and exports; the <b>Android app</b> scans on-device. They must agree on features exactly — that's what the parity checks guard.</p>
+
+<div class="grid2">
+  <div>
+    <h3 style="color:var(--accent)">Offline — Python (P0–P8)</h3>
+    <ol class="stepnum">
+      <li><b>P0 Config</b> — paths, hyperparams, <code>requirements.txt</code>, <code>verify_setup.py</code>.</li>
+      <li><b>P1 Index</b> — list every APK with label, year; split train=2020–21, test=2022–23.</li>
+      <li><b>P2 Features</b> — read dex headers (÷255 → sum-pool → fit train min/max); parse manifests → freeze receiver vocab \(\mathcal A\) ∩ allow-list; write tensors. <span class="tagx">owns M1–M4</span></li>
+      <li><b>P3 DataLoaders</b> — feed \(H\) and \(R\) in batches (kept separate — two inputs).</li>
+      <li><b>P4 Model</b> — header trunk (warm-start MLP(H)) + receiver tower + fusion head.</li>
+      <li><b>P5 Train</b> — fit with <code>pos_weight</code>; run ablations (header-only / receiver-only / fused).</li>
+      <li><b>P6 Evaluate</b> — accuracy/F1/AUC on 2022–23; honest temporal numbers.</li>
+      <li><b>P7 Export</b> — two-input ONNX + receiver vocab + <code>system_actions.json</code> + <code>normalization_header.json</code> + parity samples.</li>
+      <li><b>P8 Parity</b> — PyTorch vs ONNX scores agree within 1e-4.</li>
+    </ol>
+  </div>
+  <div>
+    <h3 style="color:var(--green)">On-device — Android (A1–A4)</h3>
+    <ol class="stepnum">
+      <li><b>A1 Extractor</b> — Java builds the same \(H\) (same min/max file) and \(R\) (same allow-list + vocab).</li>
+      <li><b>A2 Inference</b> — ONNX Runtime feeds two inputs (<code>dex_header</code>, <code>receiver</code>) → score.</li>
+      <li><b>A3 Orchestration</b> — log dex/parse/vectorize/inference time + score per scan.</li>
+      <li><b>A4 Parity test</b> — device scores match Python within 1e-4 before release.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="flow" style="margin-top:1.4rem;">
+  <div class="node" style="border-color:var(--accent);">🖥️ Python: train + export ONNX</div>
+  <div class="arrow"></div>
+  <div class="node fuse">📦 export bundle<span class="sub">model.onnx · receiver_action_vocab.json · system_actions.json · normalization_header.json · parity_samples</span></div>
+  <div class="arrow"></div>
+  <div class="node out" style="color:#aff5c2;">📱 Android app: scan APKs on-device</div>
+</div>
+<div class="note"><b>Golden rule (M3/M4):</b> if the Java side uses a different min/max than Python (header) or a different action allow-list (receivers), your offline accuracy is meaningless. Ship one <code>normalization_header.json</code> and one <code>system_actions.json</code>; both sides load the exact same files.</div>
+</section>
+
+<!-- ===================== WHY ===================== -->
+<section id="why">
+<h2>Why this hybrid is worth building</h2>
+<table>
+<tr><th>Variant</th><th>Dims</th><th>What it sees</th><th>Reality check</th></tr>
+<tr><td>Dex header only (MLP(H))</td><td>104</td><td>code shape</td><td>deployed structural baseline; blind to declared intent</td></tr>
+<tr><td>Receivers only</td><td>~30–80</td><td>event subscriptions</td><td>#12: ~71–79%; weak alone, lifts sensitivity</td></tr>
+<tr><td>Pattern B (header + manifest BoW)</td><td>~4485</td><td>code shape + huge manifest BoW</td><td>strong but heavy manifest branch</td></tr>
+<tr style="background:#10241a;"><td><b>H + R fusion (this model)</b></td><td><b>~104 + 30–80</b></td><td><b>code shape + event subscriptions</b></td><td><b>best structural+behavioral balance per parameter</b></td></tr>
+</table>
+
+<div class="eli5"><b>One-sentence takeaway:</b> read the cheap "code shape" fingerprint (Dex header) <i>and</i> the cheap "what wakes this app" fingerprint (system-action receivers), give each its own tower, fuse the two summaries, and a tiny head outputs one malware score — small and fast enough for any phone, and the header tower even reuses a model you already shipped.</div>
+
+<div class="note"><b>Be honest in the thesis (M9):</b> #12's headline 97% is on duplicate configurations; on newer apps it dropped to ~76–77%. Expect realistic temporal numbers on the 2022–23 split, and ground the header-only baseline on the <i>measured</i> deployed MLP(H) value — the MSFDroid PDF isn't in the workspace, so don't quote its table numbers.</div>
+</section>
+
+<p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:2rem;border-top:1px solid var(--border);padding-top:1rem;">
+Companion files: <code>dexheader_brdcst_rec_fusion_opus.html</code> (verified rough plan) ·
+<code>dexheader_brdcst_rec_fusion_full_impl_opus.md</code> (full P0–A4 plan) ·
+sources: paper #12 (IEEE CIC 2017), MSFDroid (PDF absent — grounded on the deployed MLP(H)).
+</p>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
   "model_id": "mlp_header",
   "domain": "dex_header_d3",
-  "exported_at": "2026-06-03T20:49:40.171328+00:00",
+  "exported_at": "2026-06-08T10:13:36.213704+00:00",
   "opset_version": 14,
   "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
   "feature_dim": 104,
@@ -41,6 +41,8 @@
       1,
       1
     ],
-    "test_output_value": 0.8521186113357544
-  }
+    "test_output_value": 0.8102356195449829
+  },
+  "val_f1": 0.967741935483871,
+  "val_accuracy": 0.9803664921465969
 }

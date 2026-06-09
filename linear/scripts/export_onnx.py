@@ -16,6 +16,8 @@ import torch
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from shared_calibration import build_val_thresholds_payload, write_export_thresholds
+
 from src.config import load_config
 from src.constants import DOMAIN_ID, MODEL_ID
 from src.data.dataset import stack_split_arrays
@@ -70,17 +72,31 @@ def export_bundle(
     if (cfg.paths.checkpoints / "coefficients.json").is_file():
         shutil.copy2(cfg.paths.checkpoints / "coefficients.json", out_dir / "coefficients.json")
 
-    threshold = float(cfg.evaluation.get("threshold", 0.5))
+    default_threshold = float(cfg.evaluation.get("threshold", 0.5))
     primary_variant = str(cfg.model.get("variant", "linregdroid1"))
-    thresholds = {
-        "malware_threshold": threshold,
-        "decision_variant": primary_variant,
-        "description": (
-            "LinRegDroid1: predict malware when malware_probability >= malware_threshold. "
-            "LinRegDroid2: nearest-class on raw linear score (see export_manifest decision_rules)."
+    write_export_thresholds(
+        cfg.paths.artifacts / "metrics" / "thresholds.json",
+        out_dir / "thresholds.json",
+        fallback=build_val_thresholds_payload(
+            model_id=MODEL_ID,
+            y_true=np.array([0, 1]),
+            scores=np.array([0.25, 0.75]),
+            default=default_threshold,
+            tune=False,
+            calibrate_bands=False,
+            cascade_targets=cfg.raw.get("cascade", {}),
+            extra={
+                "decision_variant": primary_variant,
+                "description": (
+                    "LinRegDroid1: predict malware when malware_probability >= tuned_val. "
+                    "LinRegDroid2: nearest-class on raw linear score (ignores tuned_val)."
+                ),
+            },
         ),
-    }
-    (out_dir / "thresholds.json").write_text(json.dumps(thresholds, indent=2) + "\n", encoding="utf-8")
+    )
+    threshold = float(
+        json.loads((out_dir / "thresholds.json").read_text(encoding="utf-8"))["tuned_val"]
+    )
 
     manifest = {
         "model_id": MODEL_ID,
@@ -89,10 +105,10 @@ def export_bundle(
         "opset_version": ONNX_OPSET,
         "preprocessing_version": "1",
         "multidex_mode": "n/a",
-        "split_mode": cfg.preprocessing.get("split_mode", "stratified_development"),
-        "train_years": cfg.preprocessing.get("development_years", [2020, 2021]),
-        "test_years": cfg.preprocessing.get("temporal_holdout_years", [2022, 2023]),
-        "primary_test_split": "temporal_holdout",
+        "split_mode": cfg.preprocessing.get("split_mode", "temporal_holdout"),
+        "train_years": cfg.preprocessing.get("train_years", [2020, 2021]),
+        "holdout_years": cfg.preprocessing.get("holdout_years", [2022, 2023]),
+        "primary_test_split": "test",
         "feature_dim": feature_dim,
         "token_normalization": "vigidroid",
         "label_encoding": {

@@ -24,7 +24,6 @@ from src.features.normalization import load_normalization_stats, transform_minma
 from src.preprocessing.common import (
     DatasetRow,
     append_processed_id,
-    load_processed_ids,
     log_failure,
     read_dataset_index,
     read_split_ids,
@@ -70,7 +69,6 @@ def extract_split(cfg: PipelineConfig, split: str, *, limit: int | None = None) 
 
     shard_dir = _shard_dir(cfg, split)
     shard_dir.mkdir(parents=True, exist_ok=True)
-    done_ids = load_processed_ids(cfg.paths.processed_ids_log)
 
     failed = 0
     skipped = 0
@@ -78,7 +76,9 @@ def extract_split(cfg: PipelineConfig, split: str, *, limit: int | None = None) 
 
     for row in tqdm(rows, desc=f"Extracting shards ({split})", unit="apk"):
         shard_path = shard_dir / f"{row.apk_id}.npz"
-        if row.apk_id in done_ids or shard_path.is_file():
+        # Resume only from shards in this split dir. A global processed_ids log must
+        # not skip extraction when split assignment changed and the shard lives elsewhere.
+        if shard_path.is_file():
             skipped += 1
             continue
 
@@ -120,7 +120,14 @@ def extract_split(cfg: PipelineConfig, split: str, *, limit: int | None = None) 
             entries.append(_entry_from_row(row, shard_path))
 
     if not entries:
-        raise RuntimeError(f"No shards for split={split}; see failed_apks.log")
+        hint = ""
+        if skipped:
+            hint = (
+                f" ({skipped} APK(s) skipped without shards in {shard_dir}; "
+                "split assignment may have changed — delete artifacts/processed/shards "
+                "or the full artifacts/processed tree and re-run preprocess)"
+            )
+        raise RuntimeError(f"No shards for split={split}; see failed_apks.log{hint}")
 
     write_shard_manifest(
         _manifest_path(cfg, split),

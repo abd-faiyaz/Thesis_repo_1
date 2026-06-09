@@ -24,7 +24,7 @@ def main() -> int:
     rows = read_dataset_index(index_path)
     counts = split_counts(rows)
     print("Split counts:")
-    for name in ("train", "val", "dev_test", "temporal_holdout"):
+    for name in ("train", "val", "test", "other"):
         print(f"  {name}: {counts.get(name, 0)}")
 
     for split in ("train", "val"):

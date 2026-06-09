@@ -24,6 +24,8 @@ from src.models import (
 )
 from src.models.mldp_logistic import MldpStage1TinyMlp
 from src.training.ablation import ABLATION_MODES, build_eval_loader_for_shard, load_val_test_shards
+from shared_calibration import find_repo_root, write_split_scores_bundle
+
 from src.training.calibrate_thresholds import (
     build_thresholds_payload,
     calibrate_cascade_thresholds,
@@ -265,10 +267,36 @@ def run_test_evaluation(
     thresholds_path = cfg.paths.metrics / "thresholds.json"
     write_thresholds(thresholds_path, thresholds_payload)
 
+    repo_root = find_repo_root(cfg.root)
+    val_score_path = write_split_scores_bundle(
+        model_id=cfg.model_id,
+        split="val",
+        metrics_dir=cfg.paths.metrics,
+        apk_ids=val_shard.sha256,
+        labels=y_val_s,
+        scores=stage1_val_scores,
+        threshold=mode_a_threshold,
+        repo_root=repo_root,
+    )
+    print(f"  val scores (stage1) → {val_score_path}")
+
     y_test, mode_a_test_scores = collect_logits_scores(mode_a, test_loader_x, device)
     y_test_s, stage1_test_scores = collect_logits_scores(stage1, test_loader_s, device)
     if not np.array_equal(y_test, y_test_s):
         raise RuntimeError("Test label mismatch between fusion and perm loaders")
+
+    test_score_path = write_split_scores_bundle(
+        model_id=cfg.model_id,
+        split="test",
+        metrics_dir=cfg.paths.metrics,
+        apk_ids=test_shard.sha256,
+        labels=y_test_s,
+        scores=stage1_test_scores,
+        threshold=mode_a_threshold,
+        repo_root=repo_root,
+        sync_val_to_workspace=False,
+    )
+    print(f"  test scores (stage1) → {test_score_path}")
 
     mode_a_result = evaluate_scores(y_test, mode_a_test_scores, threshold=mode_a_threshold)
 

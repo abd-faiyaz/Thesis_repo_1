@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "device_session.schema.json",
+  "title": "On-device scan batch session metrics",
+  "type": "object",
+  "required": [
+    "record_type",
+    "session_id",
+    "trigger",
+    "started_ms",
+    "ended_ms",
+    "wall_ms_total",
+    "apk_count",
+    "apk_scanned",
+    "apk_failed",
+    "battery"
+  ],
+  "properties": {
+    "record_type": { "type": "string", "const": "session" },
+    "session_id": { "type": "string" },
+    "trigger": { "type": "string", "enum": ["manual", "download"] },
+    "started_ms": { "type": "integer" },
+    "ended_ms": { "type": "integer" },
+    "wall_ms_total": { "type": "number", "minimum": 0 },
+    "apk_count": { "type": "integer", "minimum": 0 },
+    "apk_scanned": { "type": "integer", "minimum": 0 },
+    "apk_failed": { "type": "integer", "minimum": 0 },
+    "apk_skipped_dedup": { "type": "integer", "minimum": 0 },
+    "cascade_enabled": { "type": "boolean" },
+    "provenance": { "type": "object" },
+    "device": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "api": { "type": "integer" }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "properties": {
+        "capacity_pct_start": { "type": ["integer", "null"] },
+        "capacity_pct_end": { "type": ["integer", "null"] },
+        "capacity_pct_delta": { "type": ["integer", "null"] },
+        "charge_counter_uah_start": { "type": ["integer", "null"] },
+        "charge_counter_uah_end": { "type": ["integer", "null"] },
+        "charge_counter_uah_used": { "type": ["integer", "null"] },
+        "current_now_ua_start": { "type": ["integer", "null"] },
+        "current_now_ua_end": { "type": ["integer", "null"] },
+        "temperature_deci_c_start": { "type": ["integer", "null"] },
+        "temperature_deci_c_end": { "type": ["integer", "null"] },
+        "temperature_deci_c_delta": { "type": ["integer", "null"] }
+      }
+    }
+  },
+  "additionalProperties": true
+}

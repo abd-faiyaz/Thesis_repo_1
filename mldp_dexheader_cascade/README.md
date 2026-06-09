@@ -22,10 +22,28 @@ python scripts/verify_setup.py
 
 Edit `config/default.yaml` → `paths.apk_root` if needed (default: `/mnt/Files/thesis_full_dataset`).
 
-## Run order
+## Full run (recommended)
+
+```bash
+cd mldp_dexheader_cascade
+export ROOT="$PWD"
+source scripts/activate_thesis_env.sh
+
+# Full corpus P0–P8 (+ optional archive + Android staging)
+./run_mldp_dexheader_cascade.sh
+
+# Logged archive for thesis snippet
+MDH_ARCHIVE=1 ./run_mldp_dexheader_cascade.sh
+
+# PC pipeline + copy bundle into vigidroid assets
+STAGE_ANDROID=1 ./run_mldp_dexheader_cascade.sh
+```
+
+## Run order (step-by-step)
 
 | Phase | Command |
 |-------|---------|
+| **All** | `./run_mldp_dexheader_cascade.sh` |
 | P0 | `python scripts/verify_setup.py` |
 | P1 | `bash scripts/run_index.sh` |
 | P2 | `bash scripts/run_mldp.sh` · `bash scripts/run_preprocess.sh` |
@@ -37,6 +55,7 @@ Edit `config/default.yaml` → `paths.apk_root` if needed (default: `/mnt/Files/
 | P6 | `bash scripts/run_evaluate.sh` |
 | P7 | `python scripts/export_onnx.py` |
 | P8 | `bash scripts/run_parity.sh` |
+| Stage Android | `bash ../Android_Works/stage_mldp_dexheader_cascade.sh` |
 | A1–A4 | VigiDroid integration (after P8 green) |
 
 ## Split policy

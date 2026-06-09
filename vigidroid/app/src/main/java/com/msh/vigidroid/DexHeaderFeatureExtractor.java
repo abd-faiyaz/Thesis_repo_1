@@ -27,10 +27,10 @@ public final class DexHeaderFeatureExtractor {
     public static final int DEX_HEADER_SIZE = 0x70;
     public static final String NORMALIZATION_ASSET =
             "models/mlp_header/features/normalization_header.json";
-    public static final String PATTERN_A_NORMALIZATION_ASSET =
-            "models/pattern_a_combined/features/normalization_header.json";
-    public static final String PATTERN_B_NORMALIZATION_ASSET =
-            "models/pattern_b_dual_branch/features/normalization_header.json";
+    public static final String EARLY_FUSION_DEX_MANIFEST_NORMALIZATION_ASSET =
+            "models/early_fusion_dex_manifest/features/normalization_header.json";
+    public static final String DUAL_BRANCH_DEX_MANIFEST_NORMALIZATION_ASSET =
+            "models/dual_branch_dex_manifest/features/normalization_header.json";
 
     private static final Pattern DEX_BASENAME = Pattern.compile("^classes(\\d*)\\.dex$");
 
@@ -73,33 +73,39 @@ public final class DexHeaderFeatureExtractor {
     }
 
     public ExtractionResult extract(File apkFile) throws Exception {
-        long t0 = System.nanoTime();
-        float[] summed = new float[FEATURE_DIM];
-        int dexCount = 0;
-
         try (ZipFile zip = new ZipFile(apkFile)) {
             List<String> dexEntries = listDexEntries(zip);
             if (dexEntries.isEmpty()) {
                 throw new IllegalStateException("No classes*.dex in APK");
             }
+            List<byte[]> dexBytes = new ArrayList<>(dexEntries.size());
             for (String entryName : dexEntries) {
                 ZipEntry entry = zip.getEntry(entryName);
-                if (entry == null) {
-                    continue;
+                if (entry != null) {
+                    dexBytes.add(readEntryBytes(zip, entry));
                 }
-                byte[] dexBytes = readEntryBytes(zip, entry);
-                float[] perDex = extractRawHeaderFeatures(dexBytes);
-                for (int i = 0; i < FEATURE_DIM; i++) {
-                    summed[i] += perDex[i];
-                }
-                dexCount++;
+            }
+            return extractFromDexByteArrays(dexBytes);
+        }
+    }
+
+    /** Sum-pool + min-max from pre-read DEX buffers (shared {@link FeatureContext}). */
+    public ExtractionResult extractFromDexByteArrays(List<byte[]> dexByteArrays) throws Exception {
+        if (dexByteArrays.isEmpty()) {
+            throw new IllegalStateException("No classes*.dex in APK");
+        }
+        long t0 = System.nanoTime();
+        float[] summed = new float[FEATURE_DIM];
+        for (byte[] dexBytes : dexByteArrays) {
+            float[] perDex = extractRawHeaderFeatures(dexBytes);
+            for (int i = 0; i < FEATURE_DIM; i++) {
+                summed[i] += perDex[i];
             }
         }
-
         long t1 = System.nanoTime();
         float[] normalized = transformMinMax(summed);
         long t2 = System.nanoTime();
-        return new ExtractionResult(normalized, dexCount, t1 - t0, t2 - t1);
+        return new ExtractionResult(normalized, dexByteArrays.size(), t1 - t0, t2 - t1);
     }
 
     static List<String> listDexEntries(ZipFile zip) {

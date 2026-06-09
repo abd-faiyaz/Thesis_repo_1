@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--splits",
         nargs="+",
-        default=["train", "val", "dev_test", "temporal_holdout"],
+        default=["train", "val", "test"],
     )
     args = parser.parse_args(argv)
 

@@ -18,6 +18,9 @@ import java.util.Map;
  */
 public final class MldpDexHeaderExtractor {
 
+  public static final String MODEL_FAMILY_ID = "mldp_dexheader_cascade";
+  public static final String DOMAIN = "manifest_mldp_perm_dex_header";
+
   public static final int S_DIM = 22;
   public static final int H_DIM = 104;
   public static final int D_DIM = 126;
@@ -167,8 +170,19 @@ public final class MldpDexHeaderExtractor {
     long t0 = System.nanoTime();
     List<String> normalizedPermissions = PermissionNormalizer.readNormalizedPermissions(apkFile);
     long t1 = System.nanoTime();
+    return buildPermissionBlock(normalizedPermissions, t1 - t0);
+  }
+
+  public PermissionBlockResult extractPermissionBlock(FeatureContext ctx) throws Exception {
+    return buildPermissionBlock(ctx.normalizedPermissions(), 0L);
+  }
+
+  private PermissionBlockResult buildPermissionBlock(
+      List<String> normalizedPermissions, long parseNanos) {
+    long t1 = System.nanoTime();
     float[] xS = buildXS(normalizedPermissions);
-    return new PermissionBlockResult(xS, normalizedPermissions.size(), t1 - t0);
+    long t2 = System.nanoTime();
+    return new PermissionBlockResult(xS, normalizedPermissions.size(), parseNanos + (t2 - t1));
   }
 
   /** Dex header H only — skipped on Mode B early exit (A3). */
@@ -178,14 +192,36 @@ public final class MldpDexHeaderExtractor {
         dex.features, dex.dexFilesFound, dex.extractNanos + dex.normalizeNanos);
   }
 
+  public DexBlockResult extractDexBlock(FeatureContext ctx) throws Exception {
+    DexHeaderFeatureExtractor.ExtractionResult dex =
+        dexExtractor.extractFromDexByteArrays(ctx.dexByteArrays());
+    return new DexBlockResult(
+        dex.features, dex.dexFilesFound, dex.extractNanos + dex.normalizeNanos);
+  }
+
   public ExtractionResult extract(File apkFile) throws Exception {
     long t0 = System.nanoTime();
     List<String> normalizedPermissions = PermissionNormalizer.readNormalizedPermissions(apkFile);
     long t1 = System.nanoTime();
+    return fuseBlocks(
+        normalizedPermissions,
+        t1 - t0,
+        dexExtractor.extract(apkFile));
+  }
 
+  public ExtractionResult extract(FeatureContext ctx) throws Exception {
+    return fuseBlocks(
+        ctx.normalizedPermissions(),
+        0L,
+        dexExtractor.extractFromDexByteArrays(ctx.dexByteArrays()));
+  }
+
+  private ExtractionResult fuseBlocks(
+      List<String> normalizedPermissions,
+      long parseNanos,
+      DexHeaderFeatureExtractor.ExtractionResult dex) {
     long t2 = System.nanoTime();
     float[] xS = buildXS(normalizedPermissions);
-    DexHeaderFeatureExtractor.ExtractionResult dex = dexExtractor.extract(apkFile);
     long t3 = System.nanoTime();
 
     float[] x = fuse(xS, dex.features);
@@ -197,7 +233,7 @@ public final class MldpDexHeaderExtractor {
         x,
         normalizedPermissions.size(),
         dex.dexFilesFound,
-        t1 - t0,
+        parseNanos,
         dex.extractNanos + dex.normalizeNanos,
         (t3 - t2) + (t4 - t3));
   }

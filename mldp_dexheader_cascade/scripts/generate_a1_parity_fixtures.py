@@ -32,6 +32,9 @@ JVM_FIXTURES = (
     REPO_ROOT
     / "vigidroid/app/src/test/resources/mldp_dexheader_cascade_a1_fixtures.json"
 )
+JVM_MANIFESTS = (
+    REPO_ROOT / "vigidroid/app/src/test/resources/mldp_dexheader_cascade/manifests"
+)
 NUM_SAMPLES = 3
 
 
@@ -121,6 +124,8 @@ def main() -> int:
                 check=True,
                 stdout=out,
             )
+        JVM_MANIFESTS.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(manifest_out, JVM_MANIFESTS / f"{sid}.xml")
 
         fixtures.append(
             {

@@ -9,7 +9,7 @@ from pathlib import Path
 from src.config import ensure_artifact_dirs, load_config
 from src.pipeline_integration import (
     get_pipeline_settings,
-    load_shared_train_val_paths,
+    load_shared_split_paths,
     partition_rows_from_shared_paths,
 )
 from src.preprocessing.common import (
@@ -46,32 +46,35 @@ def main(argv: list[str] | None = None) -> int:
     test_rows: list | None = None
 
     settings = get_pipeline_settings(cfg)
-    shared_paths = load_shared_train_val_paths(settings)
+    shared_paths = load_shared_split_paths(settings)
     if shared_paths is not None:
-        train_paths, val_paths = shared_paths
-        train_rows, val_rows, rows = partition_rows_from_shared_paths(
-            rows, train_paths, val_paths, apk_root
+        train_paths, val_paths, test_paths = shared_paths
+        train_rows, val_rows, test_rows, rows = partition_rows_from_shared_paths(
+            rows, train_paths, val_paths, apk_root, test_paths=test_paths
         )
         print(
             f"Using shared splits from {settings.shared_splits_dir} "
-            f"(train={len(train_rows)}, val={len(val_rows)})"
+            f"(train={len(train_rows)}, val={len(val_rows)}, "
+            f"test={len(test_rows) if test_rows else 0})"
         )
     else:
-        if split_mode == "temporal_year":
+        if split_mode in {"temporal_holdout", "temporal_year"}:
             train_years = pre.get("train_years", [2020, 2021])
-            test_years = pre.get("test_years", pre.get("val_years", [2022, 2023]))
-            val_fraction = float(pre.get("val_fraction", 0.1))
-            seed = int(pre.get("seed", 42))
+            holdout_years = pre.get("holdout_years", pre.get("test_years", [2022, 2023]))
+            val_fraction = float(
+                pre.get("val_fraction_of_holdout", pre.get("val_fraction", 0.5))
+            )
+            seed = int(pre.get("random_seed", pre.get("seed", 42)))
             train_rows, val_rows, test_rows = temporal_three_way_split(
                 rows,
                 train_years=train_years,
-                test_years=test_years,
-                val_fraction=val_fraction,
+                holdout_years=holdout_years,
+                val_fraction_of_holdout=val_fraction,
                 seed=seed,
             )
             print(
-                f"Temporal year split: train_years={train_years} test_years={test_years} "
-                f"val_fraction={val_fraction} "
+                f"Temporal holdout split: train_years={train_years} holdout_years={holdout_years} "
+                f"val_fraction_of_holdout={val_fraction} "
                 f"(train={len(train_rows)}, val={len(val_rows)}, test={len(test_rows)})"
             )
         elif split_mode == "stratified_random":
@@ -83,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             raise ValueError(
                 f"Unknown preprocessing.split_mode={split_mode!r}; "
-                "use 'temporal_year' or 'stratified_random'"
+                "use 'temporal_holdout' or 'stratified_random'"
             )
 
     write_dataset_index(cfg.paths.dataset_index, rows)

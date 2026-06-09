@@ -29,8 +29,8 @@ run_export "D2 ByteCNN" "python 1dcnn/export_onnx.py"
 
 # D3–D5 — scripts added in Phase 4
 run_export "D3 MLP(H)" "python Dex_header_paper_implementation/only_base1_model/scripts/export_onnx.py"
-run_export "D4 Pattern A" "python Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/scripts/export_onnx.py"
-run_export "D5 Pattern B" "python Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/scripts/export_onnx.py"
+run_export "D4 Early-Fusion Dex+Manifest" "python Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/scripts/export_onnx.py"
+run_export "D5 Dual-Branch Dex+Manifest" "python Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/scripts/export_onnx.py"
 
 echo
 echo "Copy export bundles to $ASSETS/<model_id>/ when Phase 4 scripts exist."

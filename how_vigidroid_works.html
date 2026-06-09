@@ -14,8 +14,14 @@
       --accent: #5eb3ff;
       --accent2: #7ee787;
       --warn: #f0b429;
+      --danger: #f85149;
       --pink: #f778ba;
+      --purple: #d2a8ff;
       --border: #2d3a4f;
+      --tier1: #3fb950;
+      --tier2: #58a6ff;
+      --tier3: #d29922;
+      --tier4: #f85149;
     }
     * { box-sizing: border-box; }
     body {
@@ -23,24 +29,42 @@
       font-family: "Segoe UI", system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.6;
+      line-height: 1.65;
     }
     header {
-      padding: 2rem 1.5rem;
-      background: linear-gradient(135deg, #1a3a5c, #0f1419 70%);
+      padding: 2.5rem 1.5rem 2rem;
+      background: linear-gradient(135deg, #1a3a5c 0%, #0f1419 65%);
       border-bottom: 1px solid var(--border);
     }
-    header h1 { margin: 0 0 0.4rem; font-size: 1.6rem; }
-    header p { margin: 0; color: var(--muted); max-width: 42rem; }
-    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.85rem; letter-spacing: -0.02em; }
+    header p { margin: 0; color: var(--muted); max-width: 54rem; }
+    nav#toc {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(26, 35, 50, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.65rem 1.25rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav#toc a {
+      color: var(--accent);
+      text-decoration: none;
+      margin-right: 1.1rem;
+      font-size: 0.88rem;
+    }
+    nav#toc a:hover { text-decoration: underline; }
+    main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
     h2 {
       color: var(--accent);
-      font-size: 1.15rem;
+      font-size: 1.25rem;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 0.3rem;
-      margin: 2rem 0 1rem;
+      padding-bottom: 0.35rem;
+      margin: 2.5rem 0 1rem;
     }
-    p { margin: 0.5rem 0; }
+    h3 { color: var(--accent2); font-size: 1.05rem; margin: 1.5rem 0 0.65rem; }
+    h4 { color: var(--purple); font-size: 0.95rem; margin: 1rem 0 0.5rem; }
+    p { margin: 0.5rem 0; color: var(--muted); }
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -48,67 +72,103 @@
       padding: 1rem 1.2rem;
       margin: 1rem 0;
     }
-    .grid {
+    .card.highlight {
+      border-left: 4px solid var(--accent2);
+    }
+    .card.warn {
+      border-left: 4px solid var(--warn);
+      background: #1e1a14;
+    }
+    .grid-2 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 0.75rem;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
       margin: 1rem 0;
     }
-    .model-box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.85rem;
-      text-align: center;
-    }
-    .model-box strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .model-box span { font-size: 0.8rem; color: var(--muted); }
-    .model-box.live { border-color: var(--accent2); }
-    .model-box.soon { border-color: var(--warn); opacity: 0.85; }
-    .tag {
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+    .pill {
       display: inline-block;
-      font-size: 0.7rem;
-      padding: 0.1rem 0.45rem;
-      border-radius: 4px;
-      margin-top: 0.35rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-right: 0.35rem;
     }
-    .tag-live { background: #1b3d2a; color: var(--accent2); }
-    .tag-soon { background: #3d3018; color: var(--warn); }
+    .pill-t1 { background: rgba(63,185,80,0.2); color: var(--tier1); }
+    .pill-t2 { background: rgba(88,166,255,0.2); color: var(--tier2); }
+    .pill-t3 { background: rgba(210,153,34,0.2); color: var(--tier3); }
+    .pill-t4 { background: rgba(248,81,73,0.2); color: var(--tier4); }
+    .pill-legacy { background: rgba(154,168,188,0.15); color: var(--muted); }
+    .pill-ablation { background: rgba(247,120,186,0.15); color: var(--pink); }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
-      margin: 0.75rem 0;
+      font-size: 0.88rem;
+      margin: 0.75rem 0 1.25rem;
     }
     th, td {
       border: 1px solid var(--border);
       padding: 0.5rem 0.65rem;
       text-align: left;
+      vertical-align: top;
     }
     th { background: var(--surface2); color: var(--accent); }
+    tr:nth-child(even) td { background: rgba(36, 48, 68, 0.3); }
     code {
-      font-family: ui-monospace, monospace;
-      font-size: 0.85em;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.84em;
       background: #0d1117;
       padding: 0.1rem 0.35rem;
       border-radius: 4px;
+      color: var(--pink);
     }
-    .flow {
-      background: var(--surface);
+    pre {
+      background: #0d1117;
       border: 1px solid var(--border);
-      border-radius: 10px;
       padding: 1rem;
       overflow-x: auto;
-      font-family: ui-monospace, monospace;
-      font-size: 0.78rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
       line-height: 1.45;
-      white-space: pre;
-      color: var(--muted);
+      color: var(--text);
     }
-    .flow .hi { color: var(--accent2); }
-    .flow .hi2 { color: var(--accent); }
-    .flow .hi3 { color: var(--pink); }
-    .mermaid { margin: 1rem 0; }
+    .mermaid { margin: 1.25rem 0; overflow-x: auto; }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin: 0.75rem 0;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .flow-num {
+      flex-shrink: 0;
+      width: 2rem; height: 2rem;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.9rem;
+    }
+    .flow-body strong { color: var(--text); display: block; margin-bottom: 0.2rem; }
+    .flow-body span { color: var(--muted); font-size: 0.9rem; }
+    .tier-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 0.75rem 0;
+    }
+    .tier-bar span { flex: 1; }
+    .tb1 { background: var(--tier1); }
+    .tb2 { background: var(--tier2); }
+    .tb3 { background: var(--tier3); }
+    .tb4 { background: var(--tier4); }
+    .legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.82rem; margin: 0.5rem 0; }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
     footer {
       text-align: center;
       color: var(--muted);
@@ -116,542 +176,938 @@
       padding: 1.5rem;
       border-top: 1px solid var(--border);
     }
-    ul { margin: 0.4rem 0; padding-left: 1.2rem; }
-    li { margin: 0.25rem 0; }
-    .manual-order {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      align-items: center;
+    .evolution {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
       margin: 1rem 0;
-      font-size: 0.95rem;
     }
-    .manual-order .step-pill {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 0.35rem 0.85rem;
-    }
-    .manual-order .arrow { color: var(--muted); }
-    .step-box {
-      display: flex;
-      gap: 1rem;
+    @media (max-width: 800px) { .evolution { grid-template-columns: 1fr; } }
+    .evo-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem 1.1rem;
-      margin: 0.75rem 0;
-    }
-    .step-num {
-      flex-shrink: 0;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #0f1419;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.95rem;
-    }
-    .step-body { flex: 1; min-width: 0; }
-    .step-body strong { color: var(--text); }
-    .ui-sketch {
-      background: #0d1117;
-      border: 1px dashed var(--border);
       border-radius: 8px;
-      padding: 0.75rem 1rem;
-      margin: 0.6rem 0 0;
-      font-family: ui-monospace, monospace;
-      font-size: 0.78rem;
-      line-height: 1.5;
+      padding: 0.9rem;
+    }
+    .evo-card h4 { margin-top: 0; }
+    .evo-card p { font-size: 0.88rem; margin: 0; }
+    ol.steps { padding-left: 0; counter-reset: step; list-style: none; }
+    ol.steps > li {
+      counter-increment: step;
+      padding: 0.5rem 0 0.5rem 2.5rem;
+      position: relative;
+      margin-bottom: 0.5rem;
       color: var(--muted);
     }
-    .ui-sketch .bar { background: var(--surface2); padding: 0.35rem 0.5rem; margin-bottom: 0.35rem; border-radius: 4px; }
-    .ui-sketch .green { color: var(--accent2); }
-    .ui-sketch .blue { color: var(--accent); }
-    .ui-sketch .warn { color: var(--warn); }
-    .callout-warn {
-      border-left: 4px solid var(--warn);
-      background: var(--surface);
-      padding: 0.85rem 1rem;
-      border-radius: 6px;
-      margin: 1rem 0;
-      font-size: 0.92rem;
+    ol.steps > li::before {
+      content: counter(step);
+      position: absolute; left: 0;
+      width: 1.75rem; height: 1.75rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      text-align: center; line-height: 1.75rem;
+      font-weight: 700; font-size: 0.8rem;
+      color: var(--accent);
     }
+    ol.steps > li strong { color: var(--text); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      flowchart: { curve: 'basis', padding: 16 },
+      sequence: { actorMargin: 50 }
+    });
+  </script>
 </head>
 <body>
 
 <header>
   <h1>How VigiDroid Works</h1>
-  <p>On-device APK scanner: <strong>5 models</strong> run on each APK, scores and timings are logged. Simple overview — no deep internals.</p>
+  <p>
+    End-to-end workflow for the VigiDroid Android malware scanner: from offline model training on a PC,
+    through ONNX export and asset staging, to on-device scanning with a four-tier cascading pipeline.
+    Updated for the current codebase (June 2026) after multi-model integration, app restructuring, and cascade deployment.
+  </p>
 </header>
+
+<nav id="toc">
+  <a href="#overview">Overview</a>
+  <a href="#evolution">What changed</a>
+  <a href="#big-picture">Big picture</a>
+  <a href="#offline">Offline pipeline</a>
+  <a href="#android-arch">App architecture</a>
+  <a href="#scan-triggers">Scan triggers</a>
+  <a href="#per-apk">Per-APK flow</a>
+  <a href="#feature-context">Parse once</a>
+  <a href="#scan-modes">Scan modes</a>
+  <a href="#cascade">Cascade</a>
+  <a href="#models">Models</a>
+  <a href="#metrics">Metrics</a>
+  <a href="#files">Key files</a>
+</nav>
 
 <main>
 
-  <h2>Big picture: two places</h2>
+<!-- ── 1. Overview ── -->
+<section id="overview">
+  <h2>1. Overview</h2>
+  <p>
+    VigiDroid is an on-device Android APK scanner built for thesis evaluation. It runs multiple
+    malware-detection models trained offline in Python, exported as ONNX bundles, and loaded at app startup.
+    Each APK scan extracts static features from the APK zip, runs one or more ONNX models, and writes
+    structured JSON metrics for thesis plots (accuracy vs latency, resource usage, cascade exit rates).
+  </p>
+
+  <div class="card highlight">
+    <strong>Two cooperating worlds</strong>
+    <div class="grid-2" style="margin-top:0.75rem;">
+      <div>
+        <h4 style="margin-top:0;color:var(--accent);">PC — training &amp; calibration</h4>
+        <p>APK corpus → feature extraction → PyTorch train → evaluate → ONNX export → parity check → cascade policy build.</p>
+      </div>
+      <div>
+        <h4 style="margin-top:0;color:var(--accent2);">Phone — scanning &amp; metrics</h4>
+        <p>Trigger scan → parse APK once → tier-by-tier cascade (or all-models ablation) → verdict + JSONL metrics → pull to PC for plots.</p>
+      </div>
+    </div>
+  </div>
+
   <div class="mermaid">
 flowchart LR
-  PC["🖥️ PC — Python\nTrain & export"]
-  Phone["📱 Phone — VigiDroid\nScan APKs"]
-  PC -->|"model.onnx + config files"| Phone
-  Phone -->|"metrics JSON"| PC
+    subgraph PC["🖥️ Offline (Python)"]
+        APK[(APK corpus)]
+        P2[Feature extract]
+        P5[Train PyTorch]
+        P7[Export ONNX bundle]
+        CAL[Calibrate thresholds]
+        POL[cascade_policy.json]
+        APK --> P2 --> P5 --> P7 --> CAL --> POL
+    end
+    subgraph PHONE["📱 On-device (Java)"]
+        UI[MainActivity]
+        SS[ScanService]
+        FC[FeatureContext]
+        ORCH[ScanOrchestrator]
+        MW[MetricsWriter JSONL]
+        UI --> SS --> FC --> ORCH --> MW
+    end
+    P7 -->|copy assets| SS
+    POL -->|assets/cascade_policy.json| ORCH
   </div>
-  <p>Models are <strong>trained on the PC</strong>, copied into the app as <strong>ONNX files</strong>, then run <strong>on the phone</strong> when you scan.</p>
+</section>
 
-  <h2>Models in the app today</h2>
-  <div class="grid">
-    <div class="model-box live">
-      <strong>XGBoost</strong>
-      <span>Manifest + DEX tokens</span>
-      <span class="tag tag-live">active</span>
+<!-- ── 2. Evolution ── -->
+<section id="evolution">
+  <h2>2. What changed since the initial version</h2>
+  <p>
+    The original workflow (documented in <code>whats_going_on.pdf</code>) described a single-model app:
+    XGBoost manifest+DEX features plus a 1D-CNN on tail bytes, with a simple weighted ensemble verdict.
+    Three major upgrades followed:
+  </p>
+
+  <div class="evolution">
+    <div class="evo-card">
+      <h4>① Multi-model integration</h4>
+      <p>
+        Six thesis pipelines (MLDP, broadcast hybrid, BM1 header, Pattern A/B, LinRegDroid, MLDP+DEX cascade)
+        were added following <code>Pipeline_full_concept.html</code> phases P0–P8 (PC) and A1–A4 (Android).
+        Each model ships as <code>assets/models/&lt;model_id&gt;/</code> with ONNX, thresholds, and parity samples.
+      </p>
     </div>
-    <div class="model-box live">
-      <strong>1D-CNN</strong>
-      <span>Last 1024 APK bytes</span>
-      <span class="tag tag-live">active</span>
+    <div class="evo-card">
+      <h4>② App restructuring</h4>
+      <p>
+        Per <code>vigidroid_fix_plan_opus.md</code>: parse-once <code>FeatureContext</code>,
+        <code>StageRunner</code> + <code>ModelRegistry</code>, split JSONL metrics, real SHA-256 dedup,
+        session records, battery sampling, and UI cascade toggle. The monolithic <code>ScanService</code> god-method was decomposed.
+      </p>
     </div>
-    <div class="model-box live">
-      <strong>BM1 mlp_header</strong>
-      <span>Dex header only (104 nums)</span>
-      <span class="tag tag-live">active</span>
-    </div>
-    <div class="model-box live">
-      <strong>Pattern A</strong>
-      <span>Header + manifest BoW</span>
-      <span class="tag tag-live">active</span>
-    </div>
-    <div class="model-box live">
-      <strong>Pattern B</strong>
-      <span>Dual branch fused ONNX</span>
-      <span class="tag tag-live">active</span>
+    <div class="evo-card">
+      <h4>③ Cascading detection</h4>
+      <p>
+        Per <code>cascading_fix_opus.md</code>: every model now exports <code>tuned_val</code> plus
+        <code>t_low</code>/<code>t_high</code> bands. <code>ScanOrchestrator</code> runs a four-tier early-exit
+        policy driven by <code>cascade_policy.json</code> — cheap manifest gates first, heavy parsers last.
+      </p>
     </div>
   </div>
-  <p><strong>5 models total.</strong> XGBoost + CNN feed the <strong>main combined verdict</strong> (weighted average) shown in the results table. BM1, Pattern A, and Pattern B are <strong>separate thesis scores</strong> — logged only; they do not change the CNN/XGB verdict.</p>
 
-  <h2>What each model reads from an APK</h2>
   <table>
     <thead>
-      <tr><th>Model</th><th>Input (simple)</th><th>Output</th></tr>
+      <tr><th>Aspect</th><th>Initial version</th><th>Current (2026-06)</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td><strong>XGBoost</strong></td>
-        <td>Permissions, intents, DEX structure → 2500 flags</td>
-        <td>Malware score 0–1</td>
+        <td>Models per scan</td>
+        <td>2 (XGB + ByteCNN)</td>
+        <td>Up to 11 in ablation mode; 2–8 in cascade mode (early exit)</td>
       </tr>
       <tr>
-        <td><strong>1D-CNN</strong></td>
-        <td>Last 1024 raw bytes of the APK file</td>
-        <td>Malware score 0–1</td>
+        <td>Verdict policy</td>
+        <td>Fixed XGB+CNN weighted blend</td>
+        <td>Cascade tiers with calibrated bands, or legacy ablation ensemble</td>
       </tr>
       <tr>
-        <td><strong>BM1 mlp_header</strong></td>
-        <td>All <code>classes*.dex</code> headers summed → 104 numbers</td>
-        <td>Malware score 0–1</td>
+        <td>APK parsing</td>
+        <td>Each model re-opened the ZIP</td>
+        <td>Single <code>FeatureContext.open()</code> — manifest, DEX, tail bytes cached</td>
       </tr>
       <tr>
-        <td><strong>Pattern A</strong></td>
-        <td>Dex header (104) + manifest permissions/intents → 4381-d BoW</td>
-        <td>Malware score 0–1</td>
+        <td>Metrics file</td>
+        <td>One JSON rewritten per APK</td>
+        <td>Append-only JSONL (<code>scan_a_all_models.jsonl</code> / <code>scan_b_cascade.jsonl</code>)</td>
       </tr>
       <tr>
-        <td><strong>Pattern B</strong></td>
-        <td>Same inputs as Pattern A; fusion is inside ONNX (MLP + ASCNN branches)</td>
-        <td>Malware score 0–1</td>
+        <td>Dedup</td>
+        <td>None — every button press rescans all APKs</td>
+        <td>SHA-256 keyed <code>ScanProcessedStore</code>; incremental scan by default</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 3. Big picture ── -->
+<section id="big-picture">
+  <h2>3. Big picture — end-to-end data flow</h2>
+
+  <div class="mermaid">
+flowchart TB
+    subgraph CORPUS["APK corpus (outside git)"]
+        Y20[2020/2021 train]
+        Y22[2022/2023 test]
+    end
+
+    subgraph SHARED["Shared_pipeline_Files/"]
+        MAN[apk_index.csv]
+        SPL[splits/ train·val·test]
+        SCH[schemas/]
+        TOOLS[tools/ plot · pull · calibrate]
+    end
+
+    subgraph MODEL["Per-model folder (×7 pipelines)"]
+        PRE[preprocess P2]
+        TRN[train P5]
+        EVA[evaluate P6 + calibrate]
+        EXP[export ONNX P7]
+        PAR[parity P8]
+        PRE --> TRN --> EVA --> EXP --> PAR
+    end
+
+    subgraph ASSETS["vigidroid/app/src/main/assets/"]
+        MOD[models/&lt;model_id&gt;/]
+        CP[cascade_policy.json]
+    end
+
+    subgraph DEVICE["On-device scan"]
+        SCAN[ScanService]
+        MET[metrics/*.jsonl]
+    end
+
+    subgraph THESIS["Thesis outputs"]
+        OFF[results/offline/]
+        DEV[results/device/]
+        FIG[results/figures/]
+    end
+
+    Y20 --> PRE
+    MAN --> PRE
+    SPL --> PRE
+    EXP --> MOD
+    EVA --> OFF
+    MOD --> SCAN
+    CP --> SCAN
+    SCAN --> MET
+    MET -->|adb pull| DEV
+    OFF --> FIG
+    DEV --> FIG
+    TOOLS --> FIG
+  </div>
+
+  <div class="card warn">
+    <strong>Train/serve parity is mandatory.</strong>
+    Java feature extractors must match Python preprocessing exactly. Every model ships
+    <code>parity_samples/</code>; P8 (PC) and A4 (Android instrumented tests) verify scores within 1e-4.
+    If features diverge, offline accuracy and on-device scores are not comparable.
+  </div>
+</section>
+
+<!-- ── 4. Offline pipeline ── -->
+<section id="offline">
+  <h2>4. Offline model pipeline (PC)</h2>
+  <p>Each thesis model lives in its own folder and follows phases P0–P8 from <code>Pipeline_full_concept.html</code>.</p>
+
+  <table>
+    <thead><tr><th>Phase</th><th>Name</th><th>Key outputs</th></tr></thead>
+    <tbody>
+      <tr><td><strong>P0</strong></td><td>Config &amp; environment</td><td><code>config/default.yaml</code>, <code>requirements.txt</code></td></tr>
+      <tr><td><strong>P1</strong></td><td>Dataset indexing</td><td>Manifest CSV with sha256, label, year, split</td></tr>
+      <tr><td><strong>P2</strong></td><td>Feature extraction</td><td>Sharded tensors, vocab/norm JSON, <code>failed_apks.log</code></td></tr>
+      <tr><td><strong>P3–P4</strong></td><td>DataLoader + model</td><td>PyTorch <code>Dataset</code> and architecture</td></tr>
+      <tr><td><strong>P5</strong></td><td>Training</td><td><code>artifacts/checkpoints/</code></td></tr>
+      <tr><td><strong>P6</strong></td><td>Evaluation</td><td>Test metrics + <code>val_scores.json</code> for cascade calibration</td></tr>
+      <tr><td><strong>P7</strong></td><td>ONNX export</td><td><code>artifacts/export/&lt;model_id&gt;/</code> bundle</td></tr>
+      <tr><td><strong>P8</strong></td><td>Parity</td><td>PyTorch vs ONNX on parity samples (≤ 1e-4)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>ONNX export bundle structure</h3>
+  <pre>artifacts/export/&lt;model_id&gt;/
+├── model.onnx
+├── export_manifest.json    # inputs, outputs, preprocessing_version
+├── thresholds.json         # tuned_val + cascade { t_low, t_high, ... }
+├── features/               # vocab, normalization stats (if needed)
+└── parity_samples/         # ~10 inputs + expected scores</pre>
+
+  <h3>Cascade calibration (after all models trained)</h3>
+  <ol class="steps">
+    <li><strong>Per-model bands</strong> — each pipeline runs <code>calibrate_thresholds.py</code> on val scores → <code>t_low</code> / <code>t_high</code> in <code>thresholds.json</code>.</li>
+    <li><strong>Val score collection</strong> — aligned <code>val_scores.json</code> per model copied to <code>Shared_pipeline_Files/calibration/</code>.</li>
+    <li><strong>Tier policy build</strong> — <code>build_cascade_policy.py</code> inner-joins val scores, calibrates per-tier bands, writes <code>cascade_policy.json</code>.</li>
+    <li><strong>Asset sync</strong> — bundles copied to <code>vigidroid/app/src/main/assets/models/</code>; policy to <code>assets/cascade_policy.json</code>.</li>
+  </ol>
+
+  <div class="mermaid">
+flowchart LR
+    VAL[val_scores per model] --> JOIN[inner-join on sha256]
+    JOIN --> T1[Tier 1 bands]
+    JOIN --> T2[Tier 2 bands]
+    JOIN --> T3[Tier 3 bands]
+    T1 & T2 & T3 --> POLICY[cascade_policy.json]
+    POLICY --> APP[VigiDroid assets]
+  </div>
+</section>
+
+<!-- ── 5. Android architecture ── -->
+<section id="android-arch">
+  <h2>5. Android app architecture</h2>
+
+  <div class="mermaid">
+flowchart TB
+    subgraph UI["UI layer"]
+        MA[MainActivity]
+        BR[ApkDownloadReceiver]
+    end
+
+    subgraph SERVICE["Background scan"]
+        SS[ScanService JobIntentService]
+        CP[CascadePolicy loader]
+        LSR[LegacyScanRunner]
+        SO[ScanOrchestrator]
+        SR[StageRunner]
+    end
+
+    subgraph CORE["Shared per-APK"]
+        FC[FeatureContext]
+        MR[ModelRegistry]
+    end
+
+    subgraph RUNNERS["ONNX runners (×11)"]
+        R1[mldp_pruned · broadcast · mode_a/b]
+        R2[mlp_header · pattern_a/b · linreg]
+        R3[xgb · bytecnn · dex_broadcast_fusion]
+    end
+
+    subgraph OUT["Output"]
+        MW[MetricsWriter JSONL]
+        SPS[ScanProcessedStore]
+        LBM[LocalBroadcast → UI]
+    end
+
+    MA -->|enqueueWork| SS
+    BR -->|single APK| SS
+    SS --> CP
+    SS -->|cascade?| SO
+    SS -->|ablation?| LSR
+    SO & LSR --> FC
+    SO & LSR --> SR
+    SR --> RUNNERS
+    FC --> RUNNERS
+    MR --> SR
+    SS --> MW
+    SS --> SPS
+    SS --> LBM --> MA
+  </div>
+
+  <table>
+    <thead><tr><th>Component</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>MainActivity</code></td>
+        <td>UI: Start Scan, Rescan All, Stop, cascade toggle, results table, detail dialog, log viewer</td>
+      </tr>
+      <tr>
+        <td><code>ScanService</code></td>
+        <td>Background worker: discover APKs, loop per file, dispatch to cascade or legacy runner, write metrics</td>
+      </tr>
+      <tr>
+        <td><code>FeatureContext</code></td>
+        <td>Parse-once: one <code>ZipFile</code>, cached manifest permissions, hybrid manifest, BoW tokens, DEX bytes, tail 1024 bytes, full SHA-256</td>
+      </tr>
+      <tr>
+        <td><code>StageRunner</code></td>
+        <td>Runs individual model pipelines against a <code>FeatureContext</code>; returns <code>StageResult</code> with timings and score</td>
+      </tr>
+      <tr>
+        <td><code>ScanOrchestrator</code></td>
+        <td>Four-tier cascade with early exit; loads thresholds from <code>CascadePolicy</code></td>
+      </tr>
+      <tr>
+        <td><code>LegacyScanRunner</code></td>
+        <td>Ablation mode: runs all 11 stages sequentially; verdict = XGB+CNN weighted fusion</td>
+      </tr>
+      <tr>
+        <td><code>ModelRegistry</code></td>
+        <td>Canonical <code>model_id</code> → domain → assets path mapping for all stages</td>
+      </tr>
+      <tr>
+        <td><code>MetricsWriter</code></td>
+        <td>Append-only JSONL per scan mode; session records; schema-aligned fields</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 6. Scan triggers ── -->
+<section id="scan-triggers">
+  <h2>6. How a scan starts</h2>
+
+  <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant MA as MainActivity
+    participant SS as ScanService
+    participant FC as FeatureContext
+    participant OR as Orchestrator
+    participant MW as MetricsWriter
+
+    User->>MA: Tap "Start Scan" (or Rescan All)
+    MA->>MA: session_id = UUID, cascade flag from toggle
+    MA->>SS: enqueueWork(intent)
+    SS->>SS: List APKs in Download/ (+ Scanable/)
+    loop Each APK
+        SS->>FC: open(apk)
+        alt Already scanned (SHA-256 dedup)
+            SS->>MW: write skipped record
+        else New APK
+            SS->>OR: run(ctx) cascade OR legacy
+            OR-->>SS: ScanApkResult
+            SS->>MW: append JSONL scan record
+            SS->>MA: broadcast SCAN_RESULT
+        end
+    end
+    SS->>MW: write session record
+    SS->>MA: broadcast "Idle"
+  </div>
+
+  <table>
+    <thead><tr><th>Trigger</th><th>Source</th><th>APK scope</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>manual</code></td>
+        <td>Start Scan / Rescan All button in <code>MainActivity</code></td>
+        <td>All <code>.apk</code> in <code>/sdcard/Download/</code> and <code>Download/Scanable/</code> (thesis eval set)</td>
+      </tr>
+      <tr>
+        <td><code>download</code></td>
+        <td><code>ApkDownloadReceiver</code> on <code>DOWNLOAD_COMPLETE</code></td>
+        <td>Single newly downloaded APK only (incremental)</td>
       </tr>
     </tbody>
   </table>
 
-  <h2>Full scan workflow (what happens when you tap Start)</h2>
+  <p>
+    <strong>Incremental vs rescan:</strong> Default scan skips APKs whose full SHA-256 is already in
+    <code>ScanProcessedStore</code>. "Rescan All" bypasses dedup. "Clear scan history" resets the store.
+  </p>
+</section>
+
+<!-- ── 7. Per-APK flow ── -->
+<section id="per-apk">
+  <h2>7. Per-APK scan flow</h2>
+
+  <div class="flow-step">
+    <div class="flow-num">1</div>
+    <div class="flow-body">
+      <strong>Discover &amp; open APK</strong>
+      <span><code>ScanService</code> resolves target files, opens <code>FeatureContext.open(apk)</code></span>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-num">2</div>
+    <div class="flow-body">
+      <strong>Parse once (shared)</strong>
+      <span>Stream SHA-256, read tail bytes, open ZIP once, decode manifest, list &amp; read all <code>classes*.dex</code> entries</span>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-num">3</div>
+    <div class="flow-body">
+      <strong>Run detection pipeline</strong>
+      <span>Cascade: tier-by-tier with early exit. Ablation: all 11 models sequentially.</span>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-num">4</div>
+    <div class="flow-body">
+      <strong>Assemble metrics &amp; verdict</strong>
+      <span><code>ScanMetricsAssembler</code> builds scan record with stages[], cascade{}, totals{}, battery snapshot</span>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-num">5</div>
+    <div class="flow-body">
+      <strong>Persist &amp; notify UI</strong>
+      <span>Append JSONL line, mark SHA-256 processed, broadcast result row to <code>MainActivity</code></span>
+    </div>
+  </div>
+
+  <h3>Real latency has two parts</h3>
+  <div class="card">
+    <table>
+      <thead><tr><th>Timer</th><th>What it measures</th><th>Typical scale</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>totals.shared_parse_ms</code></td>
+          <td>One-time <code>FeatureContext</code> open: ZIP, manifest decode, DEX listing, SHA-256, tail bytes</td>
+          <td>~100–250 ms (dominates for cheap models)</td>
+        </tr>
+        <tr>
+          <td><code>totals.wall_ms</code></td>
+          <td>Model pipeline only (parse-once already done; per-stage times are vectorize + infer)</td>
+          <td>~5–500 ms depending on cascade exit tier</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin:0.5rem 0 0;font-size:0.9rem;">
+      End-to-end ≈ <code>shared_parse_ms + wall_ms</code>. The UI results table shows <code>wall_ms</code>;
+      tap a row for the full breakdown including shared parse.
+    </p>
+  </div>
+</section>
+
+<!-- ── 8. FeatureContext ── -->
+<section id="feature-context">
+  <h2>8. Parse once — <code>FeatureContext</code></h2>
+  <p>
+    Before restructuring, every model independently opened the APK ZIP and re-parsed the manifest — up to 6+
+    manifest decodes and 4+ DEX header reads per APK. <code>FeatureContext</code> eliminates that waste.
+  </p>
+
+  <div class="mermaid">
+flowchart LR
+    APK[APK file] --> SHA[SHA-256 stream]
+    APK --> TAIL[Last 1024 bytes]
+    APK --> ZIP[ZipFile open once]
+    ZIP --> MAN[Manifest decode]
+    MAN --> PERM[Permissions normalized]
+    MAN --> HYB[Hybrid manifest features]
+    MAN --> BOW[BoW tokens]
+    MAN --> XGBTOK[XGB manifest tokens]
+    ZIP --> DEX[All classes*.dex bytes]
+    SHA & TAIL & PERM & HYB & BOW & XGBTOK & DEX --> CTX[FeatureContext cache]
+    CTX --> M1[Tier 1 runners]
+    CTX --> M2[Tier 2 runners]
+    CTX --> M3[Tier 3 runners]
+    CTX --> M4[ByteCNN]
+  </div>
+
+  <p>
+    Each ONNX runner's extractor reads from the cache instead of re-opening the file.
+    Per-stage <code>parse_ms</code> then measures only model-specific vectorization — a fair comparison across models.
+  </p>
+</section>
+
+<!-- ── 9. Scan modes ── -->
+<section id="scan-modes">
+  <h2>9. Two scan modes</h2>
+  <p>
+  The cascade toggle in <code>MainActivity</code> selects which runner <code>ScanService</code> uses.
+  Metrics go to separate JSONL files so ablation and cascade runs don't mix.
+  </p>
+
+  <div class="grid-2">
+    <div class="card" style="border-top:3px solid var(--accent2);">
+      <span class="pill pill-t1">Deployed</span>
+      <h3 style="margin-top:0.5rem;">Cascade mode</h3>
+      <p><code>ScanOrchestrator</code> · <code>scan_b_cascade.jsonl</code></p>
+      <ul style="color:var(--muted);font-size:0.9rem;padding-left:1.2rem;">
+        <li>Four-tier early-exit policy</li>
+        <li>Verdict from cascade score at exit tier</li>
+        <li>Typically 2–5 models run per APK</li>
+        <li>~40% exit at Tier 1 on val set</li>
+        <li>Thesis "production" configuration</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top:3px solid var(--pink);">
+      <span class="pill pill-ablation">Ablation</span>
+      <h3 style="margin-top:0.5rem;">All-models mode</h3>
+      <p><code>LegacyScanRunner</code> · <code>scan_a_all_models.jsonl</code></p>
+      <ul style="color:var(--muted);font-size:0.9rem;padding-left:1.2rem;">
+        <li>All 11 stages run every APK</li>
+        <li>Verdict = XGB + ByteCNN weighted fusion (legacy)</li>
+        <li>Full per-model instrumentation</li>
+        <li>Used for model comparison &amp; debugging</li>
+        <li>Higher latency, complete stage coverage</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── 10. Cascade ── -->
+<section id="cascade">
+  <h2>10. Cascading detection pipeline</h2>
+  <p>
+    The cascade runs models from cheapest to most expensive. At each tier, a combined score is compared
+    against calibrated uncertain bands. Confident benign or malware scores stop immediately; uncertain
+    scores escalate to the next tier.
+  </p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--tier1)"></div> Tier 1 — manifest-only gates</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--tier2)"></div> Tier 2 — DEX header escalation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--tier3)"></div> Tier 3 — heavy structural parse</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--tier4)"></div> Tier 4 — late fusion</div>
+  </div>
+  <div class="tier-bar">
+    <span class="tb1" title="Tier 1"></span>
+    <span class="tb2" title="Tier 2"></span>
+    <span class="tb3" title="Tier 3"></span>
+    <span class="tb4" title="Tier 4"></span>
+  </div>
+
+  <h3>Exit rule (every tier)</h3>
+  <div class="card">
+    <table>
+      <thead><tr><th>Condition</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>Score ≤ <code>t_low</code></td><td>Confident <strong style="color:var(--tier1)">benign</strong> → stop, record early exit</td></tr>
+        <tr><td>Score ≥ <code>t_high</code> (or any model ≥ its <code>tuned_val</code> when conservative OR enabled)</td><td>Confident <strong style="color:var(--tier4)">malware</strong> → stop</td></tr>
+        <tr><td><code>t_low &lt; score &lt; t_high</code></td><td><strong style="color:var(--warn)">Uncertain</strong> → escalate to next tier</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Cascade flowchart (deployed models)</h3>
   <div class="mermaid">
 flowchart TD
-  A[You tap Start scan] --> B[ScanService starts]
-  B --> C[Find all .apk in Download folder]
-  C --> D{Any APKs?}
-  D -->|No| E[Show: no APKs found]
-  D -->|Yes| F[For each APK...]
-  F --> G[Run XGBoost pipeline]
-  F --> H[Run 1D-CNN pipeline]
-  F --> I[Run BM1 mlp_header]
-  F --> N[Run Pattern A]
-  F --> O[Run Pattern B]
-  G --> J[Combine XGB + CNN score]
-  H --> J
-  I --> K[Log all scores + timings]
-  N --> K
-  O --> K
-  J --> K
-  K --> L[Show result in app table]
-  K --> M[Append to all_scan_metrics.json]
-  F --> F
+    START([APK in FeatureContext]) --> G1A
+    START --> G1B
+    G1A[mldp_pruned_permission]
+    G1B[broadcast_mldp_hybrid]
+    G1A --> AGG1[Tier 1 weighted score]
+    G1B --> AGG1
+
+    AGG1 -->|score below t_low| EXIT_B[Benign verdict]
+    AGG1 -->|score above t_high| EXIT_M[Malware verdict]
+    AGG1 -->|uncertain| MB
+
+    MB[mldp_dexheader cascade Mode B]
+    MB -->|stage-1 confident| EXIT2E[Early exit tier 2]
+    MB -->|uncertain| MLP[mlp_header fallback]
+    MLP --> AGG2[Tier 2 score]
+    MB --> AGG2
+
+    AGG2 -->|confident| EXIT2[Verdict tier 2]
+    AGG2 -->|uncertain| PA
+
+    PA[early_fusion_dex_manifest]
+    XGB[manifest_xgb]
+    PA --> AGG3[Tier 3 weighted score]
+    XGB --> AGG3
+
+    AGG3 -->|confident| EXIT3[Verdict tier 3]
+    AGG3 -->|uncertain| CNN
+
+    CNN[bytecnn tail bytes]
+    CNN --> FUSE[Tier 4 fusion score]
+    PA --> FUSE
+    XGB --> FUSE
+    FUSE --> EXIT4[Final verdict]
+
+    EXIT_B --> LOG[Write metrics JSONL]
+    EXIT_M --> LOG
+    EXIT2E --> LOG
+    EXIT2 --> LOG
+    EXIT3 --> LOG
+    EXIT4 --> LOG
   </div>
 
-  <h2>Inside one APK (visual)</h2>
-  <div class="flow"><span class="hi2">APK file</span> (in Download/)
-    │
-    ├─► <span class="hi">XGBoost path</span>     open ZIP → manifest + all classes*.dex → 2500-d vector → ONNX → score₁
-    │
-    ├─► <span class="hi">1D-CNN path</span>      read last 1024 bytes → ONNX → score₂
-    │                                      └─► <span class="hi2">ensemble</span> = weighted mix of score₁ + score₂ → shown as main verdict
-    │
-    ├─► <span class="hi3">BM1 path</span>           dex headers summed → 104 floats → ONNX → score₃ (logged separately)
-    │
-    ├─► <span class="hi3">Pattern A path</span>     dex header + manifest BoW → ONNX → score₄ (logged separately)
-    │
-    └─► <span class="hi3">Pattern B path</span>     same features as A → fused ONNX → score₅ (logged separately)</div>
-
-  <h2>Where model files live</h2>
-  <div class="card">
-    <p><strong>Built into the app (assets):</strong></p>
-    <ul>
-      <li><code>assets/bytecnn_basemodel_2020.onnx</code> — CNN</li>
-      <li><code>assets/mh1m_2500_rp_XGBoost.onnx</code> + feature list — XGBoost</li>
-      <li><code>assets/models/mlp_header/</code> — BM1 ONNX + normalization + parity samples</li>
-      <li><code>assets/models/pattern_a_combined/</code> — Pattern A ONNX + vocab + normalization + parity samples</li>
-      <li><code>assets/models/pattern_b_dual_branch/</code> — Pattern B ONNX + vocab + normalization + parity samples</li>
-    </ul>
-    <p><strong>On the phone after a scan:</strong></p>
-    <ul>
-      <li><code>Android/data/.../files/metrics/all_scan_metrics.json</code> — one growing log of all scans</li>
-    </ul>
-  </div>
-
-  <h2>Parity check vs real scans</h2>
-  <div class="mermaid">
-flowchart LR
-  subgraph A4["A4 — Parity (test)"]
-    P1[8 fixed number sets in app] --> P2[Run ONNX on phone]
-    P2 --> P3{Match PC answers?}
-  end
-  subgraph A3["A3 — Real scans"]
-    R1[Your APKs in Download/] --> R2[Extract features from each APK]
-    R2 --> R3[Run all models + save JSON]
-  end
-  A4 -->|pass first| A3
-  </div>
-  <p><strong>A4</strong> = quick exam (Android Studio → run three parity tests). <strong>A3</strong> = real work (use the app, scan APKs, pull JSON to PC). Run all three A4 tests before trusting thesis scores.</p>
-
-  <h2>What you see in the app</h2>
-  <ul>
-    <li><strong>Results table</strong> — one row per APK (XGB+CNN ensemble verdict, time, memory)</li>
-    <li><strong>Log panel</strong> — all 5 model scores as each APK is processed (XGB, CNN, BM1, Pattern A, Pattern B)</li>
-    <li><strong>Metrics file</strong> — detailed JSON with a <code>stages[]</code> list (one entry per model per scan)</li>
-  </ul>
-
-  <h2>Typical stages[] in metrics JSON</h2>
-  <div class="flow">one scan entry
-  ├─ stages[0]  domain: manifest_xgb        → score, parse_ms, inference_ms
-  ├─ stages[1]  domain: bytecnn             → score, parse_ms, inference_ms
-  ├─ stages[2]  domain: dex_header_d3       → BM1 score + timings
-  ├─ stages[3]  domain: dex_header_manifest       → Pattern A score + timings
-  ├─ stages[4]  domain: dex_header_manifest_dual  → Pattern B score + timings
-  ensemble block → combined XGB + CNN verdict only</div>
-
-  <h2>Rules of thumb</h2>
-  <div class="card">
-    <ul>
-      <li>Put APKs in <strong>Download/</strong> — the app scans <em>all</em> of them, not one-by-one picker.</li>
-      <li>Models run <strong>on the phone</strong> — no internet needed for inference.</li>
-      <li>All 5 models run on <strong>every</strong> APK in Download — scans take longer than the old 2-model app.</li>
-      <li>Legacy (XGB + CNN) and thesis models (BM1, Pattern A, Pattern B) coexist; missing assets skip that model only.</li>
-      <li>Train on PC → export ONNX → copy into <code>assets/</code> → rebuild app → re-run A4 → scan on phone.</li>
-    </ul>
-  </div>
-
-  <h2>What you need to manually handle yourself</h2>
-  <p>Everything below happens <strong>outside Cursor</strong> — on your PC (Android Studio) and your POCO F3. The code is already in the repo; you install and run it.</p>
-
-  <div class="callout-warn">
-    <strong>Order matters:</strong> run <strong>A4 (all three parity tests) before A3 (real APK scans)</strong>.
-    A4 checks phone ONNX math in a few minutes — run <code>MlpHeaderParityTest</code>, <code>PatternAParityTest</code>, and <code>PatternBParityTest</code> (8/8 each).
-    Only then scan real APKs and pull metrics.
-  </div>
-
-  <div class="manual-order">
-    <span class="step-pill">① One-time phone setup</span>
-    <span class="arrow">→</span>
-    <span class="step-pill">② Install app (Run ▶)</span>
-    <span class="arrow">→</span>
-    <span class="step-pill">③ A4 parity (BM1 + A + B)</span>
-    <span class="arrow">→</span>
-    <span class="step-pill">④ A3 scan APKs</span>
-    <span class="arrow">→</span>
-    <span class="step-pill">⑤ Pull JSON to PC</span>
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">① One-time: phone + cable</h3>
-
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <strong>Enable Developer options on POCO F3</strong><br />
-      Settings → About phone → tap <em>MIUI/HyperOS version</em> 7 times until it says you are a developer.
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <strong>Turn on USB debugging</strong><br />
-      Settings → Additional settings → Developer options → enable <em>USB debugging</em> (and <em>Install via USB</em> if you see it).
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <strong>Plug phone into PC</strong><br />
-      Use a data USB cable. On the phone popup, tap <em>Allow USB debugging</em> → Allow.
-      <div class="ui-sketch">Phone notification shade → USB mode → choose <span class="blue">File transfer</span> if the PC does not see the device.</div>
-    </div>
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">② Install VigiDroid (every time code changes)</h3>
-
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <strong>Open the correct folder in Android Studio</strong><br />
-      File → Open → select <code>thesis_vigidroid/vigidroid</code> (not the repo root). Wait for Gradle sync to finish (progress bar at the bottom).
-      <div class="ui-sketch">
-        <div class="bar">Android Studio window</div>
-        Left: <span class="blue">Project</span> panel &nbsp;|&nbsp; Center: code &nbsp;|&nbsp; Bottom: Build / Run tabs
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <strong>Select your phone at the top</strong><br />
-      In the toolbar, open the device dropdown (next to the green triangle). Pick <em>POCO F3</em> or <em>M2012K11AG</em> — not "No devices".
-      <div class="ui-sketch">
-        <div class="bar">[ app ▼ ]  [ <span class="green">POCO F3 ▼</span> ]  [ <span class="green">▶ Run</span> ]  [ 🐛 ]</div>
-        If empty: unplug/replug USB, unlock phone, check USB debugging.
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <strong>Click the green Run button (▶)</strong><br />
-      Android Studio builds the app, installs it on the phone, and opens VigiDroid automatically. First build can take several minutes.
-      <div class="ui-sketch">
-        Bottom <span class="blue">Run</span> tab → you should see <span class="green">BUILD SUCCESSFUL</span> then <span class="green">Install successfully finished</span>
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">4</div>
-    <div class="step-body">
-      <strong>Grant storage permission on the phone</strong><br />
-      When VigiDroid opens, allow storage access. If asked for <em>All files access</em>, go to Settings and enable it for VigiDroid — otherwise scans cannot read <code>Download/</code>.
-    </div>
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">③ A4 — Parity tests (do this <em>before</em> scanning real APKs)</h3>
-  <p>This does <strong>not</strong> use your APK dataset. Each test runs 8 built-in practice inputs and checks scores match the PC export. Run <strong>all three</strong> tests after every install that changes models or assets.</p>
-
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <strong>Phone still plugged in</strong> with USB debugging on (same as step ②).
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <strong>Find the test files in the Project panel</strong><br />
-      Switch the left panel to <em>Project</em> view (dropdown usually says "Android" — change to <em>Project</em> if needed). Expand:
-      <div class="ui-sketch">
-        app → src → <span class="blue">androidTest</span> → java → com.msh.vigidroid →<br />
-        &nbsp;&nbsp;<span class="green">MlpHeaderParityTest</span> &nbsp;(BM1)<br />
-        &nbsp;&nbsp;<span class="green">PatternAParityTest</span> &nbsp;(Pattern A)<br />
-        &nbsp;&nbsp;<span class="green">PatternBParityTest</span> &nbsp;(Pattern B)
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <strong>Run BM1 parity test</strong><br />
-      Right-click <code>MlpHeaderParityTest</code> → <em>Run 'MlpHeaderParityTest'</em>.<br />
-      (This is <strong>not</strong> the green ▶ Run button for the app — that runs the normal app. Tests are a separate run.)
-      <div class="ui-sketch">
-        Bottom panel switches to <span class="blue">Run</span> (or <span class="blue">Test Results</span>)<br />
-        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = BM1 A4 passed<br />
-        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/mlp_header/</code> before doing A3
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">4</div>
-    <div class="step-body">
-      <strong>Run Pattern A parity test</strong><br />
-      Right-click <code>PatternAParityTest</code> → <em>Run 'PatternAParityTest'</em>.
-      <div class="ui-sketch">
-        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = Pattern A A4 passed<br />
-        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/pattern_a_combined/</code> before doing A3
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">5</div>
-    <div class="step-body">
-      <strong>Run Pattern B parity test</strong><br />
-      Right-click <code>PatternBParityTest</code> → <em>Run 'PatternBParityTest'</em>.
-      <div class="ui-sketch">
-        <span class="green">✓ paritySamples_matchPcExport</span>  — green check = Pattern B A4 passed<br />
-        <span class="warn">✗ red line</span>  — failed; fix code or re-copy <code>assets/models/pattern_b_dual_branch/</code> before doing A3
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">6</div>
-    <div class="step-body">
-      <strong>Pass criteria</strong><br />
-      All three tests green (8/8 samples each). You do not need to touch the phone screen during this — tests run on the connected device in the background.
-      <div class="ui-sketch" style="margin-top:0.5rem;">
-        Optional terminal (all three in one go, after <code>installDebug</code>):<br />
-        cd thesis_vigidroid/vigidroid<br />
-        ./gradlew connectedDebugAndroidTest \<br />
-        &nbsp;&nbsp;-Pandroid.testInstrumentationRunnerArguments.package=com.msh.vigidroid
-      </div>
-    </div>
-  </div>
-
-  <div class="callout-warn">
-    <strong>Do not skip A4.</strong> If any parity test fails, scanning real APKs will produce untrustworthy thesis model scores.
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">④ A3 — Real scans on the phone</h3>
-  <p>Only after <strong>all three</strong> A4 parity tests pass.</p>
-
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <strong>Copy APKs onto the phone</strong><br />
-      Put every APK you want scanned into <strong>Internal storage → Download</strong> (not inside the app folder).
-      <ul>
-        <li>USB: copy files into the phone's Download folder from your PC file manager</li>
-        <li>Or: <code>adb push myapp.apk /sdcard/Download/</code> from a terminal</li>
-      </ul>
-      <div class="ui-sketch">
-        Files app on phone → <span class="blue">Internal storage</span> → <span class="blue">Download</span> → your .apk files listed here
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <strong>Open VigiDroid on the phone</strong><br />
-      Tap the VigiDroid icon (installed from Android Studio Run ▶). You do not need USB connected for scanning, but keep it connected if you want to watch logs in Android Studio.
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <strong>Tap <em>Start APK Scan</em></strong><br />
-      The app finds <strong>all</strong> <code>.apk</code> files in Download and scans them one by one.
-      <div class="ui-sketch">
-        [ <span class="green">Start APK Scan</span> ]  button near the top<br />
-        Status changes to <span class="blue">Scanning…</span><br />
-        Log panel shows XGBoost, 1D-CNN, then thesis lines like:<br />
-        <span class="green">BM1 mlp_header: score=0.87 …</span><br />
-        <span class="green">Pattern A: score=0.12 …</span><br />
-        <span class="green">Pattern B: score=0.65 …</span><br />
-        Results table gets one row per APK (ensemble verdict only)
-      </div>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">4</div>
-    <div class="step-body">
-      <strong>Wait until finished</strong><br />
-      Status returns to Idle. Metrics are saved automatically to <code>all_scan_metrics.json</code> on the phone (path shown in the app metrics section).
-    </div>
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">⑤ Pull metrics to your PC</h3>
-
-  <div class="step-box">
-    <div class="step-num">1</div>
-    <div class="step-body">
-      <strong>Phone plugged in, USB debugging on</strong>
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">2</div>
-    <div class="step-body">
-      <strong>Run the pull script from the repo root</strong>
-      <div class="ui-sketch" style="font-size:0.82rem;">
-        cd /mnt/Files/thesis_vigidroid<br />
-        bash Shared_pipeline_Files/tools/pull_device_metrics.sh
-      </div>
-      Output lands in <code>Shared_pipeline_Files/results/device/</code> — use this for thesis plots.
-    </div>
-  </div>
-  <div class="step-box">
-    <div class="step-num">3</div>
-    <div class="step-body">
-      <strong>Alternative: Android Studio Device File Explorer</strong><br />
-      View → Tool Windows → <em>Device File Explorer</em> → browse to the metrics path on the phone → right-click file → Save As.
-    </div>
-  </div>
-
-  <h3 style="color:var(--text);margin-top:1.5rem;">Quick reference: app Run vs parity tests</h3>
+  <h3>Tier → model mapping</h3>
   <table>
     <thead>
-      <tr><th>What you want</th><th>What to click in Android Studio</th><th>Runs on phone</th></tr>
+      <tr><th>Tier</th><th>Models</th><th>Feature cost</th><th>Val exit rate*</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td>Install / open the app (step ②, A3)</td>
-        <td>Green <strong>▶ Run 'app'</strong> (top toolbar)</td>
-        <td>VigiDroid UI — you tap Start APK Scan</td>
+        <td><span class="pill pill-t1">1</span></td>
+        <td><code>mldp_pruned_permission</code><br><code>broadcast_mldp_hybrid</code></td>
+        <td>Manifest only (~20–120 dims)</td>
+        <td>~40% cumulative</td>
       </tr>
       <tr>
-        <td>BM1 parity (A4)</td>
-        <td>Right-click <strong>MlpHeaderParityTest</strong> → Run test</td>
-        <td>Automatic — 8 fixed samples</td>
+        <td><span class="pill pill-t2">2</span></td>
+        <td><code>mldp_dexheader_cascade_mode_b</code> (→ <code>mlp_header</code> fallback)</td>
+        <td>DEX header bytes 8–111 per DEX, sum-pooled</td>
+        <td>~41% cumulative</td>
       </tr>
       <tr>
-        <td>Pattern A parity (A4)</td>
-        <td>Right-click <strong>PatternAParityTest</strong> → Run test</td>
-        <td>Automatic — 8 fixed samples</td>
+        <td><span class="pill pill-t3">3</span></td>
+        <td><code>early_fusion_dex_manifest</code> + <code>manifest_xgb</code></td>
+        <td>DEX header + manifest BoW + full DEX token scan (2500-d)</td>
+        <td>~80% cumulative</td>
       </tr>
       <tr>
-        <td>Pattern B parity (A4)</td>
-        <td>Right-click <strong>PatternBParityTest</strong> → Run test</td>
-        <td>Automatic — 8 fixed samples</td>
+        <td><span class="pill pill-t4">4</span></td>
+        <td><code>bytecnn</code> fused with Tier 3 pool</td>
+        <td>Last 1024 APK bytes (cheap infer, orthogonal signal)</td>
+        <td>Final — no further escalation</td>
       </tr>
     </tbody>
   </table>
+  <p style="font-size:0.85rem;">* From <code>cascade_policy.json</code> calibration on 764 aligned val APKs.</p>
 
-  <h3 style="color:var(--text);margin-top:1.5rem;">Checklist before thesis scans</h3>
-  <div class="card">
-    <ul>
-      <li>Phone: USB debugging on, storage / all-files access granted for VigiDroid</li>
-      <li>PC: Android Studio opened on <code>vigidroid/</code>, POCO F3 selected, <strong>Run ▶</strong> succeeded</li>
-      <li>A4: <code>MlpHeaderParityTest</code>, <code>PatternAParityTest</code>, <code>PatternBParityTest</code> — all green</li>
-      <li>A3: APKs in <code>Download/</code>, tap Start APK Scan, wait for Idle</li>
-      <li>Pull: <code>bash Shared_pipeline_Files/tools/pull_device_metrics.sh</code> → check <code>stages[]</code> has 5 entries per scan</li>
-    </ul>
+  <h3>Nested early exit — Mode B cascade</h3>
+  <p>
+    Tier 2's <code>mldp_dexheader_cascade_mode_b</code> has its own two-stage logic: Stage 1 runs MLDP logistic
+    on permissions only. If confident, it exits without reading DEX headers at all — a genuine latency win
+    inside Tier 2.
+  </p>
+  <div class="mermaid">
+flowchart LR
+    PERM[MLDP permission vector] --> S1[Stage 1 logistic ONNX]
+    S1 -->|below stage1_t_low| BEN[Benign no DEX read]
+    S1 -->|above stage1_t_high| MAL[Malware no DEX read]
+    S1 -->|uncertain| DEX[Read DEX headers]
+    DEX --> S2[Stage 2 MLP header ONNX]
+    S2 --> SCORE[Mode B final score]
   </div>
 
-  <p style="margin-top:1rem;color:var(--muted);font-size:0.9rem;">
-    More install/USB help: <code>vigidroid_for_noobs.html</code>.
-    Per-model details: <code>Android_Works/BM1_android_steps.md</code>,
-    <code>Android_Works/patternA_android_steps.md</code>,
-    <code>Android_Works/patternB_android_steps.md</code>.
+  <h3>Models <em>not</em> in the live cascade</h3>
+  <p>These run in ablation mode only (instrumentation / comparison):</p>
+  <ul style="color:var(--muted);">
+    <li><code>linregdroid_permission</code> — overlaps XGB manifest signal; kept for ablation</li>
+    <li><code>mldp_dexheader_cascade_mode_a</code> — fused single-pass alternative to Mode B</li>
+    <li><code>dual_branch_dex_manifest</code> — selectable as Tier 3 pattern via policy config</li>
+    <li><code>dexheader_broadcast_fusion</code> — experimental fusion model</li>
+  </ul>
+</section>
+
+<!-- ── 11. Models ── -->
+<section id="models">
+  <h2>11. All exported models</h2>
+  <p>Eleven ONNX pipelines are registered in <code>ModelRegistry.ALL_SCAN_STAGES</code>.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>model_id</th>
+        <th>Domain</th>
+        <th>Cascade tier</th>
+        <th>Features</th>
+        <th>Source pipeline</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>mldp_pruned_permission</code></td>
+        <td><code>manifest_permissions_mldp</code></td>
+        <td><span class="pill pill-t1">1</span></td>
+        <td>MLDP-selected permission subset (~20–40-d)</td>
+        <td><code>permission_extractor/</code></td>
+      </tr>
+      <tr>
+        <td><code>broadcast_mldp_hybrid</code></td>
+        <td><code>manifest_mldp_perm_receiver_actions</code></td>
+        <td><span class="pill pill-t1">1</span></td>
+        <td>Permissions + broadcast receiver actions (~50–120-d)</td>
+        <td><code>broadcast_mldp_hybrid/</code></td>
+      </tr>
+      <tr>
+        <td><code>mldp_dexheader_cascade_mode_b</code></td>
+        <td><code>mldp_dexheader_cascade</code></td>
+        <td><span class="pill pill-t2">2</span></td>
+        <td>Two-stage: MLDP logistic → MLP(DEX header 104-d)</td>
+        <td><code>mldp_dexheader_cascade/mode_b/</code></td>
+      </tr>
+      <tr>
+        <td><code>mlp_header</code></td>
+        <td><code>dex_header_d3</code></td>
+        <td><span class="pill pill-t2">2</span> fallback</td>
+        <td>DEX header sum-pooled 104-d MLP (BM1)</td>
+        <td><code>only_base1_model/</code></td>
+      </tr>
+      <tr>
+        <td><code>early_fusion_dex_manifest</code></td>
+        <td><code>dex_header_manifest</code></td>
+        <td><span class="pill pill-t3">3</span></td>
+        <td>DEX header + manifest bag-of-words fused MLP</td>
+        <td><code>full_combined_pipeline_approach/</code></td>
+      </tr>
+      <tr>
+        <td><code>manifest_xgb</code></td>
+        <td><code>manifest_xgb</code></td>
+        <td><span class="pill pill-t3">3</span></td>
+        <td>Manifest + all DEX tokens → 2500-d XGBoost</td>
+        <td><span class="pill pill-legacy">legacy</span> pre-thesis</td>
+      </tr>
+      <tr>
+        <td><code>bytecnn</code></td>
+        <td><code>bytecnn</code></td>
+        <td><span class="pill pill-t4">4</span></td>
+        <td>Last 1024 raw APK bytes → 1D-CNN</td>
+        <td><span class="pill pill-legacy">legacy</span> <code>1dcnn/</code></td>
+      </tr>
+      <tr>
+        <td><code>linregdroid_permission</code></td>
+        <td><code>manifest_permissions</code></td>
+        <td><span class="pill pill-ablation">ablation</span></td>
+        <td>Full permission vector → linear model</td>
+        <td><code>linear/</code></td>
+      </tr>
+      <tr>
+        <td><code>mldp_dexheader_cascade_mode_a</code></td>
+        <td><code>mldp_dexheader_cascade</code></td>
+        <td><span class="pill pill-ablation">ablation</span></td>
+        <td>Fused [permissions ‖ DEX header] → single MLP</td>
+        <td><code>mldp_dexheader_cascade/mode_a/</code></td>
+      </tr>
+      <tr>
+        <td><code>dual_branch_dex_manifest</code></td>
+        <td><code>dex_header_manifest_dual</code></td>
+        <td><span class="pill pill-ablation">alt T3</span></td>
+        <td>Dual-branch: separate DEX + manifest towers</td>
+        <td><code>dual_branch_merge_approach/</code></td>
+      </tr>
+      <tr>
+        <td><code>dexheader_broadcast_fusion</code></td>
+        <td><code>dexheader_broadcast_fusion</code></td>
+        <td><span class="pill pill-ablation">ablation</span></td>
+        <td>DEX header + broadcast receiver fusion MLP</td>
+        <td><code>dexheader_broadcast_fusion/</code></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 12. Metrics ── -->
+<section id="metrics">
+  <h2>12. Metrics &amp; thesis data flow</h2>
+
+  <h3>On-device output files</h3>
+  <pre>getExternalFilesDir(null)/metrics/
+├── scan_a_all_models.jsonl    ← ablation mode (all models)
+├── scan_b_cascade.jsonl       ← cascade mode (deployed)
+└── sessions.jsonl             ← one record per button press</pre>
+
+  <h3>Per-APK scan record (simplified)</h3>
+  <pre>{
+  "record_type": "scan",
+  "scan_id": "&lt;uuid&gt;",
+  "session_id": "&lt;uuid&gt;",
+  "apk": { "name": "...", "sha256": "&lt;full&gt;", "size_bytes": 0 },
+  "trigger": "manual | download",
+  "stages": [{
+    "domain": "...", "model_id": "...", "status": "ok|skipped|error",
+    "parse_ms": 0, "vectorize_ms": 0, "inference_ms": 0, "cpu_ms": 0,
+    "score": 0.0, "mem_delta_bytes": 0
+  }],
+  "cascade": {
+    "policy": "cascade_v1", "exit_tier": 1,
+    "exit_reason": "low_confident_benign",
+    "models_run": ["mldp_pruned_permission", "broadcast_mldp_hybrid"],
+    "models_skipped": ["mldp_dexheader_cascade_mode_b", "..."],
+    "final_score": 0.07, "decision": "benign"
+  },
+  "ensemble": { "score": 0.07, "decision": "benign", "policy": "cascade_v1" },
+  "totals": {
+    "wall_ms": 12.5, "shared_parse_ms": 210.0,
+    "cpu_ms": 8.0, "mem_delta_bytes": 0,
+    "java_heap_used_bytes": 0, "peak_total_pss_kb": 0
+  }
+}</pre>
+
+  <h3>Pull metrics to PC for plots</h3>
+  <div class="mermaid">
+flowchart LR
+    PHONE[Device JSONL] -->|pull_device_metrics.sh| PC[results/device/]
+    PC --> MERGE[jsonl_to_json.py]
+    MERGE --> PLOT[plot_*.py scripts]
+    PLOT --> FIG[thesis figures]
+    OFF[results/offline/] --> PLOT
+  </div>
+
+  <p>
+    Offline test metrics (accuracy, F1, AUC from 2022–2023 holdout) come from PC evaluation.
+    On-device metrics supply latency, memory, CPU, cascade exit rates, and per-stage timings.
+    Thesis plots combine both sides.
   </p>
+</section>
+
+<!-- ── 13. Key files ── -->
+<section id="files">
+  <h2>13. Key source files</h2>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4>Android app (<code>vigidroid/</code>)</h4>
+      <ul style="color:var(--muted);font-size:0.88rem;padding-left:1.1rem;margin:0;">
+        <li><code>MainActivity.java</code> — UI, scan triggers, cascade toggle</li>
+        <li><code>ScanService.java</code> — scan loop, session, APK discovery</li>
+        <li><code>FeatureContext.java</code> — parse-once APK context</li>
+        <li><code>pipeline/ScanOrchestrator.java</code> — cascade tiers</li>
+        <li><code>pipeline/LegacyScanRunner.java</code> — ablation all-models</li>
+        <li><code>pipeline/StageRunner.java</code> — per-model inference</li>
+        <li><code>ModelRegistry.java</code> — model_id / domain map</li>
+        <li><code>CascadePolicy.java</code> — loads cascade_policy.json</li>
+        <li><code>MetricsWriter.java</code> — JSONL append</li>
+        <li><code>assets/cascade_policy.json</code> — tier thresholds &amp; weights</li>
+        <li><code>assets/models/&lt;model_id&gt;/</code> — ONNX bundles</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Shared thesis infrastructure</h4>
+      <ul style="color:var(--muted);font-size:0.88rem;padding-left:1.1rem;margin:0;">
+        <li><code>Shared_pipeline_Files/tools/build_cascade_policy.py</code></li>
+        <li><code>Shared_pipeline_Files/tools/pull_device_metrics.sh</code></li>
+        <li><code>Shared_pipeline_Files/tools/run_all_thesis_plots.sh</code></li>
+        <li><code>Shared_pipeline_Files/calibration/cascade_policy.json</code></li>
+        <li><code>Shared_pipeline_Files/schemas/device_scan.schema.json</code></li>
+        <li><code>Pipeline_full_concept.html</code> — new model guide</li>
+        <li><code>vigidroid_fix_plan_opus.md</code> — app restructuring plan</li>
+        <li><code>cascading_fix_opus.md</code> — calibration plan</li>
+        <li><code>vigidroid_current_metrics_state.html</code> — metrics reference</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Quick reference — class call chain for one APK (cascade mode)</h3>
+  <pre>MainActivity.startScan()
+  → ScanService.onHandleWork()
+      → FeatureContext.open(apk)
+      → ScanOrchestrator.run(ctx)
+          → StageRunner.runMldpPruned(ctx)     // Tier 1
+          → StageRunner.runBroadcast(ctx)       // Tier 1
+          → [evaluate tier → exit or continue]
+          → StageRunner.runModeB(ctx)           // Tier 2
+          → [evaluate tier → exit or continue]
+          → StageRunner.runPatternA(ctx)        // Tier 3
+          → StageRunner.runXgb(ctx)             // Tier 3
+          → [evaluate tier → exit or continue]
+          → StageRunner.runCnn(ctx)             // Tier 4 fusion
+      → ScanMetricsAssembler.toScanMetrics()
+      → MetricsWriter.appendScanJsonl()
+      → LocalBroadcast SCAN_RESULT → MainActivity</pre>
+</section>
 
 </main>
 
 <footer>
-  how_vigidroid_works.html — thesis_vigidroid / VigiDroid overview
+  How VigiDroid Works · thesis_vigidroid monorepo · Updated 2026-06-09 ·
+  Sources: live <code>vigidroid/</code> codebase, Pipeline_full_concept.html, vigidroid_fix_plan_opus.md,
+  cascading_fix_opus.md, vigidroid_current_metrics_state.html
 </footer>
 
 </body>

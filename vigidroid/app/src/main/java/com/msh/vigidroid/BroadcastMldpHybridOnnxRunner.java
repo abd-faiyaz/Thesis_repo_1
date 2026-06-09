@@ -6,7 +6,6 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
 import java.util.Collections;
 import java.util.Map;
 
@@ -32,16 +31,19 @@ public final class BroadcastMldpHybridOnnxRunner implements Closeable {
   private final OrtEnvironment environment;
   private final OrtSession session;
   private final String inputName;
+  private final String outputName;
   private final ModelThresholds thresholds;
 
   private BroadcastMldpHybridOnnxRunner(
       OrtEnvironment environment,
       OrtSession session,
       String inputName,
+      String outputName,
       ModelThresholds thresholds) {
     this.environment = environment;
     this.session = session;
     this.inputName = inputName;
+    this.outputName = outputName;
     this.thresholds = thresholds;
   }
 
@@ -50,17 +52,21 @@ public final class BroadcastMldpHybridOnnxRunner implements Closeable {
     String manifestJson = ModelAssetHelper.readAssetText(context, MANIFEST_ASSET);
     JSONObject manifest = new JSONObject(manifestJson);
     String inputName = OnnxManifestIo.inputName(manifest, "features");
+    String outputName = OnnxManifestIo.malwareOutputName(manifest);
     ModelThresholds thresholds = ModelThresholds.fromAsset(context, THRESHOLDS_ASSET);
     java.io.File modelFile = ModelAssetHelper.copyAssetToCache(context, MODEL_ASSET, CACHE_FILE);
     OrtSession session =
-        sharedEnv.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
+        sharedEnv.createSession(
+            modelFile.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OnnxSessionDiagnostics.logSingleIo(TAG, MODEL_ID, session, inputName, outputName);
     Log.i(
         TAG,
         "Loaded broadcast_mldp_hybrid ONNX (threshold="
             + thresholds.getMalwareThreshold()
             + ") from "
             + modelFile.getAbsolutePath());
-    return new BroadcastMldpHybridOnnxRunner(sharedEnv, session, inputName, thresholds);
+    return new BroadcastMldpHybridOnnxRunner(
+        sharedEnv, session, inputName, outputName, thresholds);
   }
 
   public ModelThresholds getThresholds() {
@@ -84,13 +90,11 @@ public final class BroadcastMldpHybridOnnxRunner implements Closeable {
               + " features, got "
               + features.length);
     }
-    long[] shape = new long[] {1, features.length};
-    try (OnnxTensor tensor =
-        OnnxTensor.createTensor(environment, FloatBuffer.wrap(features), shape)) {
+    long[] shape = OnnxTensorFactory.batchRowShape(features.length);
+    try (OnnxTensor tensor = OnnxTensorFactory.createFloatTensor(environment, features, shape)) {
       Map<String, OnnxTensor> inputs = Collections.singletonMap(inputName, tensor);
       try (OrtSession.Result result = session.run(inputs)) {
-        Object value = result.get(0).getValue();
-        return readProbability(value);
+        return OnnxProbabilityReader.readFromResult(result, outputName);
       }
     }
   }
@@ -98,22 +102,6 @@ public final class BroadcastMldpHybridOnnxRunner implements Closeable {
   /** Malware when sigmoid probability >= tuned threshold from thresholds.json. */
   public boolean isMalware(float malwareProbability) {
     return thresholds.isMalware(malwareProbability);
-  }
-
-  private static float readProbability(Object value) {
-    if (value instanceof float[][]) {
-      return ((float[][]) value)[0][0];
-    }
-    if (value instanceof float[]) {
-      return ((float[]) value)[0];
-    }
-    if (value instanceof double[][]) {
-      return (float) ((double[][]) value)[0][0];
-    }
-    if (value instanceof double[]) {
-      return (float) ((double[]) value)[0];
-    }
-    throw new IllegalStateException("Unexpected ONNX output type: " + value.getClass().getName());
   }
 
   @Override

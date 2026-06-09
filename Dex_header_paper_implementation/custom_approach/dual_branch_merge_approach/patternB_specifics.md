@@ -491,7 +491,7 @@ New `pipeline:` block:
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `model_id` | `pattern_b_dual_branch` | Offline JSON + future ONNX bundle id |
+| `model_id` | `dual_branch_dex_manifest` | Offline JSON + future ONNX bundle id |
 | `domain` | `dex_header_manifest_dual` | Feature domain label in metrics |
 | `export_offline_json` | `true` | Write to `Shared_pipeline_Files/results/offline/` on every `evaluate` |
 | `use_shared_splits` | `false` | Use shared `train.txt` / `val.txt` (apk paths) when `true` |
@@ -512,7 +512,7 @@ Set `paths.apk_root` to your full corpus before Phase 3 training.
 ### Evaluate outputs
 
 1. **Local:** `artifacts/checkpoints/metrics_val.json`
-2. **Shared:** `Shared_pipeline_Files/results/offline/pattern_b_dual_branch_val_<timestamp>.json`
+2. **Shared:** `Shared_pipeline_Files/results/offline/dual_branch_dex_manifest_val_<timestamp>.json`
 
 ### Shared splits workflow (optional)
 

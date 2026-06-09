@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "val_scores.schema.json",
+  "title": "Per-model split score dump",
+  "type": "object",
+  "required": ["model_id", "split", "alignment_key", "n_samples", "threshold", "metrics", "rows"],
+  "properties": {
+    "model_id": { "type": "string" },
+    "split": { "type": "string" },
+    "alignment_key": { "type": "string", "enum": ["sha256"] },
+    "canonical_manifest": { "type": ["string", "null"] },
+    "n_samples": { "type": "integer", "minimum": 0 },
+    "n_aligned": { "type": "integer", "minimum": 0 },
+    "threshold": { "type": "number" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "accuracy": { "type": "number" },
+        "f1": { "type": "number" },
+        "roc_auc": { "type": ["number", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["apk_id", "label", "score"],
+        "properties": {
+          "apk_id": { "type": "string", "minLength": 64, "maxLength": 64 },
+          "label": { "type": "integer", "enum": [0, 1] },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "exported_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

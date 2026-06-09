@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run_broadcast_mldp_hybrid.sh
+# run_brd_mldp_hybrid.sh
 # End-to-end runner for Broadcast + MLDP Hybrid (manifest permissions + receivers).
 #
 # Pipeline:
@@ -13,13 +13,15 @@
 #   P6  evaluate on test split (ACC, F1, AUC)
 #   P7  export ONNX bundle (artifacts/export/broadcast_mldp_hybrid/)
 #   P8  PyTorch vs ONNX parity
-#   +   figures, archive finalize, THESIS_SNIPPET when BMH_ARCHIVE=1
+#   +   figures, archive finalize, THESIS_SNIPPET (default on; BMH_ARCHIVE=0 or SKIP_ARCHIVE=1 to disable)
+#   +   Android asset staging by default (set STAGE_ANDROID=0 to skip)
 #
 # Usage:
-#   ./run_broadcast_mldp_hybrid.sh
-#   APK_ROOT=/data/apks ./run_broadcast_mldp_hybrid.sh
-#   SKIP_PREPROCESS=1 ./run_broadcast_mldp_hybrid.sh
-#   QUICK=1 BMH_ARCHIVE=1 ./run_broadcast_mldp_hybrid.sh
+#   ./run_brd_mldp_hybrid.sh
+#   APK_ROOT=/data/apks ./run_brd_mldp_hybrid.sh
+#   SKIP_PREPROCESS=1 ./run_brd_mldp_hybrid.sh
+#   QUICK=1 BMH_ARCHIVE=1 ./run_brd_mldp_hybrid.sh
+#   STAGE_ANDROID=0 ./run_brd_mldp_hybrid.sh
 # =============================================================================
 
 set -euo pipefail
@@ -33,7 +35,7 @@ cd "$ROOT"
 source "$ROOT/scripts/activate_thesis_env.sh"
 PYTHON="${PYTHON:-python3}"
 export PYTHON
-export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="${REPO_ROOT}:${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 
 ARCHIVE_PY="$REPO_ROOT/scripts/thesis_run_archive.py"
 PROFILE="broadcast_mldp_hybrid"
@@ -51,14 +53,19 @@ SKIP_TRAIN="${SKIP_TRAIN:-0}"
 SKIP_EVAL="${SKIP_EVAL:-0}"
 SKIP_EXPORT_ONNX="${SKIP_EXPORT_ONNX:-0}"
 SKIP_PARITY="${SKIP_PARITY:-0}"
+SKIP_ARCHIVE="${SKIP_ARCHIVE:-0}"
 SKIP_PLOTS="${SKIP_PLOTS:-0}"
 FRESH_TRAIN="${FRESH_TRAIN:-0}"
 PREPROCESS_LIMIT="${PREPROCESS_LIMIT:-}"
 EPOCHS="${EPOCHS:-}"
 QUICK="${QUICK:-0}"
 
-BMH_ARCHIVE="${BMH_ARCHIVE:-0}"
+BMH_ARCHIVE="${BMH_ARCHIVE:-1}"
 BMH_RUN_ID="${BMH_RUN_ID:-}"
+STAGE_ANDROID="${STAGE_ANDROID:-1}"
+if [[ "$SKIP_ARCHIVE" == "1" ]]; then
+  BMH_ARCHIVE=0
+fi
 
 if [[ "$BMH_ARCHIVE" == "1" ]]; then
   if [[ -z "$BMH_RUN_ID" ]]; then
@@ -94,11 +101,13 @@ echo "SKIP_TRAIN:          $SKIP_TRAIN"
 echo "SKIP_EVAL:           $SKIP_EVAL"
 echo "SKIP_EXPORT:         $SKIP_EXPORT_ONNX"
 echo "SKIP_PARITY:         $SKIP_PARITY"
+echo "SKIP_ARCHIVE:        $SKIP_ARCHIVE"
 echo "SKIP_PLOTS:          $SKIP_PLOTS"
 echo "FRESH_TRAIN:         $FRESH_TRAIN"
 echo "QUICK:               $QUICK"
 echo "BMH_ARCHIVE:         $BMH_ARCHIVE"
 echo "BMH_RUN_ID:          ${BMH_RUN_ID:-<auto when BMH_ARCHIVE=1>}"
+echo "STAGE_ANDROID:       $STAGE_ANDROID"
 
 if [[ "$INSTALL_DEPS" == "1" ]]; then
   section "Installing dependencies"
@@ -228,6 +237,11 @@ if [[ "$BMH_ARCHIVE" == "1" ]]; then
     --run-id "$BMH_RUN_ID"
 fi
 
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  section "Stage Android assets (P7 → vigidroid/)"
+  bash "$REPO_ROOT/Android_Works/stage_broadcast_mldp_hybrid.sh"
+fi
+
 section "Broadcast + MLDP Hybrid pipeline finished"
 echo "Checkpoint:  $CHECKPOINT"
 echo "Metrics:     $ROOT/artifacts/metrics/"
@@ -235,5 +249,8 @@ echo "ONNX bundle: $ROOT/artifacts/export/broadcast_mldp_hybrid/"
 if [[ "$BMH_ARCHIVE" == "1" ]]; then
   echo "Run archive: $ROOT/output_archives/$BMH_RUN_ID"
   echo "  THESIS_SNIPPET: $ROOT/output_archives/$BMH_RUN_ID/THESIS_SNIPPET.md"
+fi
+if [[ "$STAGE_ANDROID" != "0" ]]; then
+  echo "Android assets: $REPO_ROOT/vigidroid/app/src/main/assets/models/broadcast_mldp_hybrid/"
 fi
 echo "Done."

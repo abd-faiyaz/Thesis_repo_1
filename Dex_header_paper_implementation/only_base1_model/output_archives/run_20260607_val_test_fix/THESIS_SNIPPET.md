@@ -1,6 +1,6 @@
 # Base Model 1 (MLP-H) — Thesis snippet
 
-**Run:** `run_20260607_val_test_fix` · **Generated:** 2026-06-06  
+**Run:** `run_20260607_val_test_fix` · **Generated:** 2026-06-08  
 **Archive:** `output_archives/run_20260607_val_test_fix/`  
 **Reproducibility:** see [Appendix: run manifest](#appendix-run-manifest) (`RUN_MANIFEST.json`).
 
@@ -99,7 +99,7 @@ Figures: `output_archives/run_20260607_val_test_fix/figures/` (`loss_curves.png`
 | Check | Result |
 |-------|--------|
 | ONNX bundle | `output_archives/run_20260607_val_test_fix/export/` |
-| Parity (PyTorch vs ONNX) | PyTorch vs ONNX max abs diff = 8.94e-08 (PASS, tolerance 0.0001). |
+| Parity (PyTorch vs ONNX) | PyTorch vs ONNX max abs diff = 5.96e-08 (PASS, tolerance 0.0001). |
 
 ---
 

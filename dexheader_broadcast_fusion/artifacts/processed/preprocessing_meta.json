@@ -1,0 +1,23 @@
+{
+  "preprocessing_version": "eb44039",
+  "created_at": "2026-06-07T21:31:35.502219+00:00",
+  "model_id": "dexheader_broadcast_fusion",
+  "R": 70,
+  "dex_dim": 104,
+  "multidex_mode": "sum",
+  "normalization_source": "/mnt/Files/thesis_vigidroid/vigidroid/app/src/main/assets/models/mlp_header/features/normalization_header.json",
+  "normalization_policy": "reuse_deployed_bm1",
+  "train_parse_failures": 0,
+  "split_counts": {
+    "train": 12000,
+    "val": 764,
+    "test": 764
+  },
+  "split_failures": {
+    "train": 0,
+    "val": 0,
+    "test": 0
+  },
+  "system_actions_file": "/mnt/Files/thesis_vigidroid/dexheader_broadcast_fusion/assets/system_actions.json",
+  "system_actions_count": 172
+}

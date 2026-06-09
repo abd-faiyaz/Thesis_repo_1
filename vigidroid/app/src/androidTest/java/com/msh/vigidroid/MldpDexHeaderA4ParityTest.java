@@ -42,12 +42,11 @@ public class MldpDexHeaderA4ParityTest {
 
   @Test
   public void apkExtraction_matchesPcParityVectors_allGoldenApks() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     MldpDexHeaderExtractor extractor = MldpDexHeaderExtractor.fromAssets(context);
-    JSONObject root =
-        new JSONObject(ModelAssetHelper.readAssetText(context, EXTRACTION_FIXTURES_ASSET));
-    assertEquals(MldpDexHeaderModeAOnnxRunner.MODEL_ID, root.getString("model_id"));
-    assertEquals(MldpDexHeaderModeAOnnxRunner.DOMAIN, root.getString("domain"));
+    JSONObject root = new JSONObject(TestAssetHelper.readTestAssetText(EXTRACTION_FIXTURES_ASSET));
+    assertEquals(MldpDexHeaderExtractor.MODEL_FAMILY_ID, root.getString("model_id"));
+    assertEquals(MldpDexHeaderExtractor.DOMAIN, root.getString("domain"));
 
     JSONArray fixtures = root.getJSONArray("fixtures");
     float maxDiff = 0f;
@@ -59,7 +58,7 @@ public class MldpDexHeaderA4ParityTest {
       float[] expectedX = jsonToFloats(fixture.getJSONArray("expected_x"));
 
       String apkAsset = APK_ASSET_PREFIX + sampleId + ".apk";
-      assumeApkAssetPresent(context, apkAsset);
+      assumeApkAssetPresent(apkAsset);
       File apkFile = copyApkAssetToCache(context, apkAsset);
 
       MldpDexHeaderExtractor.ExtractionResult result = extractor.extract(apkFile);
@@ -134,10 +133,9 @@ public class MldpDexHeaderA4ParityTest {
 
   @Test
   public void endToEnd_modeA_extractAndInfer_matchesExpectedProb_allGoldenApks() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     MldpDexHeaderExtractor extractor = MldpDexHeaderExtractor.fromAssets(context);
-    JSONObject fixturesRoot =
-        new JSONObject(ModelAssetHelper.readAssetText(context, EXTRACTION_FIXTURES_ASSET));
+    JSONObject fixturesRoot = new JSONObject(TestAssetHelper.readTestAssetText(EXTRACTION_FIXTURES_ASSET));
     JSONArray fixtures = fixturesRoot.getJSONArray("fixtures");
 
     OrtEnvironment env = OrtEnvironment.getEnvironment();
@@ -150,7 +148,7 @@ public class MldpDexHeaderA4ParityTest {
         double expectedProb = fixture.getDouble("expected_mode_a_malware_prob");
 
         String apkAsset = APK_ASSET_PREFIX + sampleId + ".apk";
-        assumeApkAssetPresent(context, apkAsset);
+        assumeApkAssetPresent(apkAsset);
         File apkFile = copyApkAssetToCache(context, apkAsset);
 
         MldpDexHeaderExtractor.ExtractionResult extraction = extractor.extract(apkFile);
@@ -171,10 +169,9 @@ public class MldpDexHeaderA4ParityTest {
 
   @Test
   public void endToEnd_modeB_cascade_matchesExpectedProb_allGoldenApks() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     MldpDexHeaderExtractor extractor = MldpDexHeaderExtractor.fromAssets(context);
-    JSONObject fixturesRoot =
-        new JSONObject(ModelAssetHelper.readAssetText(context, EXTRACTION_FIXTURES_ASSET));
+    JSONObject fixturesRoot = new JSONObject(TestAssetHelper.readTestAssetText(EXTRACTION_FIXTURES_ASSET));
     JSONArray fixtures = fixturesRoot.getJSONArray("fixtures");
 
     OrtEnvironment env = OrtEnvironment.getEnvironment();
@@ -189,7 +186,7 @@ public class MldpDexHeaderA4ParityTest {
         double expectedS2 = fixture.getDouble("expected_stage2_prob");
 
         String apkAsset = APK_ASSET_PREFIX + sampleId + ".apk";
-        assumeApkAssetPresent(context, apkAsset);
+        assumeApkAssetPresent(apkAsset);
         File apkFile = copyApkAssetToCache(context, apkAsset);
 
         MldpDexHeaderExtractor.PermissionBlockResult perm =
@@ -219,24 +216,16 @@ public class MldpDexHeaderA4ParityTest {
     }
   }
 
-  private static void assumeApkAssetPresent(Context context, String assetPath) throws Exception {
-    if (!assetExists(context, assetPath)) {
+  private static void assumeApkAssetPresent(String assetPath) throws Exception {
+    if (!TestAssetHelper.testAssetExists(assetPath)) {
       Assume.assumeTrue(
           "Missing APK asset " + assetPath + " — run generate_a4_parity_fixtures.sh", false);
     }
   }
 
-  private static boolean assetExists(Context context, String assetPath) {
-    try (InputStream ignored = context.getAssets().open(assetPath)) {
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
   private static File copyApkAssetToCache(Context context, String assetPath) throws Exception {
     File out = new File(context.getCacheDir(), "a4_parity_" + assetPath.replace('/', '_'));
-    try (InputStream is = context.getAssets().open(assetPath);
+    try (InputStream is = TestAssetHelper.openTestAsset(assetPath);
         FileOutputStream fos = new FileOutputStream(out)) {
       byte[] buf = new byte[8192];
       int read;

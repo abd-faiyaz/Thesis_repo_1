@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-# A2 — deploy ONNX assets, generate parity vectors, run JVM smoke tests.
+# A2 — deploy ONNX assets, refresh fixtures, run JVM smoke tests.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
-echo "=== Deploy export bundle to Android assets ==="
-SRC="$REPO/mldp_dexheader_cascade/artifacts/export/mldp_dexheader_cascade"
-DST="$REPO/vigidroid/app/src/main/assets/models/mldp_dexheader_cascade"
-mkdir -p "$DST"
-cp -r "$SRC/mode_a" "$SRC/mode_b" "$DST/"
-cp "$SRC/thresholds.json" "$DST/"
-cp -r "$SRC/features" "$DST/"
-cp -r "$SRC/parity_samples" "$DST/"
+SKIP_JVM_TESTS="${SKIP_JVM_TESTS:-0}"
 
-echo "=== Generate parity_onnx_vectors.json ==="
-bash "$REPO/mldp_dexheader_cascade/scripts/generate_a2_parity_vectors.sh" 2>/dev/null \
-  || python3 "$REPO/mldp_dexheader_cascade/scripts/generate_a2_parity_vectors.py"
+bash "$REPO/mldp_dexheader_cascade/scripts/deploy_android_assets.sh"
+
+echo "=== Regenerate A1 JVM + androidTest extraction fixtures ==="
+bash "$REPO/mldp_dexheader_cascade/scripts/generate_a1_parity_fixtures.sh"
+
+if [[ "$SKIP_JVM_TESTS" == "1" ]]; then
+  echo "(Skipping JVM unit tests; SKIP_JVM_TESTS=1)"
+  exit 0
+fi
 
 echo "=== JVM unit tests (JBR) ==="
 export JAVA_HOME=/opt/android-studio/jbr

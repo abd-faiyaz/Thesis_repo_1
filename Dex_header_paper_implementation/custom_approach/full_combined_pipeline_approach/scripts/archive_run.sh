@@ -20,6 +20,6 @@ if [[ -z "$RUN_ID" ]]; then
 fi
 
 exec "$PYTHON" "$REPO_ROOT/scripts/thesis_run_archive.py" finalize \
-  --profile pattern_a_combined \
+  --profile early_fusion_dex_manifest \
   --root "$ROOT" \
   --run-id "$RUN_ID"

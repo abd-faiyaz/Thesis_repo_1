@@ -6,7 +6,6 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
 import java.util.Collections;
 import java.util.Map;
 
@@ -52,12 +51,14 @@ public final class MldpDexHeaderModeAOnnxRunner implements Closeable {
       throws Exception {
     JSONObject manifest = new JSONObject(ModelAssetHelper.readAssetText(context, MANIFEST_ASSET));
     String inputName = OnnxManifestIo.inputName(manifest, "features");
-    String outputName = OnnxManifestIo.outputName(manifest, "malware_prob");
+    String outputName = OnnxManifestIo.malwareOutputName(manifest);
     MldpDexHeaderCascadeThresholds thresholds =
         MldpDexHeaderCascadeThresholds.fromAsset(context, THRESHOLDS_ASSET);
     java.io.File modelFile = ModelAssetHelper.copyAssetToCache(context, MODEL_ASSET, CACHE_FILE);
     OrtSession session =
-        sharedEnv.createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
+        sharedEnv.createSession(
+            modelFile.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OnnxSessionDiagnostics.logSingleIo(TAG, MODEL_ID, session, inputName, outputName);
     Log.i(
         TAG,
         "Loaded Mode A ONNX (threshold="
@@ -95,13 +96,11 @@ public final class MldpDexHeaderModeAOnnxRunner implements Closeable {
       OrtEnvironment environment,
       float[] features)
       throws OrtException {
-    long[] shape = new long[] {1, features.length};
-    try (OnnxTensor tensor =
-        OnnxTensor.createTensor(environment, FloatBuffer.wrap(features), shape)) {
+    long[] shape = OnnxTensorFactory.batchRowShape(features.length);
+    try (OnnxTensor tensor = OnnxTensorFactory.createFloatTensor(environment, features, shape)) {
       Map<String, OnnxTensor> inputs = Collections.singletonMap(inputName, tensor);
       try (OrtSession.Result result = session.run(inputs)) {
-        Object value = result.get(0).getValue();
-        return OnnxProbabilityReader.readScalar(value);
+        return OnnxProbabilityReader.readFromResult(result, outputName);
       }
     }
   }

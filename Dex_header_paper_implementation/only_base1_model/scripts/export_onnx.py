@@ -130,12 +130,25 @@ def build_export_manifest(
 
 
 def build_thresholds(cfg) -> dict[str, Any]:
-    threshold = float(cfg.evaluation.get("threshold", 0.5))
-    return {
-        "malware_threshold": threshold,
-        "benign_threshold": 1.0 - threshold,
-        "description": "Predict malware when malware_probability >= malware_threshold",
-    }
+    from shared_calibration import build_val_thresholds_payload, read_thresholds_payload
+
+    default_threshold = float(cfg.evaluation.get("threshold", 0.5))
+    model_id = str(cfg.raw.get("pipeline", {}).get("model_id", "mlp_header"))
+    return read_thresholds_payload(
+        cfg.root / "artifacts" / "metrics" / "thresholds.json",
+        fallback=build_val_thresholds_payload(
+            model_id=model_id,
+            y_true=np.array([0, 1]),
+            scores=np.array([0.25, 0.75]),
+            default=default_threshold,
+            tune=False,
+            calibrate_bands=False,
+            cascade_targets=cfg.raw.get("cascade", {}),
+            extra={
+                "description": "Predict malware when malware_probability >= tuned_val",
+            },
+        ),
+    )
 
 
 def write_parity_samples(

@@ -72,7 +72,7 @@ def get_pipeline_settings(cfg: PipelineConfig) -> PipelineSettings:
 
     return PipelineSettings(
         enabled=bool(raw.get("enabled", True)),
-        model_id=str(raw.get("model_id", "pattern_b_dual_branch")),
+        model_id=str(raw.get("model_id", "dual_branch_dex_manifest")),
         domain=str(raw.get("domain", "dex_header_manifest_dual")),
         use_shared_splits=bool(raw.get("use_shared_splits", False)),
         shared_splits_dir=shared_splits,
@@ -131,7 +131,9 @@ def partition_rows_from_shared_paths(
     train_paths: list[str],
     val_paths: list[str],
     apk_root: Path,
-) -> tuple[list[Any], list[Any], list[Any]]:
+    *,
+    test_paths: list[str] | None = None,
+) -> tuple[list[Any], list[Any], list[Any] | None, list[Any]]:
     by_rel, by_abs = _build_path_lookups(rows, apk_root)
     train_rows = [
         resolve_row_for_split_path(p, apk_root, by_rel, by_abs) for p in train_paths
@@ -139,23 +141,42 @@ def partition_rows_from_shared_paths(
     val_rows = [
         resolve_row_for_split_path(p, apk_root, by_rel, by_abs) for p in val_paths
     ]
+    test_rows: list[Any] | None = None
+    if test_paths:
+        test_rows = [
+            resolve_row_for_split_path(p, apk_root, by_rel, by_abs) for p in test_paths
+        ]
     seen: set[str] = set()
     indexed: list[Any] = []
-    for row in train_rows + val_rows:
+    for row in train_rows + val_rows + (test_rows or []):
         if row.apk_id not in seen:
             seen.add(row.apk_id)
             indexed.append(row)
-    return train_rows, val_rows, indexed
+    return train_rows, val_rows, test_rows, indexed
 
 
-def load_shared_train_val_paths(settings: PipelineSettings) -> tuple[list[str], list[str]] | None:
+def load_shared_split_paths(
+    settings: PipelineSettings,
+) -> tuple[list[str], list[str], list[str] | None] | None:
     if not settings.use_shared_splits or settings.shared_splits_dir is None:
         return None
     train_file = settings.shared_splits_dir / "train.txt"
     val_file = settings.shared_splits_dir / "val.txt"
+    test_file = settings.shared_splits_dir / "test.txt"
     if not train_file.is_file() or not val_file.is_file():
         return None
-    return read_split_apk_paths(train_file), read_split_apk_paths(val_file)
+    train_paths = read_split_apk_paths(train_file)
+    val_paths = read_split_apk_paths(val_file)
+    test_paths = read_split_apk_paths(test_file) if test_file.is_file() else None
+    return train_paths, val_paths, test_paths
+
+
+def load_shared_train_val_paths(settings: PipelineSettings) -> tuple[list[str], list[str]] | None:
+    shared = load_shared_split_paths(settings)
+    if shared is None:
+        return None
+    train_paths, val_paths, _test_paths = shared
+    return train_paths, val_paths
 
 
 def build_confusion_matrix(

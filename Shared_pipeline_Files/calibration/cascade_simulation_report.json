@@ -1,0 +1,46 @@
+{
+  "policy_name": "cascade_v1",
+  "n_apks": 764,
+  "cascade": {
+    "n": 764,
+    "n_uncertain": 0,
+    "accuracy": 0.9541884816753927,
+    "f1": 0.9295774647887324,
+    "precision": 0.8953488372093024,
+    "recall": 0.9665271966527197,
+    "avg_models_run": 3.1164921465968587,
+    "early_exit_rate": 0.8154450261780105,
+    "exit_tier_counts": {
+      "1": 337,
+      "2": 1,
+      "3": 285,
+      "4": 141
+    }
+  },
+  "full_pipeline": {
+    "n": 764,
+    "n_uncertain": 0,
+    "accuracy": 0.9672774869109948,
+    "f1": 0.9464668094218416,
+    "precision": 0.9692982456140351,
+    "recall": 0.9246861924686193,
+    "avg_models_run": 4.0,
+    "early_exit_rate": 0.0,
+    "exit_tier_counts": {
+      "4": 764
+    }
+  },
+  "comparison": {
+    "f1_delta": -0.016889344633109205,
+    "accuracy_delta": -0.01308900523560208,
+    "avg_models_run_reduction": 0.22087696335078533,
+    "pass_f1_within_0.01": false
+  },
+  "notes": [
+    "manifest_xgb and bytecnn have no thesis val_scores; tier 3/4 use available scores only.",
+    "Device validation: run 400-APK eval twice (enabled=false vs true) and use compare_cascade_eval.py."
+  ],
+  "alignment_warnings": [
+    "Tier 4: no val scores for ['bytecnn']; using placeholder bands"
+  ]
+}

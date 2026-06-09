@@ -11,6 +11,6 @@ if [[ -z "$RUN_ID" && -f "$ROOT/output_archives/LATEST_RUN.txt" ]]; then
   RUN_ID="$(tr -d '[:space:]' < "$ROOT/output_archives/LATEST_RUN.txt")"
 fi
 exec "$PYTHON" "$REPO_ROOT/scripts/thesis_run_archive.py" snippet \
-  --profile pattern_a_combined \
+  --profile early_fusion_dex_manifest \
   --root "$ROOT" \
   --run-id "$RUN_ID"

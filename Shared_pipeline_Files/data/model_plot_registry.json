@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "description": "Canonical model list for Phase 9 plotting and extended-abstract CSV. Offline metrics always from PC test eval.",
+  "plot_order": [
+    "manifest_xgb",
+    "bytecnn",
+    "mlp_header",
+    "early_fusion_dex_manifest",
+    "dual_branch_dex_manifest",
+    "linregdroid_permission",
+    "mldp_pruned_permission",
+    "broadcast_mldp_hybrid",
+    "mldp_dexheader_cascade",
+    "dexheader_broadcast_fusion"
+  ],
+  "device_stage_ids": [
+    "mldp_dexheader_cascade_mode_b",
+    "mldp_dexheader_cascade_mode_a",
+    "manifest_xgb",
+    "bytecnn",
+    "broadcast_mldp_hybrid",
+    "mlp_header",
+    "early_fusion_dex_manifest",
+    "dual_branch_dex_manifest",
+    "linregdroid_permission",
+    "mldp_pruned_permission",
+    "dexheader_broadcast_fusion"
+  ],
+  "feasibility": {
+    "labels": {
+      "high": "high",
+      "medium": "medium",
+      "low": "low"
+    },
+    "top_high": 3,
+    "middle_medium": 4,
+    "quality_weight": 0.45,
+    "tier_weight": 0.3,
+    "cost_weight": 0.25,
+    "tier_weights": {
+      "1": 1.0,
+      "2": 0.85,
+      "3": 0.65,
+      "4": 0.5,
+      "mlp_header_fallback": 0.8,
+      "not_in_cascade": 0.25
+    }
+  },
+  "split_notes": {
+    "temporal_holdout_764": "Shared test split n=764 (2022+2023 disjoint holdout)",
+    "bm1_test_1528": "Temporal holdout n=1528 (all 2022+2023 APKs in BM1 split policy)"
+  },
+  "models": [
+    {
+      "model_id": "manifest_xgb",
+      "method": "XGBoost",
+      "features": "Manifest perms, intents, APIs",
+      "comment": "Strong AUC; heaviest parse cost",
+      "domain": "manifest_xgb",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "legacy_models/artifacts/manifest_xgb/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": ".",
+        "script": "legacy_models/run_thesis_eval.sh",
+        "env": { "SPLIT": "test" },
+        "note": "Runs manifest_xgb and bytecnn; idempotent for manifest_xgb only when bytecnn skipped via separate legacy call"
+      }
+    },
+    {
+      "model_id": "bytecnn",
+      "method": "1D-CNN",
+      "features": "Last 1024 APK bytes",
+      "comment": "Byte-tail CNN; tier-4 fallback",
+      "domain": "bytecnn",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "legacy_models/artifacts/bytecnn/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": ".",
+        "command": ["legacy_models/evaluate.py", "--model", "bytecnn", "--split", "test"]
+      }
+    },
+    {
+      "model_id": "mlp_header",
+      "method": "MLP-H",
+      "features": "Dex header, sum-pooled",
+      "comment": "Best speed-accuracy; cascade fallback",
+      "domain": "dex_header_d3",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "Dex_header_paper_implementation/only_base1_model/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "Dex_header_paper_implementation/only_base1_model",
+        "command": ["-m", "src.training.evaluate", "--split", "test"]
+      }
+    },
+    {
+      "model_id": "early_fusion_dex_manifest",
+      "method": "Early-Fusion Dex+Manifest",
+      "features": "Dex header + manifest BoW",
+      "comment": "MSFDroid fused; tier-3 deployed",
+      "domain": "dex_header_manifest",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/checkpoints/test_results.json",
+        "Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "Dex_header_paper_implementation/custom_approach/full_combined_pipeline_approach",
+        "command": ["-m", "src.training.evaluate", "--split", "test"]
+      }
+    },
+    {
+      "model_id": "dual_branch_dex_manifest",
+      "method": "Dual-Branch Dex+Manifest",
+      "features": "Dex header + manifest, dual-branch",
+      "comment": "Dual-branch fusion; ablation-only",
+      "domain": "dex_header_manifest_dual",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/checkpoints/test_results.json",
+        "Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "Dex_header_paper_implementation/custom_approach/dual_branch_merge_approach",
+        "command": ["-m", "src.training.evaluate", "--split", "test"]
+      }
+    },
+    {
+      "model_id": "linregdroid_permission",
+      "method": "LinRegDroid",
+      "features": "Manifest permission flags",
+      "comment": "Linear baseline; permission-only",
+      "domain": "manifest_permissions",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "linear/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "linear",
+        "command": ["-m", "src.training.evaluate"]
+      }
+    },
+    {
+      "model_id": "mldp_pruned_permission",
+      "method": "MLDP-pruned",
+      "features": "MLDP-selected permissions",
+      "comment": "Tiny tier-1 gate; early exit",
+      "domain": "manifest_permissions_mldp",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "permission_extractor/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "permission_extractor",
+        "command": ["-m", "src.training.evaluate"]
+      }
+    },
+    {
+      "model_id": "broadcast_mldp_hybrid",
+      "method": "Broadcast+MLDP",
+      "features": "MLDP perms + receiver actions",
+      "comment": "Hybrid tier-1; receiver-aware filter",
+      "domain": "manifest_mldp_perm_receiver_actions",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "broadcast_mldp_hybrid/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "broadcast_mldp_hybrid",
+        "command": ["-m", "src.training.evaluate"]
+      }
+    },
+    {
+      "model_id": "mldp_dexheader_cascade",
+      "method": "MLDP+Dex Cascade",
+      "features": "MLDP perms + dex header",
+      "comment": "Tier-2 fuse; strong mid-cost",
+      "domain": "manifest_mldp_perm_dex_header",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "mode_a",
+      "split_note_key": "temporal_holdout_764",
+      "comments_extra": "Offline metrics from Mode A fusion; Mode B device stage reported separately in Scan A.",
+      "test_results_candidates": [
+        "mldp_dexheader_cascade/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "mldp_dexheader_cascade",
+        "command": ["-m", "src.training.evaluate", "--split", "test"]
+      }
+    },
+    {
+      "model_id": "dexheader_broadcast_fusion",
+      "method": "Dex+Broadcast Fusion",
+      "features": "Dex header + receiver actions",
+      "comment": "Peak accuracy; not in cascade",
+      "domain": "dexheader_broadcast_fusion",
+      "include_in_csv": true,
+      "include_in_plots": true,
+      "offline_metrics_from": "metrics",
+      "split_note_key": "temporal_holdout_764",
+      "test_results_candidates": [
+        "dexheader_broadcast_fusion/artifacts/metrics/test_results.json"
+      ],
+      "evaluate": {
+        "cwd": "dexheader_broadcast_fusion",
+        "command": ["-m", "src.training.evaluate"]
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from shared_splits import resolve_split_config, temporal_holdout_partition
 from sklearn.model_selection import train_test_split
 
 from src.config import PipelineConfig
@@ -95,42 +96,18 @@ def scan_apk_rows(
 
 def assign_splits(cfg: PipelineConfig, rows: list[DatasetRow]) -> list[DatasetRow]:
     """
-    Development years (2020+2021): 70% train / 15% val / 15% dev_test (stratified).
-    Temporal holdout years (2022+2023): temporal_holdout split (for later evaluation).
+    Train on train_years (2020+2021). Val and test are a stratified, disjoint
+    partition of holdout_years (2022+2023).
     """
-    pre = cfg.preprocessing
-    dev_years = {str(y) for y in pre.get("development_years", [2020, 2021])}
-    holdout_years = {str(y) for y in pre.get("temporal_holdout_years", [2022, 2023])}
-    seed = int(pre.get("random_seed", 42))
-
-    dev_rows = [r for r in rows if r.year in dev_years]
-    holdout_rows = [r for r in rows if r.year in holdout_years]
-    other = [r for r in rows if r.year not in dev_years and r.year not in holdout_years]
-
-    if not dev_rows:
-        raise ValueError(f"No APKs found for development years {sorted(dev_years)}")
-
-    labels = np.array([r.label for r in dev_rows])
-    train_ratio = float(pre.get("train_ratio", 0.70))
-    val_ratio = float(pre.get("val_ratio", 0.15))
-    dev_test_ratio = float(pre.get("dev_test_ratio", 0.15))
-    ratio_sum = train_ratio + val_ratio + dev_test_ratio
-    if abs(ratio_sum - 1.0) > 1e-6:
-        raise ValueError(f"train/val/dev_test ratios must sum to 1.0, got {ratio_sum}")
-
-    train_rows, temp_rows = train_test_split(
-        dev_rows,
-        train_size=train_ratio,
-        stratify=labels,
-        random_state=seed,
-    )
-    temp_labels = np.array([r.label for r in temp_rows])
-    val_size = val_ratio / (val_ratio + dev_test_ratio)
-    val_rows, dev_test_rows = train_test_split(
-        temp_rows,
-        train_size=val_size,
-        stratify=temp_labels,
-        random_state=seed,
+    split_cfg = resolve_split_config(cfg.preprocessing)
+    train_rows, val_rows, test_rows, other_rows = temporal_holdout_partition(
+        rows,
+        [r.label for r in rows],
+        get_year=lambda row: row.year or year_from_apk_path(row.apk_path),
+        train_years=split_cfg.train_years,
+        holdout_years=split_cfg.holdout_years,
+        val_fraction_of_holdout=split_cfg.val_fraction_of_holdout,
+        seed=split_cfg.random_seed,
     )
 
     def tag(split_name: str, items: list[DatasetRow]) -> list[DatasetRow]:
@@ -148,9 +125,8 @@ def assign_splits(cfg: PipelineConfig, rows: list[DatasetRow]) -> list[DatasetRo
     result: list[DatasetRow] = []
     result.extend(tag("train", train_rows))
     result.extend(tag("val", val_rows))
-    result.extend(tag("dev_test", dev_test_rows))
-    result.extend(tag("temporal_holdout", holdout_rows))
-    result.extend(tag("other", other))
+    result.extend(tag("test", test_rows))
+    result.extend(tag("other", other_rows))
     return result
 
 

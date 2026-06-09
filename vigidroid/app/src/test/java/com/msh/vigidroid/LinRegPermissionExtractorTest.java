@@ -27,7 +27,10 @@ public class LinRegPermissionExtractorTest {
   }
 
   @Test
-  public void featureDim_matchesExportManifest() {
-    assertEquals(173, LinRegPermissionExtractor.FEATURE_DIM);
+  public void featureDim_matchesVectorSize() {
+    Map<String, Integer> tokenToIndex = new HashMap<>();
+    tokenToIndex.put("permissions::internet", 0);
+    LinRegPermissionExtractor extractor = new LinRegPermissionExtractor(tokenToIndex, 1);
+    assertEquals(1, extractor.featureDim());
   }
 }

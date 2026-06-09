@@ -1,0 +1,17 @@
+{
+  "best_epoch": 2,
+  "best_val_f1": 0.9529914529914529,
+  "best_val_metrics": {
+    "accuracy": 0.9712041884816754,
+    "f1": 0.9529914529914529,
+    "tn": 519.0,
+    "fp": 6.0,
+    "fn": 16.0,
+    "tp": 223.0,
+    "roc_auc": 0.9841880852759515
+  },
+  "epochs_configured": 2,
+  "warm_started": true,
+  "pos_weight": 3.0,
+  "trained_at": "2026-06-07T21:32:59.236104+00:00"
+}

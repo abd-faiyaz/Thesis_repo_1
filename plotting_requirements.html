@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phase 9 — Plotting Requirements (Illustrations_templates)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #5eb3ff;
+      --accent2: #7ee787;
+      --warn: #f0b429;
+      --danger: #f85149;
+      --border: #2d3a4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    header {
+      padding: 2rem 1.5rem;
+      background: linear-gradient(135deg, #1a3a5c, #0f1419 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { margin: 0 0 0.4rem; font-size: 1.55rem; }
+    header p { margin: 0; color: var(--muted); max-width: 58rem; }
+    main { max-width: 62rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+    h2 {
+      color: var(--accent);
+      font-size: 1.15rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3rem;
+      margin: 2rem 0 1rem;
+    }
+    h3 { color: var(--accent2); font-size: 1rem; margin: 1.4rem 0 0.6rem; }
+    p, li { color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      margin: 0.75rem 0 1.25rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--surface2); color: var(--accent); }
+    tr:nth-child(even) td { background: rgba(36, 48, 68, 0.35); }
+    code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.84em;
+      background: #0d1117;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: #f778ba;
+    }
+    .yes { color: var(--accent2); font-weight: 600; }
+    .partial { color: var(--warn); font-weight: 600; }
+    .no { color: var(--danger); font-weight: 600; }
+    .note {
+      background: #1c2a1c;
+      border-left: 3px solid var(--accent2);
+      padding: 0.6rem 0.9rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+    .warn {
+      background: #2a2218;
+      border-left: 3px solid var(--warn);
+      padding: 0.6rem 0.9rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+    .toc a { color: var(--accent); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .img-ref { font-size: 0.82rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 9 — Plotting Requirements</h1>
+    <p>
+      Maps supervisor templates in <code>Illustrations_templates/</code> and the extended-abstract
+      CSV to concrete metric variables. Aligned with
+      <code>plotting_based_codebase_fix.md</code> (Phases 0–8 <strong>code complete</strong>;
+      POCO Scan A/B on device still pending). Pipeline scripts live under
+      <code>Shared_pipeline_Files/tools/</code>.
+    </p>
+  </header>
+
+  <main>
+    <div class="card toc">
+      <strong>Contents</strong>
+      <ol>
+        <li><a href="#impl-status">Implementation status</a></li>
+        <li><a href="#pipeline">E2E pipeline scripts</a></li>
+        <li><a href="#templates">Template inventory</a></li>
+        <li><a href="#scan-modes">Two scan types — which data for which plot</a></li>
+        <li><a href="#table">Extended-abstract table (CSV)</a></li>
+        <li><a href="#plots">Per-plot metric requirements</a></li>
+        <li><a href="#collected">All collected metrics (inventory)</a></li>
+        <li><a href="#verify">Sufficiency check</a></li>
+        <li><a href="#device-values">Latest device values (filled)</a></li>
+        <li><a href="#offline-values">Latest offline test values</a></li>
+      </ol>
+    </div>
+
+    <!-- ── Implementation ── -->
+    <h2 id="impl-status">0. Implementation status (2026-06-08)</h2>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Phases 0–2, 5–8 (PC + Android code)</td>
+          <td class="yes">Done</td>
+          <td>Registry, offline collect, aggregation, plots, CSV, sufficiency report, unit tests.</td>
+        </tr>
+        <tr>
+          <td>Phases 3–4 (POCO device E2E)</td>
+          <td class="partial">Pending you</td>
+          <td>Scripts ready; need fresh Scan A (ablation) + Scan B (cascade) pulls with Phase 2+ APK.</td>
+        </tr>
+        <tr>
+          <td>Legacy device pull (853 scans, 5 stages)</td>
+          <td class="no">Stale</td>
+          <td><code>results/device/all_scan_metrics.json</code> predates <code>model_id</code>, <code>cpu_ms</code>, battery, 11-stage ablation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="pipeline">0b. E2E pipeline scripts</h2>
+    <table>
+      <thead>
+        <tr><th>Script</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>run_e2e_plotting_pipeline.sh</code></td>
+          <td><strong>One-shot PC driver</strong> after data exists: offline collect → aggregate → all thesis plots → CSV → sufficiency report. Use <code>--skip-device</code> before POCO; full run after Scan A/B pulled.</td>
+        </tr>
+        <tr>
+          <td><code>run_phase3_device_scan_a.sh</code> / <code>run_phase4_device_scan_b.sh</code></td>
+          <td>Stage/install instructions + pull + validate for ablation vs cascade scans.</td>
+        </tr>
+        <tr>
+          <td><code>aggregate_plot_metrics.py</code></td>
+          <td>Merges <code>offline/latest</code> + Scan A + Scan B → <code>plot_metrics_table.json</code>.</td>
+        </tr>
+        <tr>
+          <td><code>run_all_thesis_plots.sh</code></td>
+          <td>Writes PNGs/JPEG to <code>results/figures/templates/</code>.</td>
+        </tr>
+        <tr>
+          <td><code>build_extended_abstract_csv.py</code></td>
+          <td>Fills <code>On-Device ML-Experiments - Sheet1-generated.csv</code>.</td>
+        </tr>
+        <tr>
+          <td><code>generate_plotting_sufficiency_report.py</code></td>
+          <td>Checks deliverables → <code>plotting_sufficiency_report.md</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── Templates ── -->
+    <h2 id="templates">1. Template inventory</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Plot type</th><th>Primary comparison</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>apk_size_vs_detection_time.png</code></td>
+          <td>Line chart (2 series)</td>
+          <td>API-call model vs 1D ByteCNN — detection time vs APK size</td>
+        </tr>
+        <tr>
+          <td><code>6fd97139-4bd1-4b2e-abe9-5d45e0548ff0.png</code></td>
+          <td>Stacked bar chart</td>
+          <td>Same two models — <code>T_parse + T_vectorize + T_inference</code> by APK size bucket</td>
+        </tr>
+        <tr>
+          <td><code>plot3_accuracy_vs_ram.png</code></td>
+          <td>Scatter</td>
+          <td>F1 vs RAM (MB) — one point per model</td>
+        </tr>
+        <tr>
+          <td><code>plot4_accuracy_vs_latency.png</code></td>
+          <td>Scatter</td>
+          <td>F1 vs inference time (ms) — one point per model</td>
+        </tr>
+        <tr>
+          <td><code>sample_model_vs_accuracy_resources.png</code></td>
+          <td>Multi-metric line chart + error bars</td>
+          <td>Per model: Accuracy/F1, CPU %, RAM MB, Battery %</td>
+        </tr>
+        <tr>
+          <td><code>performance_res_usage_tradeoff_plot.jpeg</code></td>
+          <td>Scatter + side table + Pareto frontier</td>
+          <td>F1 % vs normalized cost score; table adds inference time, memory GB, cost</td>
+        </tr>
+        <tr>
+          <td><code>On-Device ML-Experiments - Sheet1.csv</code></td>
+          <td>Results table</td>
+          <td>Per-method row: features, ACC, F1, AUC, CPU, memory, battery, avg time, feasibility</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>On-device files:</strong> <code>scan_a_all_models.jsonl</code> (ablation) and
+      <code>scan_b_cascade.jsonl</code> (cascade) — separate append-only logs under
+      <code>files/metrics/</code>.
+      <strong>Ablation pipeline:</strong> 11 stages per APK — all models in
+      <code>model_plot_registry.json</code> including <code>dexheader_broadcast_fusion</code> and cascade mode A/B stages.
+      <strong>ACC/F1/ROC-AUC</strong> always from PC <code>test_results.json</code>, never from app hard-coded val accuracies.
+    </div>
+
+    <!-- ── Scan modes ── -->
+    <h2 id="scan-modes">1b. Two scan types — which data for which plot</h2>
+    <p>
+      Run the same eval APK set twice on POCO F3. Tag each pull with
+      <code>session.cascade_enabled</code> (or separate output folders).
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Scan type</th>
+          <th>Config</th>
+          <th>What it measures</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>A — All-models (ablation)</strong></td>
+          <td>UI: <strong>Ablation (all models)</strong> → <code>cascade_enabled=false</code></td>
+          <td>Every model runs on every APK. Fair per-model latency, CPU, memory, time-weighted battery split.</td>
+        </tr>
+        <tr>
+          <td><strong>B — Cascade (deployed)</strong></td>
+          <td>UI: <strong>Cascade (deployed)</strong> → clear dedup → <code>cascade_enabled=true</code></td>
+          <td>Early exit; <code>cascade.models_skipped</code> populated. Median <code>totals.wall_ms</code> for CSV Comments.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Offline metrics (ACC, F1, ROC-AUC)</strong> always come from PC test JSON — neither scan type.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Template / deliverable</th>
+          <th>Scan A (all-models)</th>
+          <th>Scan B (cascade)</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>apk_size_vs_detection_time.png</code></td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗</td>
+          <td>Compares per-model stage time vs APK size; skipped stages have no fair point.</td>
+        </tr>
+        <tr>
+          <td>Stacked bar (<code>6fd97139-…png</code>)</td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗</td>
+          <td>Needs <code>parse_ms</code> + <code>vectorize_ms</code> + <code>inference_ms</code> for every bucket × model.</td>
+        </tr>
+        <tr>
+          <td><code>plot3_accuracy_vs_ram.png</code></td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗</td>
+          <td>Y = offline F1; X = median per-model memory — requires all models to have run.</td>
+        </tr>
+        <tr>
+          <td><code>plot4_accuracy_vs_latency.png</code></td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗</td>
+          <td>Same as plot3; one comparable latency point per model.</td>
+        </tr>
+        <tr>
+          <td><code>sample_model_vs_accuracy_resources.png</code></td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗</td>
+          <td>CPU / RAM / battery columns need every model on every APK (battery via time-weighted session split).</td>
+        </tr>
+        <tr>
+          <td><code>performance_res_usage_tradeoff_plot.jpeg</code></td>
+          <td class="yes">✅ Use</td>
+          <td class="partial">Optional 2nd series</td>
+          <td>Primary Pareto uses per-model worst-case cost (scan A). Optional: overlay cascade <em>average</em> end-to-end point for “deployed” policy.</td>
+        </tr>
+        <tr>
+          <td>CSV — ACC, F1, ROC-AUC</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Offline test JSON only.</td>
+        </tr>
+        <tr>
+          <td>CSV — CPU, Memory, Total Time (Avg)</td>
+          <td class="yes">✅ Use</td>
+          <td class="no">✗ for per-model rows</td>
+          <td>Per-model medians from <code>stages[]</code> where <code>status=ok</code>.</td>
+        </tr>
+        <tr>
+          <td>CSV — Battery</td>
+          <td class="yes">✅ Use</td>
+          <td class="partial">Alt. column</td>
+          <td>Scan A: time-weighted split of <code>session.battery.charge_counter_uah_used</code>. Scan B: same formula but skipped models → 0 (deployment story only).</td>
+        </tr>
+        <tr>
+          <td>CSV — Total Time (deployed)</td>
+          <td class="no">✗</td>
+          <td class="yes">✅ Use</td>
+          <td>Put median <code>totals.wall_ms</code> in <strong>Comments</strong> or a second “Cascade avg” column — not mixed with per-model ablation times.</td>
+        </tr>
+        <tr>
+          <td><em>Bonus: exit-tier / skip-rate chart</em></td>
+          <td class="no">✗</td>
+          <td class="yes">✅ Use</td>
+          <td>Not in supervisor templates; thesis-only from <code>cascade.exit_tier</code>, <code>models_skipped</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Rule of thumb:</strong> All <code>Illustrations_templates</code> plots and the CSV resource columns
+      match <strong>Scan A</strong>. <strong>Scan B</strong> is for deployed latency, cascade exit rates, and optional
+      “production cost” commentary — not for fair model-vs-model scatter or stacked timing charts.
+    </div>
+
+    <!-- ── CSV table ── -->
+    <h2 id="table">2. Extended-abstract table — required metrics</h2>
+    <p class="img-ref">Source: <code>Illustrations_templates/On-Device ML-Experiments - Sheet1.csv</code></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>CSV column</th>
+          <th>Variable / JSON path</th>
+          <th>Source</th>
+          <th>Aggregation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Method</strong></td>
+          <td><code>model_id</code> or display name</td>
+          <td>Model registry / export manifest</td>
+          <td>Static label per row</td>
+        </tr>
+        <tr>
+          <td><strong>Features</strong></td>
+          <td><code>domain</code> → feature description</td>
+          <td>Export <code>features/feature_layout.json</code> or docs</td>
+          <td>Static text (e.g. “Permissions, Intents, API Calls”)</td>
+        </tr>
+        <tr>
+          <td><strong>Accuracy</strong></td>
+          <td><code>metrics.accuracy</code></td>
+          <td>Offline <code>test_results.json</code> or <code>Shared_pipeline_Files/results/offline/*_test_*.json</code></td>
+          <td>Test-split evaluation (not device)</td>
+        </tr>
+        <tr>
+          <td><strong>F1</strong></td>
+          <td><code>metrics.f1</code></td>
+          <td>Same offline test JSON</td>
+          <td>Test-split evaluation</td>
+        </tr>
+        <tr>
+          <td><strong>ROC-AUC</strong></td>
+          <td><code>metrics.roc_auc</code></td>
+          <td>Same offline test JSON</td>
+          <td>Test-split evaluation</td>
+        </tr>
+        <tr>
+          <td><strong>CPU</strong></td>
+          <td><code>stages[].cpu_ms</code></td>
+          <td>Device scan JSON (Scan A)</td>
+          <td>Median per model; <code>cpu_pct</code> = cpu_ms / stage_total_ms × 100 for resource chart</td>
+        </tr>
+        <tr>
+          <td><strong>Memory</strong></td>
+          <td><code>stages[].mem_delta_bytes</code></td>
+          <td>Device scan JSON</td>
+          <td>Median per model → convert to MB or GB</td>
+        </tr>
+        <tr>
+          <td><strong>Battery</strong></td>
+          <td><code>stages[].battery_pct_delta</code> (median)</td>
+          <td>Device scan JSON (Scan A)</td>
+          <td>Time-weighted split of session <code>totals.battery_pct_delta</code>; null on charger</td>
+        </tr>
+        <tr>
+          <td><strong>Total Time (Avg)</strong></td>
+          <td><code>stage_total_ms = parse_ms + vectorize_ms + inference_ms</code></td>
+          <td>Device <code>stages[]</code></td>
+          <td>Median (or mean) per model across eval APKs</td>
+        </tr>
+        <tr>
+          <td><strong>Device Feasibility</strong></td>
+          <td><em>derived</em></td>
+          <td>Phase 9 ranking rule</td>
+          <td>Qualitative: e.g. “feasible” if median stage_total_ms &lt; 500 ms and mem &lt; 512 MB</td>
+        </tr>
+        <tr>
+          <td><strong>Comments</strong></td>
+          <td>auto + notes</td>
+          <td><code>build_extended_abstract_csv.py</code></td>
+          <td>Split policy, n_samples; Scan B adds <code>Cascade deployed median wall=… ms</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+  <p>CSV auto-fills <strong>10 ranked models</strong> via <code>build_extended_abstract_csv.py</code> (XGB ROC-AUC regression: 0.9913).</p>
+
+    <!-- ── Per-plot ── -->
+    <h2 id="plots">3. Per-plot metric requirements</h2>
+
+    <h3>3a. <code>apk_size_vs_detection_time.png</code> — APK Size vs Detection Time</h3>
+    <table>
+      <thead>
+        <tr><th>Axis / series</th><th>Variable</th><th>JSON path</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>X-axis</td><td><code>apk_size_mb</code></td><td><code>apk.size_bytes / 1e6</code></td><td>Per scan</td></tr>
+        <tr><td>Y-axis</td><td><code>detection_time_ms</code></td><td><code>stages[].parse_ms + vectorize_ms + inference_ms</code></td><td>Per model stage</td></tr>
+        <tr><td>Series A</td><td><code>model = manifest_xgb</code></td><td><code>stages[].domain == "manifest_xgb"</code></td><td>API-call / semantic model</td></tr>
+        <tr><td>Series B</td><td><code>model = bytecnn</code></td><td><code>stages[].domain == "bytecnn"</code></td><td>1D ByteCNN</td></tr>
+        <tr><td>Optional</td><td><code>apk_sha256_short</code></td><td><code>apk.sha256_short</code></td><td>Join key if deduplicating</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3b. <code>6fd97139-…png</code> — Inference Time Breakdown vs APK Size (stacked bars)</h3>
+    <table>
+      <thead>
+        <tr><th>Stack segment</th><th>Variable</th><th>JSON path</th><th>Aggregation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>X categories</td><td><code>size_bucket</code></td><td>Bin <code>apk.size_bytes</code> → {1, 5, 10, 25, 50, 100} MB</td><td>Fixed buckets like template</td></tr>
+        <tr><td>Blue — feature extraction</td><td><code>T_parse_ms</code></td><td><code>stages[].parse_ms</code></td><td>Median per bucket × model</td></tr>
+        <tr><td>Orange — vectorization</td><td><code>T_vectorize_ms</code></td><td><code>stages[].vectorize_ms</code></td><td>Median per bucket × model</td></tr>
+        <tr><td>Red — inference</td><td><code>T_inference_ms</code></td><td><code>stages[].inference_ms</code></td><td>Median per bucket × model</td></tr>
+        <tr><td>Bar total label</td><td><code>stage_total_ms</code></td><td>Sum of three above</td><td>Median per bucket × model</td></tr>
+        <tr><td>Series pair</td><td><code>domain</code></td><td><code>manifest_xgb</code> vs <code>bytecnn</code></td><td>Two bars per bucket</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3c. <code>plot3_accuracy_vs_ram.png</code> — Accuracy–Memory Trade-off</h3>
+    <table>
+      <thead>
+        <tr><th>Axis</th><th>Variable</th><th>Source</th><th>Per-point key</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>X</td><td><code>ram_mb</code></td><td><code>stages[].mem_delta_bytes / 1e6</code> (device median)</td><td><code>model_id</code></td></tr>
+        <tr><td>Y</td><td><code>f1</code></td><td>Offline <code>metrics.f1</code></td><td><code>model_id</code></td></tr>
+        <tr><td>Label</td><td><code>model_short_name</code></td><td>Display mapping</td><td>One scatter point per model</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3d. <code>plot4_accuracy_vs_latency.png</code> — Accuracy–Latency Trade-off</h3>
+    <table>
+      <thead>
+        <tr><th>Axis</th><th>Variable</th><th>Source</th><th>Per-point key</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>X</td><td><code>inference_ms</code> <em>or</em> <code>stage_total_ms</code></td><td>Device <code>stages[]</code> median</td><td><code>model_id</code></td></tr>
+        <tr><td>Y</td><td><code>f1</code></td><td>Offline test metrics</td><td><code>model_id</code></td></tr>
+        <tr><td>Label</td><td><code>model_short_name</code></td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>Template uses <strong>inference time only</strong> on X; for fair comparison of heavy parsers, also consider <code>stage_total_ms</code> variant.</p>
+
+    <h3>3e. <code>sample_model_vs_accuracy_resources.png</code> — Model vs Accuracy &amp; Resources</h3>
+    <table>
+      <thead>
+        <tr><th>Metric line</th><th>Variable</th><th>Source</th><th>Extra</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Left Y — Accuracy/F1 (%)</td><td><code>f1_pct</code> = <code>metrics.f1 × 100</code></td><td>Offline test</td><td>Error bars need <code>f1_std</code> — <span class="no">not collected</span> (requires k-fold or repeated runs)</td></tr>
+        <tr><td>Right Y — CPU (%)</td><td><code>cpu_pct</code></td><td>Device per-stage <code>cpu_ms</code></td><td><span class="no">Not implemented</span>; proxy: <code>totals.cpu_ms / wall_ms × 100</code> at scan level only</td></tr>
+        <tr><td>Right Y — RAM (MB)</td><td><code>mem_mb</code></td><td><code>stages[].mem_delta_bytes / 1e6</code> median</td><td>—</td></tr>
+        <tr><td>Right Y — Battery (%)</td><td><code>battery_pct_delta</code></td><td><code>totals.battery_pct_delta</code></td><td><span class="no">Always null</span></td></tr>
+        <tr><td>X categories</td><td><code>model_id</code></td><td>Top-N ranked models</td><td>Ordered bar/line positions</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3f. <code>performance_res_usage_tradeoff_plot.jpeg</code> — Performance vs Resource Cost</h3>
+    <table>
+      <thead>
+        <tr><th>Element</th><th>Variable</th><th>Source / formula</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Scatter Y</td><td><code>f1_pct</code></td><td><code>metrics.f1 × 100</code> (offline)</td></tr>
+        <tr><td>Scatter X</td><td><code>cost_score</code></td><td><em>Derived:</em> normalized composite of inference time + CPU + memory (log scale). Define in Phase 9 script, e.g. <code>z(inference_ms) + z(cpu_ms) + z(mem_mb)</code> then min–max to [0.1, 100]</td></tr>
+        <tr><td>Point label</td><td><code>model_id</code>, <code>f1_pct</code>, <code>mem_gb</code>, <code>inference_ms</code></td><td>Annotation text on chart</td></tr>
+        <tr><td>Table: F1</td><td><code>f1_pct</code></td><td>Offline</td></tr>
+        <tr><td>Table: Inference Time</td><td><code>inference_ms</code> or <code>stage_total_ms</code></td><td>Device median</td></tr>
+        <tr><td>Table: Memory</td><td><code>mem_gb</code></td><td><code>median(mem_delta_bytes) / 1e9</code></td></tr>
+        <tr><td>Table: Cost Score</td><td><code>cost_score</code></td><td>Same composite as X-axis</td></tr>
+        <tr><td>Pareto frontier</td><td><em>computed</em></td><td>Non-dominated set on (cost_score ↓, f1_pct ↑)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ── Collected metrics ── -->
+    <h2 id="collected">4. All collected metrics — variable names &amp; one-line meaning</h2>
+
+    <h3>4a. Offline (P6 test evaluation) — per model</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>Typical path</th><th>One-line meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>model_id</code></td><td>root</td><td>Canonical model bundle identifier.</td></tr>
+        <tr><td><code>domain</code></td><td>root</td><td>Feature domain ID used on Android (<code>stages[].domain</code>).</td></tr>
+        <tr><td><code>split</code></td><td>root</td><td>Which data partition was evaluated (<code>test</code>, <code>temporal_holdout</code>, etc.).</td></tr>
+        <tr><td><code>n_samples</code></td><td>root</td><td>Number of APKs in the evaluated split.</td></tr>
+        <tr><td><code>metrics.accuracy</code></td><td><code>metrics</code></td><td>Fraction of correct benign/malware classifications on the test split.</td></tr>
+        <tr><td><code>metrics.f1</code></td><td><code>metrics</code></td><td>Harmonic mean of precision and recall (primary detection-performance metric for plots).</td></tr>
+        <tr><td><code>metrics.roc_auc</code></td><td><code>metrics</code></td><td>Area under ROC curve — ranking quality independent of a single threshold.</td></tr>
+        <tr><td><code>metrics.precision</code></td><td><code>metrics</code></td><td>Fraction of predicted malware that are truly malware.</td></tr>
+        <tr><td><code>metrics.recall</code></td><td><code>metrics</code></td><td>Fraction of true malware correctly detected (sensitivity).</td></tr>
+        <tr><td><code>threshold</code></td><td>root</td><td>Probability cutoff used for hard class decisions in reported metrics.</td></tr>
+        <tr><td><code>confusion_matrix</code></td><td>root</td><td>2×2 [[TN, FP], [FN, TP]] counts for the test split.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4b. On-device — per APK scan (top-level)</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>JSON path</th><th>One-line meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>scan_id</code></td><td>root</td><td>Unique UUID for one APK scan.</td></tr>
+        <tr><td><code>timestamp_ms</code></td><td>root</td><td>Wall-clock time when metrics were written.</td></tr>
+        <tr><td><code>device.model</code></td><td><code>device</code></td><td>Phone model string (e.g. M2012K11AG).</td></tr>
+        <tr><td><code>device.manufacturer</code></td><td><code>device</code></td><td>OEM name (e.g. Xiaomi).</td></tr>
+        <tr><td><code>device.api</code></td><td><code>device</code></td><td>Android API level of the test device.</td></tr>
+        <tr><td><code>apk.name</code></td><td><code>apk</code></td><td>APK filename on device.</td></tr>
+        <tr><td><code>apk.size_bytes</code></td><td><code>apk</code></td><td>APK file size on disk — drives size-vs-time plots.</td></tr>
+        <tr><td><code>apk.sha256_short</code></td><td><code>apk</code></td><td>Short hash key (name+size), not full APK digest.</td></tr>
+        <tr><td><code>trigger</code></td><td>root</td><td>How scan started: <code>manual</code> or <code>download</code>.</td></tr>
+        <tr><td><code>ensemble.score</code></td><td><code>ensemble</code></td><td>Weighted XGB+CNN blend score (legacy verdict path).</td></tr>
+        <tr><td><code>ensemble.decision</code></td><td><code>ensemble</code></td><td>Final benign/malware label from XGB+CNN ensemble only.</td></tr>
+        <tr><td><code>totals.wall_ms</code></td><td><code>totals</code></td><td>Elapsed real time for partial scan window (stops before some thesis models).</td></tr>
+        <tr><td><code>totals.cpu_ms</code></td><td><code>totals</code></td><td>Scan-thread CPU time for the same partial window.</td></tr>
+        <tr><td><code>totals.mem_delta_bytes</code></td><td><code>totals</code></td><td>Native heap delta over partial scan window.</td></tr>
+        <tr><td><code>totals.total_dex_files_found</code></td><td><code>totals</code></td><td>DEX file count discovered during XGBoost parse.</td></tr>
+        <tr><td><code>totals.structural_parsing_time_ms</code></td><td><code>totals</code></td><td>XGBoost ZIP/manifest/DEX structural parse duration.</td></tr>
+        <tr><td><code>totals.battery_pct_delta</code></td><td><code>totals</code></td><td>Battery % change per APK — placeholder, not populated.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4c. On-device — per model stage (<code>stages[]</code>)</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>JSON path</th><th>One-line meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>domain</code></td><td><code>stages[]</code></td><td>Which model pipeline ran (join key to offline <code>model_id</code>).</td></tr>
+        <tr><td><code>model_id</code></td><td><code>stages[]</code></td><td>Canonical model ID (only broadcast hybrid sets this today).</td></tr>
+        <tr><td><code>parse_ms</code></td><td><code>stages[]</code></td><td>Feature extraction / APK parsing time (T_feature in stacked bar).</td></tr>
+        <tr><td><code>vectorize_ms</code></td><td><code>stages[]</code></td><td>Vectorization / normalization time (T_vectorize).</td></tr>
+        <tr><td><code>inference_ms</code></td><td><code>stages[]</code></td><td>ONNX Runtime forward-pass time (T_inference).</td></tr>
+        <tr><td><code>stage_total_ms</code></td><td><em>derived</em></td><td><code>parse_ms + vectorize_ms + inference_ms</code> — end-to-end per-model latency.</td></tr>
+        <tr><td><code>score</code></td><td><code>stages[]</code></td><td>Malware probability emitted by the model (0–1).</td></tr>
+        <tr><td><code>mem_delta_bytes</code></td><td><code>stages[]</code></td><td>Native heap change during this model's stage.</td></tr>
+        <tr><td><code>cpu_ms</code></td><td><code>stages[]</code></td><td>Per-stage CPU time (Phase 2+ APK).</td></tr>
+        <tr><td><code>battery_pct_delta</code></td><td><code>stages[]</code>, <code>totals</code></td><td>Session battery delta allocated by stage time share.</td></tr>
+        <tr><td><code>cascade_enabled</code></td><td>scan + session</td><td><code>false</code> = Scan A; <code>true</code> = Scan B.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4d. Derived / aggregated (PC — <code>aggregate_plot_metrics.py</code>)</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>Formula</th><th>One-line meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>apk_size_mb</code></td><td><code>apk.size_bytes / 1e6</code></td><td>APK size in megabytes for plotting.</td></tr>
+        <tr><td><code>mem_mb</code></td><td><code>mem_delta_bytes / 1e6</code></td><td>Memory delta in megabytes.</td></tr>
+        <tr><td><code>mem_gb</code></td><td><code>mem_delta_bytes / 1e9</code></td><td>Memory delta in gigabytes (trade-off table).</td></tr>
+        <tr><td><code>f1_pct</code></td><td><code>metrics.f1 × 100</code></td><td>F1 as percentage for supervisor trade-off chart.</td></tr>
+        <tr><td><code>cost_score</code></td><td>z(stage_total_ms)+z(cpu_ms)+z(mem_mb) → [0.1, 100]</td><td>Composite resource cost for Pareto / trade-off X-axis.</td></tr>
+        <tr><td><code>device_feasibility</code></td><td>Rule on latency + memory thresholds</td><td>Qualitative yes/marginal/no for extended-abstract table.</td></tr>
+        <tr><td><code>f1_std</code></td><td>Std dev across folds/runs</td><td>Error-bar width — requires extra experiments.</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ── Verify ── -->
+    <h2 id="verify">5. Sufficiency check — tooling vs data</h2>
+
+    <table>
+      <thead>
+        <tr><th>Deliverable</th><th>Tooling</th><th>Data (after POCO E2E)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CSV (10 models, ACC/F1/ROC-AUC)</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes — <code>collect_offline_test_metrics.py</code></td>
+        </tr>
+        <tr>
+          <td>CSV device columns (CPU, Memory, Battery, Time)</td>
+          <td class="yes">Yes</td>
+          <td class="partial">Needs Scan A pull</td>
+        </tr>
+        <tr>
+          <td>All 6 supervisor figures + cascade bonus</td>
+          <td class="yes">Yes — <code>run_all_thesis_plots.sh</code></td>
+          <td class="partial">Needs Scan A; cascade chart needs Scan B</td>
+        </tr>
+        <tr>
+          <td><code>f1_std</code> error bars</td>
+          <td class="no">Waived</td>
+          <td>Not collected — omit on resource chart</td>
+        </tr>
+        <tr>
+          <td>Automated sufficiency report</td>
+          <td class="yes">Yes</td>
+          <td class="partial">Run <code>generate_plotting_sufficiency_report.py</code> after E2E</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Bottom line:</strong> All scripts exist. Final <strong>Yes</strong> on every deliverable requires a fresh POCO Scan A + B with the Phase 2+ APK (11-stage ablation). Old 853-scan pull is not valid input.
+    </div>
+
+    <!-- ── Device values ── -->
+    <h2 id="device-values">6. Reference device values — legacy pull (stale)</h2>
+    <p class="warn">
+      <strong>Historical only.</strong> Below is the pre–Phase 2 pull (5 stages, no <code>model_id</code>/<code>cpu_ms</code>).
+      Replace with medians from <code>results/device/scan_a_all_models/</code> after POCO rescan.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Model</th>
+          <th>parse_ms</th>
+          <th>vectorize_ms</th>
+          <th>inference_ms</th>
+          <th>stage_total_ms</th>
+          <th>mem_mb</th>
+          <th>n scans</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>manifest_xgb</code></td>
+          <td>XGBoost</td>
+          <td>112.95</td>
+          <td>2.13</td>
+          <td>0.48</td>
+          <td><strong>115.48</strong></td>
+          <td>0.07</td>
+          <td>853</td>
+        </tr>
+        <tr>
+          <td><code>bytecnn</code></td>
+          <td>1D-CNN</td>
+          <td>1.09</td>
+          <td>0.00</td>
+          <td>0.88</td>
+          <td><strong>1.99</strong></td>
+          <td>0.07</td>
+          <td>853</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_d3</code></td>
+          <td>BM1 (<code>mlp_header</code>)</td>
+          <td>38.85</td>
+          <td>0.00</td>
+          <td>0.42</td>
+          <td><strong>39.25</strong></td>
+          <td>0.46</td>
+          <td>851</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_manifest</code></td>
+          <td>Pattern A</td>
+          <td>33.86</td>
+          <td>3.36</td>
+          <td>4.04</td>
+          <td><strong>41.28</strong></td>
+          <td>0.48</td>
+          <td>799</td>
+        </tr>
+        <tr>
+          <td><code>dex_header_manifest_dual</code></td>
+          <td>Pattern B</td>
+          <td>35.02</td>
+          <td>3.38</td>
+          <td>3.94</td>
+          <td><strong>42.62</strong></td>
+          <td>0.47</td>
+          <td>799</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Scan-level totals (partial timing window)</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Median</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>totals.wall_ms</code></td><td>172.6 ms</td><td>Does not include all 8 models</td></tr>
+        <tr><td><code>totals.cpu_ms</code></td><td>159.3 ms</td><td>Scan-thread CPU, same partial window</td></tr>
+        <tr><td><code>totals.mem_delta_bytes</code></td><td>0.14 MB</td><td>Highly variable; negative deltas occur</td></tr>
+        <tr><td><code>totals.battery_pct_delta</code></td><td>null (0/853)</td><td>Not implemented</td></tr>
+        <tr><td>APK size range</td><td>0 – 196.1 MB</td><td>853 unique APK scans</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Stacked-bar buckets — median ms (manifest_xgb vs bytecnn)</h3>
+    <table>
+      <thead>
+        <tr><th>Size bucket</th><th>XGB parse</th><th>XGB vec</th><th>XGB inf</th><th>XGB total</th><th>CNN total</th><th>n</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>≤ 1 MB</td><td>12.6</td><td>0.3</td><td>0.5</td><td>13.4</td><td>2.0</td><td>38</td></tr>
+        <tr><td>≤ 5 MB</td><td>118.0</td><td>2.2</td><td>0.5</td><td>120.9</td><td>2.0</td><td>202</td></tr>
+        <tr><td>≤ 10 MB</td><td>117.8</td><td>2.2</td><td>0.5</td><td>120.6</td><td>2.0</td><td>394</td></tr>
+        <tr><td>≤ 25 MB</td><td>117.4</td><td>2.2</td><td>0.5</td><td>120.0</td><td>2.0</td><td>665</td></tr>
+        <tr><td>≤ 50 MB</td><td>114.6</td><td>2.2</td><td>0.5</td><td>117.8</td><td>2.0</td><td>763</td></tr>
+        <tr><td>≤ 100 MB</td><td>113.0</td><td>2.1</td><td>0.5</td><td>115.5</td><td>2.0</td><td>837</td></tr>
+        <tr><td>&gt; 100 MB</td><td>125.3</td><td>2.1</td><td>0.5</td><td>127.8</td><td>2.0</td><td>16</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ── Offline ── -->
+    <h2 id="offline-values">7. Latest offline test values (for plot Y-axis &amp; CSV ACC/F1/AUC)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>model_id</th>
+          <th>domain</th>
+          <th>accuracy</th>
+          <th>f1</th>
+          <th>roc_auc</th>
+          <th>n_samples</th>
+          <th>Source file</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>mlp_header</code></td>
+          <td><code>dex_header_d3</code></td>
+          <td>0.9660</td>
+          <td>0.9444</td>
+          <td>0.9631</td>
+          <td>1528</td>
+          <td><code>only_base1_model/.../metrics_test.json</code></td>
+        </tr>
+        <tr>
+          <td><code>early_fusion_dex_manifest</code></td>
+          <td><code>dex_header_manifest</code></td>
+          <td>0.9581</td>
+          <td>0.9295</td>
+          <td>0.9692</td>
+          <td>764</td>
+          <td><code>offline/early_fusion_dex_manifest_test_20260608T033512Z.json</code></td>
+        </tr>
+        <tr>
+          <td><code>dual_branch_dex_manifest</code></td>
+          <td><code>dex_header_manifest_dual</code></td>
+          <td>0.9503</td>
+          <td>0.9228</td>
+          <td>0.9858</td>
+          <td>764</td>
+          <td><code>offline/dual_branch_dex_manifest_test_20260608T080719Z.json</code></td>
+        </tr>
+        <tr>
+          <td><code>linregdroid_permission</code></td>
+          <td><code>manifest_permissions</code></td>
+          <td>0.9175</td>
+          <td>0.8645</td>
+          <td>0.9259</td>
+          <td>764</td>
+          <td><code>offline/linregdroid_permission_test_20260608T100306Z.json</code></td>
+        </tr>
+        <tr>
+          <td><code>mldp_pruned_permission</code></td>
+          <td><code>manifest_permissions_mldp</code></td>
+          <td>0.9319</td>
+          <td>0.8855</td>
+          <td>0.9017</td>
+          <td>764</td>
+          <td><code>offline/mldp_pruned_permission_test_20260608T095912Z.json</code></td>
+        </tr>
+        <tr>
+          <td><code>broadcast_mldp_hybrid</code></td>
+          <td><code>manifest_mldp_perm_receiver_actions</code></td>
+          <td>0.9359</td>
+          <td>0.8928</td>
+          <td>0.9373</td>
+          <td>764</td>
+          <td><code>broadcast_mldp_hybrid/artifacts/metrics/test_results.json</code></td>
+        </tr>
+        <tr>
+          <td><em>manifest_xgb (legacy)</em></td>
+          <td><code>manifest_xgb</code></td>
+          <td>0.9748*</td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Hard-coded val accuracy in <code>ScanService</code> (*not full test export)</td>
+        </tr>
+        <tr>
+          <td><em>bytecnn (legacy)</em></td>
+          <td><code>bytecnn</code></td>
+          <td>0.9608*</td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>Hard-coded val accuracy in <code>ScanService</code> (*not full test export)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Pre-filled CSV rows (device + best available offline)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th><th>Features</th><th>Accuracy</th><th>F1</th><th>ROC-AUC</th>
+          <th>CPU</th><th>Memory</th><th>Battery</th><th>Total Time (Avg)</th><th>Feasibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>XGBoost</td>
+          <td>Permissions, Intents, API Calls</td>
+          <td>0.9748*</td><td>—</td><td>—</td>
+          <td>—</td><td>0.07 MB</td><td>null</td><td>115.5 ms</td><td>Feasible</td>
+        </tr>
+        <tr>
+          <td>1D-CNN</td>
+          <td>Raw Byte</td>
+          <td>0.9608*</td><td>—</td><td>—</td>
+          <td>—</td><td>0.07 MB</td><td>null</td><td>2.0 ms</td><td>Feasible</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>* Validation accuracy used as ensemble weight — not from a repo <code>test_results.json</code>. F1/AUC for legacy baselines need external citation or a one-off eval run.</p>
+
+  </main>
+
+  <footer>
+  Updated after plotting_based_codebase_fix Phases 0–8 — thesis_vigidroid — 2026-06-08
+  </footer>
+</body>
+</html>

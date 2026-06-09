@@ -18,13 +18,12 @@ paths:
 
 splits:
   train_years: [2020, 2021]
-  test_years: [2022, 2023]
-  val_fraction_of_train: 0.10
+  holdout_years: [2022, 2023]
+  val_fraction_of_holdout: 0.5
   random_seed: 42
   split_policy_note: >
-    Train on 2020-2021 only. Val is a stratified 10% holdout from train years
-    (early stopping + threshold calibration). Test is all 2022+2023 APKs.
-    MLDP set S and dex min/max are built from train only (P2).
+    Train on 2020-2021 only. Val and test are a stratified split of 2022+2023
+    (disjoint). MLDP set S and dex min/max are built from train only (P2).
 
 indexing:
   label_mode: parent_folder

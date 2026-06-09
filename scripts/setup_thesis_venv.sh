@@ -23,6 +23,6 @@ echo "Installing dependencies into $VENV_DIR ..."
 "$VENV_DIR/bin/python" -m pip install -r "$REQS"
 
 echo ""
-echo "Done. thesis_venv is ready for BM1, Pattern A/B, LinRegDroid, and MLDP."
+echo "Done. thesis_venv is ready (includes shared_calibration, shared_splits + BM1, Pattern A/B, LinRegDroid, MLDP)."
 echo "  export PYTHON=$VENV_DIR/bin/python"
 echo "  # or rely on auto-detect in run_*.sh scripts"

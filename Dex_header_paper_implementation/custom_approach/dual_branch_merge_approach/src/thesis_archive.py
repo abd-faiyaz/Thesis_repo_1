@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-PROFILE_KEY = "pattern_b_dual_branch"
+PROFILE_KEY = "dual_branch_dex_manifest"
 _MODEL_ROOT = Path(__file__).resolve().parent.parent
 
 

@@ -2,11 +2,11 @@
   "model_id": "mldp_dexheader_cascade",
   "mode": "A",
   "domain": "manifest_mldp_perm_dex_header",
-  "exported_at": "2026-06-07T14:16:54.059454+00:00",
+  "exported_at": "2026-06-08T10:20:59.639250+00:00",
   "opset": 14,
   "checkpoint": "/mnt/Files/thesis_vigidroid/mldp_dexheader_cascade/artifacts/checkpoints/mode_a_best.pt",
-  "config_hash": "f5e39d6eb6b77bb7",
-  "preprocessing_version": "9e7b20a",
+  "config_hash": "726526be1c144fcf",
+  "preprocessing_version": "eb44039",
   "multidex_mode": "sum",
   "feature_extraction": {
     "apk_parts": [
@@ -53,7 +53,7 @@
       1,
       1
     ],
-    "test_output_value": 0.34478920698165894,
+    "test_output_value": 0.11076447367668152,
     "onnx_size_bytes": 33445,
     "onnx_size_kb": 32.66
   }

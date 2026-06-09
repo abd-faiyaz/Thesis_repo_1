@@ -1,19 +1,20 @@
-"""Train/validation/test split helpers (temporal year holdout or random index split)."""
+"""Train/validation/test split helpers (temporal holdout or random index split)."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import numpy as np
 import torch
+from shared_splits import temporal_holdout_split_indices, year_from_apk_path
 from sklearn.model_selection import train_test_split
 
-
-def year_from_apk_path(apk_path: Path | str) -> str | None:
-    """Extract a 4-digit year folder (e.g. 2020) from an APK path."""
-    match = re.search(r"/(20\d{2})/", str(apk_path).replace("\\", "/"))
-    return match.group(1) if match else None
+__all__ = [
+    "temporal_holdout_split_indices",
+    "temporal_three_way_split_indices",
+    "write_split_path_files",
+    "year_from_apk_path",
+]
 
 
 def temporal_three_way_split_indices(
@@ -21,64 +22,31 @@ def temporal_three_way_split_indices(
     labels: torch.Tensor | np.ndarray,
     *,
     train_years: list[int | str],
-    test_years: list[int | str],
-    val_fraction: float = 0.1,
+    test_years: list[int | str] | None = None,
+    holdout_years: list[int | str] | None = None,
+    val_fraction: float = 0.5,
+    val_fraction_of_holdout: float | None = None,
     seed: int = 42,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Temporal split with a stratified validation holdout from train years.
+    Temporal holdout split (legacy name retained for callers).
 
-    train_years → pool split into train + val (e.g. 2020, 2021)
-    test_years  → held-out test only (e.g. 2022, 2023); never used during training
+    train_years → all training APKs (e.g. 2020, 2021)
+    holdout_years / test_years → stratified val + test (disjoint, e.g. 2022, 2023)
     """
-    if not 0.0 < val_fraction < 1.0:
-        raise ValueError(f"val_fraction must be in (0, 1), got {val_fraction}")
-
-    train_set = {str(y) for y in train_years}
-    test_set = {str(y) for y in test_years}
-    overlap = train_set & test_set
-    if overlap:
-        raise ValueError(f"train_years and test_years overlap: {sorted(overlap)}")
-
-    dev_idx: list[int] = []
-    test_idx: list[int] = []
-    unassigned: list[str] = []
-
-    for i, path in enumerate(paths):
-        year = year_from_apk_path(path)
-        if year in train_set:
-            dev_idx.append(i)
-        elif year in test_set:
-            test_idx.append(i)
-        else:
-            unassigned.append(path)
-
-    if not dev_idx:
-        raise ValueError(f"No samples matched train_years={sorted(train_set)}")
-    if not test_idx:
-        raise ValueError(f"No samples matched test_years={sorted(test_set)}")
-    if unassigned:
-        raise ValueError(
-            f"{len(unassigned)} sample(s) not in train_years or test_years "
-            f"(example: {unassigned[0]})"
-        )
-
-    label_arr = np.asarray(labels).astype(int).ravel()
-    dev_labels = label_arr[dev_idx]
-    dev_indices = np.arange(len(dev_idx))
-    train_local, val_local = train_test_split(
-        dev_indices,
-        test_size=val_fraction,
-        random_state=seed,
-        stratify=dev_labels,
+    holdout = holdout_years if holdout_years is not None else test_years
+    val_frac = (
+        val_fraction_of_holdout
+        if val_fraction_of_holdout is not None
+        else val_fraction
     )
-    train_idx = [dev_idx[int(i)] for i in train_local]
-    val_idx = [dev_idx[int(i)] for i in val_local]
-
-    return (
-        torch.tensor(train_idx, dtype=torch.long),
-        torch.tensor(val_idx, dtype=torch.long),
-        torch.tensor(test_idx, dtype=torch.long),
+    return temporal_holdout_split_indices(
+        paths,
+        labels,
+        train_years=train_years,
+        holdout_years=holdout,
+        val_fraction_of_holdout=val_frac,
+        seed=seed,
     )
 
 

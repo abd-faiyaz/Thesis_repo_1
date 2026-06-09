@@ -139,6 +139,16 @@ public final class BroadcastMldpHybridExtractor {
         parsed = ManifestAxmlParser.parseHybridManifest(is);
       }
     }
+    long t1 = System.nanoTime();
+    return vectorizeHybridManifest(parsed, t1 - t0);
+  }
+
+  public ExtractionResult extract(FeatureContext ctx) throws Exception {
+    return vectorizeHybridManifest(ctx.hybridManifest(), 0L);
+  }
+
+  private ExtractionResult vectorizeHybridManifest(
+      ManifestAxmlParser.HybridManifestFeatures parsed, long parseNanos) {
     List<String> normalizedPermissions = PermissionNormalizer.normalizePermissions(parsed.permissions);
     List<String> filteredActions = filterReceiverSystemActions(parsed.receiverActions);
     long t1 = System.nanoTime();
@@ -148,7 +158,7 @@ public final class BroadcastMldpHybridExtractor {
         vector,
         normalizedPermissions.size(),
         filteredActions.size(),
-        t1 - t0,
+        parseNanos,
         t2 - t1);
   }
 

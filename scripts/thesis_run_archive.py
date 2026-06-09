@@ -151,6 +151,7 @@ def sync_artifacts(root: Path, profile: ArchiveProfile, run_id: str) -> Path:
         "thresholds.json",
         "metrics_val.json",
         "metrics_test.json",
+        "val_scores.json",
     )
     for metrics_src in metric_sources:
         for name in metric_names:
@@ -172,7 +173,16 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    try:
+        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except PermissionError as exc:
+        hint = (
+            f"Cannot write {path} ({exc}).\n"
+            "This usually means the file or parent directory was created by root "
+            "(e.g. an earlier run with sudo or inside a root-owned container).\n"
+            f"Fix: sudo chown -R \"${{USER}}:${{USER}}\" {path.parent.parent}"
+        )
+        raise PermissionError(hint) from exc
 
 
 def export_corpus_stats(root: Path, profile: ArchiveProfile, run_id: str | None = None) -> dict[str, Any]:
@@ -370,7 +380,7 @@ def _load_eval_metrics(archive: Path) -> dict[str, Any]:
 
 def _features_section(profile: ArchiveProfile) -> str:
     key = profile.profile_key
-    if key == "pattern_a_combined":
+    if key == "early_fusion_dex_manifest":
         return """| Item | Value |
 |------|-------|
 | Domain | `dex_header_manifest` |
@@ -378,7 +388,7 @@ def _features_section(profile: ArchiveProfile) -> str:
 | Manifest | BoW multihot, lexicon 4380 + UNK → 4381-D |
 | Fusion | Concat(H, I) → ASCNN → MLP head |
 | Input length | 4485 (padded to 4488 for ASCNN) |"""
-    if key == "pattern_b_dual_branch":
+    if key == "dual_branch_dex_manifest":
         return """| Item | Value |
 |------|-------|
 | Domain | `dex_header_manifest_dual` |
@@ -407,12 +417,21 @@ def _features_section(profile: ArchiveProfile) -> str:
 | Receivers | Static manifest broadcast system actions |
 | Model | Early-fusion tiny MLP (64 hidden) |
 | Split | Train 2020–2021; val/test stratified from 2022–2023 |"""
+    if key == "mldp_dexheader_cascade":
+        return """| Item | Value |
+|------|-------|
+| Domain | `manifest_mldp_perm_dex_header` |
+| Permissions | MLDP-pruned set S (≈22, train-only) |
+| Dex header | 104-D (bytes 8–111 /255, multidex sum, corpus min–max) |
+| Mode A | Early fusion `x = [x_S ‖ H]` → MLP(d→64→1) |
+| Mode B | Stage-1 MLDP logistic; Stage-2 deployed MLP(H) on uncertain band |
+| Split | Train 2020–2021; val 10% from train; test all 2022–2023 |"""
     return f"| model_id | `{profile.model_id}` |"
 
 
 def _split_policy_note(profile: ArchiveProfile) -> str:
     key = profile.profile_key
-    if key in ("pattern_a_combined", "pattern_b_dual_branch", "mlp_header"):
+    if key in ("early_fusion_dex_manifest", "dual_branch_dex_manifest", "mlp_header"):
         return (
             "Temporal split: **train 2020–2021**, val ~10% from train years, "
             "**test 2022–2023** (reported metrics on test only)."
@@ -424,6 +443,16 @@ def _split_policy_note(profile: ArchiveProfile) -> str:
         )
     if key == "broadcast_mldp_hybrid":
         return "Train 2020–2021; val and test are disjoint stratified halves of 2022–2023."
+    if key == "mldp_dexheader_cascade":
+        return (
+            "Temporal split: **train 2020–2021**, val 10% holdout from train years, "
+            "**test all 2022–2023**. MLDP S and dex min/max fit on train only."
+        )
+    if key == "dexheader_broadcast_fusion":
+        return (
+            "Temporal split: **train 2020–2021**, val from train years, "
+            "**test 2022–2023**. Dex header + broadcast receiver fusion."
+        )
     return "See config snapshot for split policy."
 
 
@@ -434,13 +463,21 @@ def generate_thesis_snippet(root: Path, profile: ArchiveProfile, run_id: str) ->
     labels = _load_json(labels_path) if labels_path.is_file() else {}
     eval_metrics = _load_eval_metrics(archive)
     metrics = eval_metrics.get("metrics") or {}
-    if not metrics and "accuracy" in eval_metrics:
+    cm = eval_metrics.get("confusion_matrix") or [[0, 0], [0, 0]]
+    if not metrics and "mode_a" in eval_metrics:
+        mode_a = eval_metrics.get("mode_a") or {}
+        metrics = {
+            "accuracy": mode_a.get("accuracy"),
+            "f1": mode_a.get("f1"),
+            "roc_auc": mode_a.get("roc_auc"),
+        }
+        cm = mode_a.get("confusion_matrix") or cm
+    elif not metrics and "accuracy" in eval_metrics:
         metrics = {
             "accuracy": eval_metrics.get("accuracy"),
             "f1": eval_metrics.get("f1"),
             "roc_auc": eval_metrics.get("roc_auc"),
         }
-    cm = eval_metrics.get("confusion_matrix") or [[0, 0], [0, 0]]
     eval_split = eval_metrics.get("split", "test")
 
     pre = manifest.get("preprocessing") or {}
@@ -548,7 +585,7 @@ Config snapshot: `output_archives/{run_id}/config/default.yaml.snapshot`.
 | True benign | {cm[0][0]} | {cm[0][1]} |
 | True malware | {cm[1][0]} | {cm[1][1]} |
 
-Figures: `output_archives/{run_id}/figures/` (`loss_curves.png`, `confusion_matrix_test.png`, …).
+Figures: `output_archives/{run_id}/figures/` (`loss_curves.png`, `metrics_vs_epoch.png`, `roc_curve_val.png`, `confusion_matrix_val.png`, corpus plots).
 
 ---
 
@@ -579,97 +616,9 @@ sha256sum -c output_archives/{run_id}/RUN_MANIFEST.sha256
 
 
 def plot_results(root: Path, profile: ArchiveProfile, run_id: str) -> list[Path]:
-    try:
-        import matplotlib.pyplot as plt
-        import numpy as np
-    except ImportError as exc:
-        raise SystemExit("matplotlib required: pip install matplotlib") from exc
+    from plot_thesis_results import generate_figures
 
-    archive = archive_dir_for(root, run_id)
-    figures_dir = archive / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
-
-    epochs_path = archive / "metrics" / "epochs.jsonl"
-    if not epochs_path.is_file():
-        candidates = [
-            root / "artifacts" / "metrics" / "epochs.jsonl",
-            root / "artifacts" / "checkpoints" / "epochs.jsonl",
-        ]
-        for candidate in candidates:
-            if candidate.is_file():
-                epochs_path = candidate
-                break
-    if epochs_path.is_file():
-        rows = []
-        for line in epochs_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-        if rows:
-            xs = [int(r["epoch"]) for r in rows]
-            train_loss = [float(r.get("train_loss", r.get("loss", 0))) for r in rows]
-            val_loss = [float(r.get("val_loss", 0)) for r in rows if "val_loss" in r]
-            out = figures_dir / "loss_curves.png"
-            plt.figure(figsize=(7, 4))
-            plt.plot(xs, train_loss, label="train")
-            if val_loss:
-                plt.plot(xs[: len(val_loss)], val_loss, label="val")
-            plt.xlabel("Epoch")
-            plt.ylabel("Loss")
-            plt.title(f"{profile.display_name} — loss curves")
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(out, dpi=150)
-            plt.close()
-            written.append(out)
-
-            if any("f1" in r for r in rows):
-                f1 = [float(r["f1"]) for r in rows if "f1" in r]
-                out = figures_dir / "metrics_vs_epoch.png"
-                plt.figure(figsize=(7, 4))
-                plt.plot(xs[: len(f1)], f1, label="val F1")
-                plt.xlabel("Epoch")
-                plt.ylabel("F1")
-                plt.title(f"{profile.display_name} — validation F1")
-                plt.legend()
-                plt.tight_layout()
-                plt.savefig(out, dpi=150)
-                plt.close()
-                written.append(out)
-
-    test_path = archive / "metrics" / "test_results.json"
-    if not test_path.is_file():
-        test_path = root / "artifacts" / "metrics" / "test_results.json"
-    if test_path.is_file():
-        test_data = _load_json(test_path)
-        cm = np.array(test_data.get("confusion_matrix") or [[0, 0], [0, 0]])
-        out = figures_dir / "confusion_matrix_test.png"
-        fig, ax = plt.subplots(figsize=(4.5, 4))
-        im = ax.imshow(cm, cmap="Blues")
-        ax.set_xticks([0, 1], labels=["benign", "malware"])
-        ax.set_yticks([0, 1], labels=["benign", "malware"])
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("True")
-        ax.set_title(f"{profile.display_name} — test confusion matrix")
-        for (i, j), value in np.ndenumerate(cm):
-            ax.text(j, i, int(value), ha="center", va="center", color="black")
-        fig.colorbar(im, ax=ax, fraction=0.046)
-        fig.tight_layout()
-        fig.savefig(out, dpi=150)
-        plt.close(fig)
-        written.append(out)
-
-    index = {
-        "generated_at": _utc_now(),
-        "model_id": profile.model_id,
-        "run_id": run_id,
-        "figures": [p.name for p in written],
-    }
-    index_path = figures_dir / "figure_index.json"
-    _write_json(index_path, index)
-    written.append(index_path)
-    return written
+    return generate_figures(root, profile, run_id)
 
 
 def _add_profile_arg(parser: argparse.ArgumentParser) -> None:

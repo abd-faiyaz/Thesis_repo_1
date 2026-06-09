@@ -1,25 +1,25 @@
 {
-  "timestamp": "2026-06-06T19:40:40.124317+00:00",
-  "run_id": "run_20260607_val_test_fix",
+  "timestamp": "2026-06-08T11:21:31.800475+00:00",
+  "run_id": null,
   "model_id": "mlp_header",
   "domain": "dex_header_d3",
   "split": "test",
-  "n_samples": 1528,
-  "loss": 0.20798307347043496,
+  "n_samples": 764,
+  "loss": 0.17802310552603254,
   "metrics": {
-    "accuracy": 0.9659685863874345,
-    "f1": 0.9444444444444444,
-    "roc_auc": 0.9631350866706514
+    "accuracy": 0.9685863874345549,
+    "f1": 0.9478260869565217,
+    "roc_auc": 0.9675234110380555
   },
-  "threshold": 0.5,
+  "threshold": 0.75,
   "confusion_matrix": [
     [
-      1034,
-      16
+      522,
+      3
     ],
     [
-      36,
-      442
+      21,
+      218
     ]
   ],
   "checkpoint": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/checkpoints/latest_checkpoint.pth",
@@ -29,21 +29,26 @@
     "cuda_available": true,
     "gpu_name": "NVIDIA GeForce RTX 3060 Ti"
   },
-  "apk_root": "/mnt/Files/thesis_full_dataset",
-  "split_mode": "temporal_year",
+  "apk_root": "/path/to/your/android-apks",
+  "split_mode": "temporal_holdout",
   "train_years": [
     2020,
     2021
+  ],
+  "holdout_years": [
+    2022,
+    2023
   ],
   "test_years": [
     2022,
     2023
   ],
-  "val_fraction": 0.1,
+  "val_fraction_of_holdout": 0.5,
+  "val_fraction": 0.5,
   "seed": 42,
   "splits_dir": "/mnt/Files/thesis_vigidroid/Dex_header_paper_implementation/only_base1_model/artifacts/splits",
   "class_counts": {
-    "benign": 1050,
-    "malware": 478
+    "benign": 525,
+    "malware": 239
   }
 }

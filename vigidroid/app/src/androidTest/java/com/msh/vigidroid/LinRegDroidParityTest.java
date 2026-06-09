@@ -40,14 +40,14 @@ public class LinRegDroidParityTest {
     assertEquals(vectors.length(), expectedScores.length());
 
     // Bundled vocab must load (same asset path as ScanService extractor).
-    LinRegPermissionExtractor.fromAssets(context);
+    LinRegPermissionExtractor extractor = LinRegPermissionExtractor.fromAssets(context);
     OrtEnvironment env = OrtEnvironment.getEnvironment();
     LinRegDroidOnnxRunner runner = LinRegDroidOnnxRunner.create(context, env);
     try {
       double maxDiff = 0.0;
       for (int i = 0; i < vectors.length(); i++) {
         float[] features = jsonRowToFloats(vectors.getJSONArray(i));
-        assertEquals(LinRegPermissionExtractor.FEATURE_DIM, features.length);
+        assertEquals(extractor.featureDim(), features.length);
 
         float score = runner.predict(features);
         double expected = expectedScores.getDouble(i);

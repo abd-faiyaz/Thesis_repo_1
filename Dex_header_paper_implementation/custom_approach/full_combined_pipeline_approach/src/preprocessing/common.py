@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from shared_splits import temporal_holdout_partition, year_from_apk_path
 from sklearn.model_selection import train_test_split
 
 from src.config import PipelineConfig, load_config
@@ -99,67 +100,42 @@ def read_dataset_index(path: Path) -> list[DatasetRow]:
 
 def year_from_apk_path(apk_path: Path) -> str | None:
     """Extract a 4-digit year folder (e.g. 2020) from an APK path."""
-    match = re.search(r"/(20\d{2})/", str(apk_path).replace("\\", "/"))
-    return match.group(1) if match else None
+    from shared_splits import year_from_apk_path as _year_from_apk_path
+
+    return _year_from_apk_path(apk_path)
 
 
 def temporal_three_way_split(
     rows: list[DatasetRow],
     *,
     train_years: list[int | str],
-    test_years: list[int | str],
-    val_fraction: float = 0.1,
+    test_years: list[int | str] | None = None,
+    holdout_years: list[int | str] | None = None,
+    val_fraction: float = 0.5,
+    val_fraction_of_holdout: float | None = None,
     seed: int = 42,
 ) -> tuple[list[DatasetRow], list[DatasetRow], list[DatasetRow]]:
     """
-    Hold out APKs by top-level year folder under apk_root.
+    Temporal holdout split (legacy name retained for callers).
 
-    train_years → pool split into train + val (e.g. 2020, 2021)
-    test_years  → held-out test only (e.g. 2022, 2023); never used during training
+    train_years → all training APKs (e.g. 2020, 2021)
+    holdout_years / test_years → stratified val + test (disjoint, e.g. 2022, 2023)
     """
-    if not 0.0 < val_fraction < 1.0:
-        raise ValueError(f"val_fraction must be in (0, 1), got {val_fraction}")
-
-    train_set = {str(y) for y in train_years}
-    test_set = {str(y) for y in test_years}
-    overlap = train_set & test_set
-    if overlap:
-        raise ValueError(f"train_years and test_years overlap: {sorted(overlap)}")
-
-    dev_rows: list[DatasetRow] = []
-    test_rows: list[DatasetRow] = []
-    unassigned: list[DatasetRow] = []
-
-    for row in rows:
-        year = year_from_apk_path(row.apk_path)
-        if year in train_set:
-            dev_rows.append(row)
-        elif year in test_set:
-            test_rows.append(row)
-        else:
-            unassigned.append(row)
-
-    if not dev_rows:
-        raise ValueError(f"No APKs matched train_years={sorted(train_set)}")
-    if not test_rows:
-        raise ValueError(f"No APKs matched test_years={sorted(test_set)}")
-    if unassigned:
-        sample = unassigned[0].apk_path
-        raise ValueError(
-            f"{len(unassigned)} APK(s) not in train_years or test_years "
-            f"(example: {sample})"
-        )
-
-    labels = np.array([r.label for r in dev_rows])
-    indices = np.arange(len(dev_rows))
-    train_idx, val_idx = train_test_split(
-        indices,
-        test_size=val_fraction,
-        random_state=seed,
-        stratify=labels,
+    holdout = holdout_years if holdout_years is not None else test_years
+    val_frac = (
+        val_fraction_of_holdout
+        if val_fraction_of_holdout is not None
+        else val_fraction
     )
-    train_rows = [dev_rows[int(i)] for i in train_idx]
-    val_rows = [dev_rows[int(i)] for i in val_idx]
+    train_rows, val_rows, test_rows, _other = temporal_holdout_partition(
+        rows,
+        [r.label for r in rows],
+        get_year=lambda row: year_from_apk_path(row.apk_path),
+        train_years=train_years,
+        holdout_years=holdout,
+        val_fraction_of_holdout=val_frac,
+        seed=seed,
+    )
     return train_rows, val_rows, test_rows
 
 

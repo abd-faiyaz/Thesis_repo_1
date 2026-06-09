@@ -1,5 +1,0 @@
-{
-  "malware_threshold": 0.5,
-  "benign_threshold": 0.5,
-  "description": "Predict malware when malware_probability >= malware_threshold"
-}

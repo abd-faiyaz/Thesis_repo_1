@@ -6,11 +6,7 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
-import java.util.Collections;
-import java.util.Map;
 
-import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
@@ -102,7 +98,7 @@ public final class MldpDexHeaderModeBOnnxRunner implements Closeable {
     String stage1Input = OnnxManifestIo.inputName(stage1, "features");
     String stage1Output = OnnxManifestIo.outputName(stage1, "stage1_prob");
     String stage2Input = OnnxManifestIo.inputName(stage2, "features");
-    String stage2Output = OnnxManifestIo.outputName(stage2, "malware_probability");
+    String stage2Output = OnnxManifestIo.malwareOutputName(stage2);
 
     MldpDexHeaderCascadeThresholds thresholds =
         MldpDexHeaderCascadeThresholds.fromAsset(context, THRESHOLDS_ASSET);
@@ -110,9 +106,16 @@ public final class MldpDexHeaderModeBOnnxRunner implements Closeable {
         ModelAssetHelper.copyAssetToCache(context, STAGE1_MODEL_ASSET, STAGE1_CACHE);
     java.io.File stage2File =
         ModelAssetHelper.copyAssetToCache(context, STAGE2_MODEL_ASSET, STAGE2_CACHE);
-    OrtSession.SessionOptions options = new OrtSession.SessionOptions();
-    OrtSession stage1Session = sharedEnv.createSession(stage1File.getAbsolutePath(), options);
-    OrtSession stage2Session = sharedEnv.createSession(stage2File.getAbsolutePath(), options);
+    OrtSession stage1Session =
+        sharedEnv.createSession(
+            stage1File.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OrtSession stage2Session =
+        sharedEnv.createSession(
+            stage2File.getAbsolutePath(), OnnxSessionFactory.createOptions(context));
+    OnnxSessionDiagnostics.logSingleIo(
+        TAG, MODEL_ID + "_stage1", stage1Session, stage1Input, stage1Output);
+    OnnxSessionDiagnostics.logSingleIo(
+        TAG, MODEL_ID + "_stage2", stage2Session, stage2Input, stage2Output);
     Log.i(
         TAG,
         "Loaded Mode B cascade ONNX (t_low="

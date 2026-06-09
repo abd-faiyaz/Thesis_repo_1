@@ -6,7 +6,6 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.io.Closeable;
-import java.nio.FloatBuffer;
 import java.util.Collections;
 import java.util.Map;
 
@@ -28,25 +27,29 @@ public final class MlpHeaderOnnxRunner implements Closeable {
     private final OrtEnvironment environment;
     private final OrtSession session;
     private final String inputName;
+    private final String outputName;
 
-    private MlpHeaderOnnxRunner(OrtEnvironment environment, OrtSession session, String inputName) {
+    private MlpHeaderOnnxRunner(
+            OrtEnvironment environment,
+            OrtSession session,
+            String inputName,
+            String outputName) {
         this.environment = environment;
         this.session = session;
         this.inputName = inputName;
+        this.outputName = outputName;
     }
 
     public static MlpHeaderOnnxRunner create(Context context, OrtEnvironment sharedEnv) throws Exception {
-        String manifestJson = ModelAssetHelper.readAssetText(context, MANIFEST_ASSET);
-        JSONObject manifest = new JSONObject(manifestJson);
-        JSONObject onnxCheck = manifest.optJSONObject("onnx_runtime_check");
-        String inputName = onnxCheck != null
-                ? onnxCheck.optString("input_name", "features")
-                : "features";
+        JSONObject manifest = new JSONObject(ModelAssetHelper.readAssetText(context, MANIFEST_ASSET));
+        String inputName = OnnxManifestIo.inputName(manifest, "features");
+        String outputName = OnnxManifestIo.malwareOutputName(manifest);
         java.io.File modelFile = ModelAssetHelper.copyAssetToCache(context, MODEL_ASSET, CACHE_FILE);
-        OrtSession.SessionOptions options = new OrtSession.SessionOptions();
+        OrtSession.SessionOptions options = OnnxSessionFactory.createOptions(context);
         OrtSession session = sharedEnv.createSession(modelFile.getAbsolutePath(), options);
+        OnnxSessionDiagnostics.logSingleIo(TAG, MODEL_ID, session, inputName, outputName);
         Log.i(TAG, "Loaded BM1 ONNX from " + modelFile.getAbsolutePath());
-        return new MlpHeaderOnnxRunner(sharedEnv, session, inputName);
+        return new MlpHeaderOnnxRunner(sharedEnv, session, inputName, outputName);
     }
 
     public float predict(float[] features) throws OrtException {
@@ -55,31 +58,13 @@ public final class MlpHeaderOnnxRunner implements Closeable {
                     "Expected " + DexHeaderFeatureExtractor.FEATURE_DIM + " features, got "
                             + features.length);
         }
-        long[] shape = new long[]{1, features.length};
-        FloatBuffer buffer = FloatBuffer.wrap(features);
-        try (OnnxTensor tensor = OnnxTensor.createTensor(environment, buffer, shape)) {
+        long[] shape = OnnxTensorFactory.batchRowShape(features.length);
+        try (OnnxTensor tensor = OnnxTensorFactory.createFloatTensor(environment, features, shape)) {
             Map<String, OnnxTensor> inputs = Collections.singletonMap(inputName, tensor);
             try (OrtSession.Result result = session.run(inputs)) {
-                Object value = result.get(0).getValue();
-                return readProbability(value);
+                return OnnxProbabilityReader.readFromResult(result, outputName);
             }
         }
-    }
-
-    private static float readProbability(Object value) {
-        if (value instanceof float[][]) {
-            return ((float[][]) value)[0][0];
-        }
-        if (value instanceof float[]) {
-            return ((float[]) value)[0];
-        }
-        if (value instanceof double[][]) {
-            return (float) ((double[][]) value)[0][0];
-        }
-        if (value instanceof double[]) {
-            return (float) ((double[]) value)[0];
-        }
-        throw new IllegalStateException("Unexpected ONNX output type: " + value.getClass().getName());
     }
 
     @Override

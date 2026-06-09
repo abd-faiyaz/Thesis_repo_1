@@ -31,6 +31,22 @@ if [[ -z "${PYTHON:-}" ]]; then
   [[ -n "${THESIS_VENV:-}" ]] && export THESIS_VENV
 fi
 
+# Repo root on PYTHONPATH so shared_splits / shared_calibration import without extra setup.
+if [[ -z "${THESIS_REPO_ROOT:-}" ]]; then
+  _search="${ROOT:-}"
+  while [[ "$_search" != "/" ]]; do
+    if [[ -f "$_search/requirements-thesis-all.txt" ]]; then
+      THESIS_REPO_ROOT="$_search"
+      export THESIS_REPO_ROOT
+      break
+    fi
+    _search="$(dirname "$_search")"
+  done
+fi
+if [[ -n "${THESIS_REPO_ROOT:-}" ]]; then
+  export PYTHONPATH="${THESIS_REPO_ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+fi
+
 thesis_all_requirements_path() {
   local _s="$ROOT"
   while [[ "$_s" != "/" ]]; do

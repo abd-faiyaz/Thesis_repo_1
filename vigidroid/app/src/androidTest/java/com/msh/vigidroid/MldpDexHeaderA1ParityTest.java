@@ -36,9 +36,9 @@ public class MldpDexHeaderA1ParityTest {
 
   @Test
   public void apkExtraction_matchesPythonDump_allThreeSamples() throws Exception {
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Context context = TestAssetHelper.appContext();
     MldpDexHeaderExtractor extractor = MldpDexHeaderExtractor.fromAssets(context);
-    JSONObject root = new JSONObject(ModelAssetHelper.readAssetText(context, FIXTURES_ASSET));
+    JSONObject root = new JSONObject(TestAssetHelper.readTestAssetText(FIXTURES_ASSET));
     JSONArray fixtures = root.getJSONArray("fixtures");
     assertEquals("Expected 3 A1 fixtures", 3, fixtures.length());
 
@@ -51,7 +51,7 @@ public class MldpDexHeaderA1ParityTest {
       float[] expectedX = jsonToFloats(fixture.getJSONArray("expected_x"));
 
       String apkAsset = APK_ASSET_PREFIX + sampleId + ".apk";
-      if (!assetExists(context, apkAsset)) {
+      if (!TestAssetHelper.testAssetExists(apkAsset)) {
         Assume.assumeTrue(
             "Missing APK asset " + apkAsset + " — run generate_a1_parity_fixtures.sh",
             false);
@@ -76,17 +76,9 @@ public class MldpDexHeaderA1ParityTest {
     assertTrue("max vector diff should be within tolerance", maxDiff <= TOLERANCE);
   }
 
-  private static boolean assetExists(Context context, String assetPath) {
-    try (InputStream ignored = context.getAssets().open(assetPath)) {
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
   private static File copyApkAssetToCache(Context context, String assetPath) throws Exception {
     File out = new File(context.getCacheDir(), "a1_parity_" + assetPath.replace('/', '_'));
-    try (InputStream is = context.getAssets().open(assetPath);
+    try (InputStream is = TestAssetHelper.openTestAsset(assetPath);
         FileOutputStream fos = new FileOutputStream(out)) {
       byte[] buf = new byte[8192];
       int read;

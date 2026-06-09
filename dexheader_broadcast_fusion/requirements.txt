@@ -1,0 +1,11 @@
+# Direct deps for dexheader_broadcast_fusion (install via repo-root thesis_venv)
+torch>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+pandas>=2.0
+tqdm>=4.65.0
+PyYAML>=6.0
+pyaxmlparser>=0.3.31
+onnx>=1.14
+onnxruntime>=1.16
+joblib>=1.3.0

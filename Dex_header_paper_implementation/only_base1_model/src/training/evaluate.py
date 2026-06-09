@@ -10,6 +10,14 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import torch
 import torch.nn as nn
+from shared_calibration import (
+    apk_ids_from_paths,
+    build_val_thresholds_payload,
+    find_repo_root,
+    format_cascade_band_summary,
+    write_split_scores_bundle,
+    write_thresholds,
+)
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -149,24 +157,149 @@ def validation_epoch(
     return avg_loss, metrics
 
 
+def _metrics_thresholds_path(cfg: PipelineConfig) -> Path:
+    return cfg.root / "artifacts" / "metrics" / "thresholds.json"
+
+
+def _val_apk_ids(val_loader: DataLoader, bundle_paths: list[str]) -> list[str]:
+    indices = val_loader.dataset.indices.tolist()
+    return apk_ids_from_paths([bundle_paths[int(i)] for i in indices])
+
+
+def write_val_thresholds(
+    cfg: PipelineConfig,
+    model: MLPHeader,
+    val_loader: DataLoader,
+    device: torch.device,
+    *,
+    bundle_paths: list[str],
+    tune_on_val: bool | None = None,
+    calibrate_bands: bool = True,
+    out_path: Path | None = None,
+) -> dict:
+    eval_cfg = cfg.evaluation
+    default_threshold = float(eval_cfg.get("threshold", 0.5))
+    do_tune = (
+        bool(eval_cfg.get("tune_threshold_on_val", True))
+        if tune_on_val is None
+        else tune_on_val
+    )
+
+    y_true, _, y_score = collect_predictions(
+        model, val_loader, device, threshold=default_threshold
+    )
+    model_id = str(cfg.raw.get("pipeline", {}).get("model_id", "mlp_header"))
+    payload = build_val_thresholds_payload(
+        model_id=model_id,
+        y_true=y_true,
+        scores=y_score,
+        default=default_threshold,
+        tune=do_tune,
+        calibrate_bands=calibrate_bands,
+        cascade_targets=cfg.raw.get("cascade", {}),
+        extra={
+            "description": "Predict malware when malware_probability >= tuned_val",
+        },
+    )
+    tuned_threshold = float(payload["tuned_val"])
+    payload["benign_threshold"] = 1.0 - tuned_threshold
+    metrics_dir = cfg.root / "artifacts" / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    thresholds_path = out_path or _metrics_thresholds_path(cfg)
+    write_thresholds(thresholds_path, payload)
+    band_summary = format_cascade_band_summary(payload)
+    print(
+        f"  val-tuned threshold={tuned_threshold:.4f}"
+        + (f"  cascade {band_summary}" if band_summary else "")
+        + f" → {thresholds_path}"
+    )
+    metrics_dir = cfg.root / "artifacts" / "metrics"
+    write_split_scores_bundle(
+        model_id=model_id,
+        split="val",
+        metrics_dir=metrics_dir,
+        apk_ids=_val_apk_ids(val_loader, bundle_paths),
+        labels=y_true,
+        scores=y_score,
+        threshold=tuned_threshold,
+        repo_root=find_repo_root(cfg.root),
+    )
+    return payload
+
+
+def export_split_scores(
+    cfg: PipelineConfig,
+    model: MLPHeader,
+    loader: DataLoader,
+    device: torch.device,
+    *,
+    bundle_paths: list[str],
+    split: str,
+    threshold: float,
+) -> Path | None:
+    y_true, _, y_score = collect_predictions(model, loader, device, threshold=threshold)
+    indices = loader.dataset.indices.tolist()
+    apk_ids = apk_ids_from_paths([bundle_paths[int(i)] for i in indices])
+    out = write_split_scores_bundle(
+        model_id=str(cfg.raw.get("pipeline", {}).get("model_id", "mlp_header")),
+        split=split,
+        metrics_dir=cfg.root / "artifacts" / "metrics",
+        apk_ids=apk_ids,
+        labels=y_true,
+        scores=y_score,
+        threshold=threshold,
+        repo_root=find_repo_root(cfg.root),
+        sync_val_to_workspace=split == "val",
+    )
+    print(f"  {split} scores → {out}")
+    return out
+
+
+def _tune_val_threshold(
+    cfg: PipelineConfig,
+    model: MLPHeader,
+    val_loader: DataLoader,
+    device: torch.device,
+    *,
+    bundle_paths: list[str],
+    tune_on_val: bool | None = None,
+) -> float:
+    payload = write_val_thresholds(
+        cfg,
+        model,
+        val_loader,
+        device,
+        bundle_paths=bundle_paths,
+        tune_on_val=tune_on_val,
+    )
+    return float(payload["tuned_val"])
+
+
 def run_evaluation(
     cfg: PipelineConfig,
     *,
     checkpoint_path: Path | None = None,
     split: str = "val",
     metrics_out: Path | None = None,
+    tune_on_val: bool | None = None,
 ) -> dict[str, Any]:
     """
     Load trained checkpoint and compute metrics on val (or train) split.
     Returns dict with loss and metric values.
     """
     from src.config import ensure_artifact_dirs, load_config
-    from src.data.dataloaders import build_dataloaders_from_config, build_test_loader_from_config
+    from src.data.dataloaders import (
+        build_dataloaders_from_config,
+        build_test_loader_from_config,
+        resolve_processed_path,
+    )
+    from src.data.store import load_processed_bundle
     from src.models.mlp_header import build_mlp_header
     from src.training.checkpoint import load_checkpoint, restore_from_checkpoint
     from src.training.setup import build_training_objects
 
     ensure_artifact_dirs(cfg)
+    bundle = load_processed_bundle(resolve_processed_path(cfg))
     train_loader, val_loader, feature_dim = build_dataloaders_from_config(cfg)
     if split == "test":
         loader, feature_dim = build_test_loader_from_config(cfg)
@@ -190,7 +323,15 @@ def run_evaluation(
     assert checkpoint is not None
     restore_from_checkpoint(checkpoint, model, optimizer, scheduler)
 
-    threshold = float(cfg.evaluation.get("threshold", 0.5))
+    default_threshold = float(cfg.evaluation.get("threshold", 0.5))
+    threshold = _tune_val_threshold(
+        cfg,
+        model,
+        val_loader,
+        device,
+        bundle_paths=bundle.paths,
+        tune_on_val=tune_on_val,
+    )
     val_loss, metrics = validation_epoch(
         model,
         loader,
@@ -244,6 +385,16 @@ def run_evaluation(
     }
     print(f"Evaluation ({split}) — loss={val_loss:.4f} {format_metrics(metrics)}")
     print(f"  metrics written → {out_path}")
+    if split != "val":
+        export_split_scores(
+            cfg,
+            model,
+            loader,
+            device,
+            bundle_paths=bundle.paths,
+            split=split,
+            threshold=threshold,
+        )
     return result
 
 
@@ -257,6 +408,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="JSON path for metrics (default: artifacts/metrics/test_results.json for test)",
+    )
+    parser.add_argument(
+        "--no-tune-threshold",
+        action="store_true",
+        help="Skip val max-F1 threshold tuning; use evaluation.threshold from config.",
     )
     return parser
 
@@ -274,6 +430,7 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_path=args.checkpoint,
         split=args.split,
         metrics_out=args.metrics_out,
+        tune_on_val=not args.no_tune_threshold,
     )
     return 0
 

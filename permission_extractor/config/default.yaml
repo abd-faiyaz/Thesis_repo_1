@@ -7,13 +7,13 @@ pipeline:
   enabled: true
   export_offline_json: true
   export_dir: Shared_pipeline_Files/results/offline
-  use_shared_splits: false
-  # shared_splits_dir: Shared_pipeline_Files/data/splits
-  # shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv
+  use_shared_splits: true
+  shared_splits_dir: Shared_pipeline_Files/data/splits
+  shared_manifest_csv: Shared_pipeline_Files/data/manifests/apk_index.csv
   android_assets_target: vigidroid/app/src/main/assets/models/mldp_pruned_permission/
   split_policy_note: >
-    Train/val/dev_test from 2020-2021 (70/15/15 stratified).
-    temporal_holdout (2022+2023) is the primary test split for thesis metrics (test_results.json).
+    Train on 2020-2021 only. Val and test are a stratified split of 2022+2023
+    (disjoint). Primary thesis metrics use split=test in test_results.json.
 
 paths:
   apk_root: /mnt/Files/thesis_full_dataset
@@ -30,13 +30,10 @@ paths:
   latest_checkpoint: artifacts/checkpoints/mldp_pruned.pth
 
 preprocessing:
-  # Same thesis eval protocol as LinRegDroid — see linear/config/default.yaml pipeline.split_policy_note
-  split_mode: stratified_development
-  development_years: [2020, 2021]
-  train_ratio: 0.70
-  val_ratio: 0.15
-  dev_test_ratio: 0.15
-  temporal_holdout_years: [2022, 2023]
+  split_mode: temporal_holdout
+  train_years: [2020, 2021]
+  holdout_years: [2022, 2023]
+  val_fraction_of_holdout: 0.5
   random_seed: 42
   label_mode: parent_folder
   benign_names: [benign, goodware, clean, good, "0"]
@@ -78,8 +75,13 @@ model:
     epochs: 100
     batch_size: 256
 
+cascade:
+  target_false_omission_rate: 0.02
+  target_false_alarm_at_thigh: 0.02
+
 evaluation:
   threshold: 0.5
+  tune_threshold_on_val: true
   metrics: [accuracy, f1, roc_auc]
   # Full-permission ablation (~135+ dims unpruned classifier) is N/A for thesis baseline.
   # Compare against LinRegDroid full-vocab model instead if needed.

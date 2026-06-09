@@ -37,9 +37,9 @@ class TestTemporalYearSplit(unittest.TestCase):
             val_fraction=0.5,
             seed=42,
         )
-        self.assertEqual(set(train_idx.tolist() + val_idx.tolist()), {0, 1, 2, 3})
-        self.assertEqual(test_idx.tolist(), [4, 5])
-        self.assertEqual(len(train_idx) + len(val_idx), 4)
+        self.assertEqual(set(train_idx.tolist()), {0, 1, 2, 3})
+        self.assertEqual(sorted(val_idx.tolist() + test_idx.tolist()), [4, 5])
+        self.assertEqual(len(val_idx) + len(test_idx), 2)
 
     def test_rejects_overlap(self) -> None:
         with self.assertRaises(ValueError):
@@ -77,14 +77,14 @@ class TestTemporalSplitOnBundle(unittest.TestCase):
         )
         train_idx, val_idx, test_idx = resolve_split_indices(
             bundle,
-            split_mode="temporal_year",
+            split_mode="temporal_holdout",
             train_years=[2020],
             test_years=[2023],
-            val_fraction=0.34,
+            val_fraction=0.5,
             seed=42,
         )
-        self.assertEqual(train_idx.numel() + val_idx.numel(), 3)
-        self.assertEqual(test_idx.numel(), 2)
+        self.assertEqual(train_idx.numel(), 3)
+        self.assertEqual(val_idx.numel() + test_idx.numel(), 2)
 
 
 if __name__ == "__main__":

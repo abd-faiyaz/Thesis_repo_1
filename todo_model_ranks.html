@@ -21,6 +21,7 @@
     .papers { font-size: 0.8rem; font-family: ui-monospace, monospace; }
     .rec td:first-child { box-shadow: inset 3px 0 0 #3fb950; }
     code { background: #21262d; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+    .done { color: #3fb950; font-weight: 700; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -51,7 +52,7 @@
     <tr class="rec">
       <td class="rank">1</td>
       <td class="rank">6</td>
-      <td><strong>Broadcast + MLDP Hybrid</strong></td>
+      <td><strong>Broadcast + MLDP Hybrid</strong> <span class="done">(DONE!)</span></td>
       <td class="type">Hybrid <em>(with modifications)</em></td>
       <td>MLDP-pruned permission bits · broadcast-receiver intent actions · fused tiny MLP head (~80–120-d manifest vector)</td>
       <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code><br><code>12_Detecting Android Malwares By Mining Statically Registered Broadcast Receivers (Full paper).pdf</code></td>
@@ -61,7 +62,7 @@
     <tr class="rec">
       <td class="rank">2</td>
       <td class="rank">5</td>
-      <td><strong>MLDP + Dex Header Cascade</strong></td>
+      <td><strong>MLDP + Dex Header Cascade</strong> <span class="done">(DONE!)</span></td>
       <td class="type">Hybrid <em>(with modifications)</em></td>
       <td>MLDP-selected permission subset (~30-d) · normalized Dex header bytes (104-d, multidex sum-pool) · cascade or fused tiny MLP (~150-d)</td>
       <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code><br>MSFDroid (no PDF in folder)</td>
@@ -71,7 +72,7 @@
     <tr>
       <td class="rank">3</td>
       <td class="rank">4</td>
-      <td><strong>MLDP-Pruned Permission</strong></td>
+      <td><strong>MLDP-Pruned Permission</strong> <span class="done">(DONE!)</span></td>
       <td class="type">Custom (single paper)</td>
       <td>PRNR-ranked permissions · support-filtered permission set · association-rule–selected ~20–40 binary permission bits</td>
       <td class="papers"><code>7_Permission Extraction Framework for Android Malware Detection.pdf</code></td>
@@ -91,7 +92,7 @@
     <tr>
       <td class="rank">5</td>
       <td class="rank">7</td>
-      <td><strong>Dex Header + Broadcast Receiver Fusion</strong></td>
+      <td><strong>Dex Header + Broadcast Receiver Fusion</strong> <span class="done">(DONE!)</span></td>
       <td class="type">Hybrid <em>(with modifications)</em></td>
       <td>Dex header structural vector (104-d) · broadcast-receiver intent actions (~50-d) · late-fusion MLP towers (Pattern B–style)</td>
       <td class="papers">MSFDroid (no PDF in folder)<br><code>12_Detecting Android Malwares By Mining Statically Registered Broadcast Receivers (Full paper).pdf</code></td>
@@ -111,7 +112,7 @@
     <tr>
       <td class="rank">7</td>
       <td class="rank">1</td>
-      <td><strong>LinRegDroid</strong></td>
+      <td><strong>LinRegDroid</strong> <span class="done">(DONE!)</span></td>
       <td class="type">Original (single paper)</td>
       <td>Full manifest permission vocabulary · per-permission binary indicators · multiple linear regression score + threshold rule</td>
       <td class="papers"><code>55_LinRegDroid_Detection_of_Android_Malware_Using_Mul.pdf</code></td>

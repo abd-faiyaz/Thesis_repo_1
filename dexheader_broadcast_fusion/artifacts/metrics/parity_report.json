@@ -1,0 +1,96 @@
+{
+  "samples": [
+    {
+      "sample": "sample_000",
+      "pytorch": 0.3243035674095154,
+      "onnx": 0.3243033289909363,
+      "expected": 0.3243035674095154,
+      "delta_onnx": 2.384185791015625e-07,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_001",
+      "pytorch": 0.22329868376255035,
+      "onnx": 0.22329872846603394,
+      "expected": 0.22329868376255035,
+      "delta_onnx": 4.470348358154297e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_002",
+      "pytorch": 0.017521381378173828,
+      "onnx": 0.017521381378173828,
+      "expected": 0.017521381378173828,
+      "delta_onnx": 0.0,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_003",
+      "pytorch": 0.03269876912236214,
+      "onnx": 0.03269869089126587,
+      "expected": 0.03269876912236214,
+      "delta_onnx": 7.82310962677002e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_004",
+      "pytorch": 0.18063591420650482,
+      "onnx": 0.18063589930534363,
+      "expected": 0.18063591420650482,
+      "delta_onnx": 1.4901161193847656e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_005",
+      "pytorch": 0.9997519850730896,
+      "onnx": 0.9997519850730896,
+      "expected": 0.9997519850730896,
+      "delta_onnx": 0.0,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_006",
+      "pytorch": 0.004819819238036871,
+      "onnx": 0.004819780588150024,
+      "expected": 0.004819819238036871,
+      "delta_onnx": 3.864988684654236e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_007",
+      "pytorch": 0.9997269511222839,
+      "onnx": 0.9997270107269287,
+      "expected": 0.9997269511222839,
+      "delta_onnx": 5.960464477539063e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_008",
+      "pytorch": 0.007227519992738962,
+      "onnx": 0.007227540016174316,
+      "expected": 0.007227519992738962,
+      "delta_onnx": 2.0023435354232788e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    },
+    {
+      "sample": "sample_009",
+      "pytorch": 0.0044357082806527615,
+      "onnx": 0.004435747861862183,
+      "expected": 0.0044357082806527615,
+      "delta_onnx": 3.958120942115784e-08,
+      "delta_expected": 0.0,
+      "ok": true
+    }
+  ],
+  "max_delta": 2.384185791015625e-07,
+  "passed": true
+}

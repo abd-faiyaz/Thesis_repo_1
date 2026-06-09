@@ -43,14 +43,14 @@ def main(argv: list[str] | None = None) -> int:
     write_dataset_index(cfg.paths.dataset_index, rows)
 
     splits_dir = cfg.paths.splits_dir
-    for split_name in ("train", "val", "dev_test", "temporal_holdout"):
+    for split_name in ("train", "val", "test"):
         split_rows = [r for r in rows if r.split == split_name]
         write_split_file(splits_dir / f"{split_name}.txt", split_rows)
 
     counts = split_counts(rows)
     print(f"APK root: {apk_root}")
     print(f"Indexed {len(rows)} APKs → {cfg.paths.dataset_index}")
-    for name in ("train", "val", "dev_test", "temporal_holdout", "other"):
+    for name in ("train", "val", "test", "other"):
         print(f"  {name}: {counts.get(name, 0)} → {splits_dir / f'{name}.txt'}")
     return 0
 

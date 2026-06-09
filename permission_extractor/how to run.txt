@@ -6,10 +6,10 @@ source scripts/activate_thesis_env.sh   # repo-root thesis_venv
 python3 scripts/verify_setup.py         # P0 — must pass before full run
 
 Full pipeline (P0–P8):
-./run_mldp.sh
+./run_mldp_pruned_perm_cl.sh
 
 Smoke / dev run (needs malware in index — use >=6500; not thesis numbers):
-PREPROCESS_LIMIT=6500 ./run_mldp.sh
+PREPROCESS_LIMIT=6500 ./run_mldp_pruned_perm_cl.sh
 
 P6 eval (default): val (model selection between linear_svc / tiny_mlp) + temporal_holdout (primary test)
 Optional dev_test:

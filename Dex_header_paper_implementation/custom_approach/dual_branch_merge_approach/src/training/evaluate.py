@@ -11,6 +11,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import torch
 import torch.nn as nn
+from shared_calibration import (
+    build_val_thresholds_payload,
+    find_repo_root,
+    format_cascade_band_summary,
+    write_split_scores_bundle,
+    write_thresholds,
+)
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -141,12 +148,133 @@ def validation_epoch(
     return total_loss / max(n_batches, 1), metrics
 
 
+def _metrics_thresholds_path(cfg: PipelineConfig) -> Path:
+    return cfg.root / "artifacts" / "metrics" / "thresholds.json"
+
+
+def _manifest_apk_ids(cfg: PipelineConfig, split: str) -> list[str]:
+    from src.data.store import load_shard_manifest
+
+    if split == "val":
+        manifest_path = cfg.paths.manifest_val
+    elif split == "test":
+        manifest_path = cfg.paths.manifest_test
+    else:
+        manifest_path = cfg.paths.manifest_train
+    manifest = load_shard_manifest(manifest_path)
+    return [entry.apk_id for entry in manifest.entries]
+
+
+def export_split_scores(
+    cfg: PipelineConfig,
+    model: DualBranchNet,
+    loader: DataLoader,
+    device: torch.device,
+    *,
+    split: str,
+    threshold: float,
+) -> Path | None:
+    from src.pipeline_integration import get_pipeline_settings
+
+    y_true, _, y_score = collect_predictions(model, loader, device, threshold=threshold)
+    settings = get_pipeline_settings(cfg)
+    out = write_split_scores_bundle(
+        model_id=settings.model_id,
+        split=split,
+        metrics_dir=cfg.root / "artifacts" / "metrics",
+        apk_ids=_manifest_apk_ids(cfg, split),
+        labels=y_true,
+        scores=y_score,
+        threshold=threshold,
+        repo_root=find_repo_root(cfg.root),
+        sync_val_to_workspace=split == "val",
+    )
+    print(f"  {split} scores → {out}")
+    return out
+
+
+def write_val_thresholds(
+    cfg: PipelineConfig,
+    model: DualBranchNet,
+    val_loader: DataLoader,
+    device: torch.device,
+    *,
+    tune_on_val: bool | None = None,
+    calibrate_bands: bool = True,
+    out_path: Path | None = None,
+) -> dict:
+    eval_cfg = cfg.evaluation
+    default_threshold = float(eval_cfg.get("threshold", 0.5))
+    do_tune = (
+        bool(eval_cfg.get("tune_threshold_on_val", True))
+        if tune_on_val is None
+        else tune_on_val
+    )
+
+    y_true, _, y_score = collect_predictions(
+        model, val_loader, device, threshold=default_threshold
+    )
+    from src.pipeline_integration import get_pipeline_settings
+
+    settings = get_pipeline_settings(cfg)
+    payload = build_val_thresholds_payload(
+        model_id=settings.model_id,
+        y_true=y_true,
+        scores=y_score,
+        default=default_threshold,
+        tune=do_tune,
+        calibrate_bands=calibrate_bands,
+        cascade_targets=cfg.raw.get("cascade", {}),
+        extra={
+            "description": "Predict malware when malware_probability >= tuned_val",
+        },
+    )
+    tuned_threshold = float(payload["tuned_val"])
+    payload["benign_threshold"] = 1.0 - tuned_threshold
+    metrics_dir = cfg.root / "artifacts" / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    thresholds_path = out_path or _metrics_thresholds_path(cfg)
+    write_thresholds(thresholds_path, payload)
+    band_summary = format_cascade_band_summary(payload)
+    print(
+        f"  val-tuned threshold={tuned_threshold:.4f}"
+        + (f"  cascade {band_summary}" if band_summary else "")
+        + f" → {thresholds_path}"
+    )
+    write_split_scores_bundle(
+        model_id=settings.model_id,
+        split="val",
+        metrics_dir=cfg.root / "artifacts" / "metrics",
+        apk_ids=_manifest_apk_ids(cfg, "val"),
+        labels=y_true,
+        scores=y_score,
+        threshold=tuned_threshold,
+        repo_root=find_repo_root(cfg.root),
+    )
+    return payload
+
+
+def _tune_val_threshold(
+    cfg: PipelineConfig,
+    model: DualBranchNet,
+    val_loader: DataLoader,
+    device: torch.device,
+    *,
+    tune_on_val: bool | None = None,
+) -> float:
+    payload = write_val_thresholds(
+        cfg, model, val_loader, device, tune_on_val=tune_on_val
+    )
+    return float(payload["tuned_val"])
+
+
 def run_evaluation(
     cfg: PipelineConfig,
     *,
     checkpoint_path: Path | None = None,
     split: str = "val",
     metrics_out: Path | None = None,
+    tune_on_val: bool | None = None,
 ) -> dict[str, Any]:
     from src.config import ensure_artifact_dirs
     from src.data.dataloaders import build_dataloaders_from_config, build_test_loader_from_config
@@ -178,7 +306,9 @@ def run_evaluation(
     model.to(device)
     criterion = build_criterion(cfg, device)
 
-    threshold = float(cfg.evaluation.get("threshold", 0.5))
+    threshold = _tune_val_threshold(
+        cfg, model, val_loader, device, tune_on_val=tune_on_val
+    )
     val_loss, metrics = validation_epoch(
         model,
         loader,
@@ -218,6 +348,8 @@ def run_evaluation(
         out = metrics_out or (cfg.paths.checkpoint_dir / f"metrics_{split}.json")
     write_local_metrics_json(out, result)
     print(f"  metrics written → {out}")
+    if split != "val":
+        export_split_scores(cfg, model, loader, device, split=split, threshold=threshold)
 
     try:
         from src.thesis_archive import after_eval
@@ -251,6 +383,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON path for metrics (default: artifacts/checkpoints/metrics_{split}.json)",
     )
+    parser.add_argument(
+        "--no-tune-threshold",
+        action="store_true",
+        help="Skip val max-F1 threshold tuning; use evaluation.threshold from config.",
+    )
     return parser
 
 
@@ -267,6 +404,7 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_path=args.checkpoint,
         split=args.split,
         metrics_out=args.metrics_out,
+        tune_on_val=not args.no_tune_threshold,
     )
     return 0
 

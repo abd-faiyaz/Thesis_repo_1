@@ -122,15 +122,25 @@ def copy_feature_assets(cfg, out_dir: Path) -> None:
 
 
 def load_thresholds(cfg) -> dict[str, float]:
-    tuned_path = cfg.paths.metrics / "thresholds.json"
-    if tuned_path.is_file():
-        payload = json.loads(tuned_path.read_text(encoding="utf-8"))
-        return {
-            "default": float(payload.get("default", 0.5)),
-            "tuned_val": float(payload.get("tuned_val", payload.get("default", 0.5))),
-        }
+    from shared_calibration import build_val_thresholds_payload, read_thresholds_payload
+
     default = float(cfg.evaluation.get("threshold", 0.5))
-    return {"default": default, "tuned_val": default}
+    return read_thresholds_payload(
+        cfg.paths.metrics / "thresholds.json",
+        fallback=build_val_thresholds_payload(
+            model_id=cfg.model_id,
+            y_true=np.array([0, 1]),
+            scores=np.array([0.25, 0.75]),
+            default=default,
+            tune=False,
+            calibrate_bands=False,
+            cascade_targets=cfg.raw.get("cascade", {}),
+            extra={
+                "model_type": str(cfg.classifier.get("deployment", "tiny_mlp")),
+                "description": "Run evaluate to calibrate tuned_val and cascade bands",
+            },
+        ),
+    )
 
 
 def build_export_manifest(
