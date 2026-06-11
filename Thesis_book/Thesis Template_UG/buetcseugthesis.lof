@@ -1,0 +1,13 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Offline VigiDroid model-development pipeline. The PC-side workflow indexes APKs, extracts features, trains and exports ONNX bundles, and organizes the exported detectors into LIGHT, MID, and HEAVY inference tiers.}}{15}{figure.caption.4}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces VigiDroid on-device application flow. The app selects a scan depth, runs the corresponding model tiers through local feature extraction and ONNX Runtime inference, fuses model scores, reports a verdict, and writes resource metrics for post-device analysis.}}{16}{figure.caption.5}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Model optimization and ONNX deployment pipeline}}{20}{figure.caption.6}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces On-device hardware profiling workflow}}{22}{figure.caption.7}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces VigiDroid's cascading multi-tier scan orchestration}}{26}{figure.caption.10}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

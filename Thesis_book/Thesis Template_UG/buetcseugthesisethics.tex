@@ -1,0 +1,129 @@
+\chapter{Professional Practices, Team Dynamics, and Lifelong Learning}\label{Ethics}
+
+\section{Considerations of Professional Ethics, Responsibilities, and Norms of Engineering Practice}
+Engineering complex mobile security frameworks involves responsibilities that extend far beyond optimizing algorithmic accuracy. Developing an on-device malware detection system like VigiDroid requires balancing technical innovation with strict adherence to research ethics, software engineering norms, and societal data safety expectations.
+
+\subsection{Research and Data Ethics}
+The foundational ethical consideration of this study centers on data provenance and user privacy. To train and evaluate VigiDroid's multi-tier machine learning models, 13,528 labelled Android Package (APK) files from public research corpora (AndroZoo and Hugging Face \texttt{android-apks}) were indexed on an isolated workstation. No personal user data, installed-app telemetry, or network traffic from real devices was collected for training purposes.
+
+Malware samples were handled exclusively inside controlled research environments: offline storage on encrypted drives, execution limited to static parsing (never launching malicious payloads on networked machines), and on-device scanning confined to the \texttt{Scanable/} evaluation directory on a dedicated test phone. We did not redistribute APK binaries through the git repository; only manifests, parity fixtures, and metric logs are version-controlled.
+
+Our benchmarks avoid attributing false positives to specific commercial developers or app store listings. Academic honesty was enforced through meticulous citation of foundational works---LinRegDroid, MLDP, MSFDroid, ByteCNN, Drebin, and others---with explicit documentation wherever we substituted classifiers or fusion strategies for mobile deployment. Original contributions (the four-tier cascade, unified P0--P8 pipeline, and on-device metrics schema) are clearly separated from prior art in Chapter~\ref{Proposed Methodology}.
+
+\subsection{Practices and Conventional Norms}
+The system was engineered following industry-standard software development lifecycles and rigorous experimental design:
+\begin{itemize}
+ \item \textbf{Experimental design and reproducibility:} Temporal holdout splits (train 2020--2021, test 2022--2023) prevent future leakage. Every model exports parity samples; Android instrumented tests (A1--A4) gate integration.
+ \item \textbf{Version control and modularity:} The monorepo separates Python training subtrees, shared calibration tools, and the VigiDroid Android module. Git tracks all source changes; generated build artifacts (\texttt{.aux}, \texttt{.onnx} checkpoints during development) remain outside commits where appropriate.
+ \item \textbf{Testing and profiling metrology:} Regression tests verify that streaming APK access does not leak file handles. \texttt{ScanService.onHandleWork} runs inside a background worker with explicit memory accounting to avoid out-of-memory faults during batch evaluation.
+ \item \textbf{Responsible disclosure posture:} VigiDroid is positioned as a research prototype and triage aid, not a certified antivirus product. We document known limitations---static-only analysis, vocabulary staleness, obfuscation blind spots---rather than overstating detection guarantees.
+\end{itemize}
+
+\section{Reflection on Project Management, Team Dynamics, and Economic Decision Making}
+
+\subsection{Project Management and Milestones}
+Executing a multifaceted research project spanning machine learning, ONNX export, and Android systems engineering required structured project management. The lifecycle was divided into six engineering phases tracked against concrete deliverables:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}clp{7.8cm}@{}}
+\toprule
+\textbf{Phase} & \textbf{Target} & \textbf{Deliverable} \\
+\midrule
+P1 & Literature $\rightarrow$ design & Paper-to-model mapping, shared temporal split policy \\
+P2 & Offline pipelines & P0--P8 complete for BM1, MLDP, broadcast hybrid, cascade \\
+P3 & ONNX + parity & Export bundles with P8 PASS; \texttt{stage\_*.sh} scripts \\
+P4 & Android A1--A2 & Java feature extractors match Python reference dumps \\
+P5 & Cascade integration & \texttt{cascade\_policy.json} calibrated; \texttt{ScanOrchestrator} live \\
+P6 & Device evaluation & Scan A/B on 1,528 APKs; \texttt{all\_scan\_metrics.jsonl} archive \\
+\bottomrule
+\end{tabular}
+\caption{Major project milestones and deliverables.}
+\label{tab:milestones}
+\end{table}
+
+Progress was reviewed weekly within the team and bi-weekly with the thesis supervisor, Dr. Md. Mostofa Akbar. When integration blockers arose---such as ONNX operator mismatches or multidex header sum-pooling drift---we adopted a documented root-cause workflow (\texttt{app\_runtime\_fixing\_rca.md}) rather than patching symptoms silently.
+
+\subsection{Team Dynamics and Collaboration}
+This thesis was completed as a collaborative group study by three undergraduate researchers. Workloads were divided by primary competency, with shared ownership of code review and documentation:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}p{3.6cm}p{2.2cm}p{7.2cm}@{}}
+\toprule
+\textbf{Team member} & \textbf{ID} & \textbf{Primary responsibilities} \\
+\midrule
+Abdullah Faiyaz & 2005065 &
+Offline model pipelines (BM1, Pattern~A/B, cascade); PyTorch training; ONNX export scripts; \texttt{ultimate\_runner.sh} orchestration. \\
+Jarin Tasnim & 2005083 &
+VigiDroid Android application; Java feature extractors; \texttt{ScanService} and \texttt{ScanOrchestrator}; AXML manifest parsing; asset staging. \\
+Mohammad Sadnam Faiyaz & 2005111 &
+Device evaluation harness; \texttt{MetricsWriter} schema; ADB push/pull workflows; cascade calibration analysis; thesis experiment tables and plotting pipeline. \\
+\bottomrule
+\end{tabular}
+\caption{Team member roles and primary responsibilities.}
+\label{tab:team-roles}
+\end{table}
+
+Collaboration followed three norms that proved essential in practice:
+\begin{enumerate}
+ \item \textbf{Interface contracts first:} Before merging a new model, the team froze input tensor shapes, vocabulary file formats, and threshold JSON schemas in \texttt{export\_manifest.json}. This prevented the Android side from guessing Python conventions.
+ \item \textbf{Parity before performance:} No model was promoted to the cascade until A4 end-to-end tests passed. Accuracy debates were deferred until numerical agreement between PC and device was confirmed.
+ \item \textbf{Pair debugging across stacks:} When a score mismatch appeared, one member reproduced the issue in Python (P2/P8) while another traced the Java extractor, meeting in the middle at the parity sample JSON.
+\end{enumerate}
+
+Weekly coordination meetings covered active pull requests, blocked dependencies (e.g., stale Pattern~A ONNX relative to the latest checkpoint), and division of the next sprint's device-eval batch. Shared documentation---\texttt{all\_model\_current\_stats.md}, implementation plans under \texttt{detailed\_implementation\_plans/}, and HTML model explainers---reduced onboarding friction when members switched tasks.
+
+\subsection{Economic and Financial Decision-Making}
+A core objective of VigiDroid was to deliver an economically viable alternative to cloud-dependent mobile security. Commercial antivirus backends incur recurring costs for GPU inference clusters, API gateways, and bandwidth to upload every scanned APK. VigiDroid eliminates this infrastructure entirely by running ONNX models locally.
+
+From a consumer-hardware perspective, the cascade design is also an economic safeguard. Unoptimized dynamic analysis or always-on deep scanning accelerates battery degradation through sustained CPU load and thermal stress. Figure~\ref{fig:cascading-scan-orchestration} illustrates how early exit at lightweight tiers preserves device longevity:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.25cm,
+    process/.style={rectangle, draw, thick, minimum width=2.6cm, minimum height=0.9cm, align=center},
+    data/.style={rectangle, draw, rounded corners, thick, minimum width=2.9cm, minimum height=0.8cm, align=center},
+    note/.style={align=center, font=\small},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+]
+\node[data] (apk) {Target APK File};
+\node[process, below=of apk] (tierone) {Tier 1};
+\node[data, right=4.9cm of tierone] (exitone) {Exit Scan Immediately};
+\node[note, below=0.25cm of exitone] {Saves Battery \& CPU};
+\node[process, below=1.6cm of tierone] (tiertwo) {Tier 2};
+\node[data, right=4.9cm of tiertwo] (exittwo) {Exit Scan Immediately};
+\node[process, below=1.9cm of tiertwo] (tierthree) {Tiers 3--4};
+\node[data, right=4.9cm of tierthree] (final) {Final Scan Prediction};
+
+\draw[arrow] (apk) -- (tierone);
+\draw[arrow] (tierone) -- node[above, note] {High Confidence\\Malware/Benign} (exitone);
+\draw[arrow] (tierone) -- node[right, note] {Low \\Confidence} (tiertwo);
+\draw[arrow] (tiertwo) -- node[above, note] {High Confidence\\Malware/Benign} (exittwo);
+\draw[arrow] (tiertwo) -- node[right, note] {Low \\Confidence} (tierthree);
+\draw[arrow] (tierthree) -- node[above, note] {Deep Structural/\\Bytecode Analysis} (final);
+\end{tikzpicture}
+\caption{VigiDroid's cascading multi-tier scan orchestration.}
+\label{fig:cascading-scan-orchestration}
+\end{figure}
+
+By terminating the scanning sequence once a lightweight tier yields a decisive prediction, the application minimizes CPU cycles---reducing battery consumption and thermal throttling during batch evaluation of more than 1,500 APKs on a single test device.
+
+\section{Reflection on Self-directed and Lifelong Learning}
+\subsection{Self-Directed Learning Mechanics}
+VigiDroid required knowledge that extended well beyond standard undergraduate coursework:
+\begin{itemize}
+ \item \textbf{Binary layout parsing:} We studied the DEX file format specification and Binary XML (AXML) encoding to extract features without Apktool or full decompilation.
+ \item \textbf{Cross-runtime ML deployment:} We learned ONNX tracing, opset selection, and ONNX Runtime mobile integration---topics rarely covered in classroom ML courses.
+ \item \textbf{Hardware-level metrology:} We explored \texttt{Debug.MemoryInfo}, thread CPU timing, and PSS accounting to build a credible on-device benchmark harness.
+\end{itemize}
+
+\subsection{Framework for Lifelong Learning}
+Mobile security evolves continuously; static signatures and permission heuristics that work today may degrade tomorrow. VigiDroid's modular architecture---decoupled extractors, swappable ONNX bundles, and a JSON-driven cascade policy---is deliberately designed for incremental update without rewriting the scanning core.
+
+This project taught us a transferable workflow: decompose an unfamiliar system into verifiable layers, establish parity gates between environments, and measure real-world cost alongside accuracy. That discipline will remain valuable as we encounter new platforms, model formats, and deployment constraints throughout our engineering careers.
+
+\endinput

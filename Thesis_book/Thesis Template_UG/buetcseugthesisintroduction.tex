@@ -1,0 +1,138 @@
+\chapter{Introduction}\label{intro}
+The rapid proliferation of smartphones has fundamentally reshaped human communication, commerce, and daily productivity. At the center of this mobile revolution is the Android operating system, which commands a dominant global market share powering billions of active devices. Because of its open-source nature and massive user base, Android has also become the primary target for cybercriminals, resulting in an exponential rise in sophisticated mobile malware. Traditional signature-based antivirus solutions struggle to defend against zero-day exploits and obfuscated payloads, forcing modern research toward machine learning-based detection models.
+
+However, a major gap persists between theoretical malware detection and practical deployment. Most state-of-the-art frameworks rely on resource-heavy dynamic analysis or complex structural decompilation that must be offloaded to cloud servers. This dependency poses significant user privacy risks, demands continuous network connectivity, and inflicts heavy battery and memory penalties if executed locally.
+
+To address these limitations, this thesis introduces VigiDroid: a fully offline, multi-tiered static analysis framework designed to run entirely on resource-constrained mobile hardware. By systematically exploiting lightweight metadata—starting with the structural blueprints found inside an application's compressed archive—VigiDroid seeks to prove that high-fidelity security enforcement can be achieved locally, efficiently, and without compromising device longevity.
+
+\section{ Android Operating System and Ecosystem}
+The mobile computing landscape is heavily dominated by the Android operating system, an open-source platform maintained by Google and built upon a modified version of the Linux kernel. Because of its open-source nature, flexibility, and extensive developer ecosystem, Android powers billions of active devices worldwide, ranging from smartphones and tablets to wearables and smart televisions.
+
+Unlike desktop operating systems, Android isolates applications from one another using a security mechanism known as application sandboxing. Every Android application runs inside its own low-privileged process and is assigned a unique Linux User ID (UID). This ensures that, under normal operational boundaries, an application cannot access the private data, memory, or execution space of another application without explicit permission.
+
+\section{ The Architecture of an Android Package (APK)}
+To deploy software within this ecosystem, applications must be compiled and bundled into a single file format known as an Android Package (APK), which carries the .apk file extension. Structurally, an APK file is not a solid binary executable; rather, it is a standard ZIP archive compressed according to specific structural standards. When an APK file is decompressed or inspected, it reveals a standardized directory layout containing all components necessary for the application's runtime execution:
+\begin{itemize}
+  \item classes.dex: The compiled Dalvik Executable file containing the executable bytecode that runs on the Android Runtime (ART) or legacy Dalvik Virtual Machine. This file contains the compiled application logic and API references.
+  \item 
+res/ and assets/: Directories storing compiled and raw application resources, such as user interface layouts, image assets, localized strings, and raw binary attachments.
+\item META-INF/: A folder storing the cryptographic signatures and certificates of the application, ensuring tamper-detection and origin verification during app updates or installation.
+
+\item AndroidManifest.xml: The central structural and architectural blueprint of the application.
+\end{itemize}
+
+
+
+
+
+\section{ The Lifecycle and Execution of an APK}
+When a user installs or executes an application, the Android system interacts with the APK as a structural package:
+\begin{itemize}
+ 
+\item Parsing and Verification: The system's Package Installer extracts and reads the cryptographic structures inside META-INF/ to verify authenticity. Concurrently, the platform parses structural definitions to register the application with the system services.
+
+\item Compilation and Optimization: Upon installation or during idle device states, the Android Runtime (ART) compiles the Dalvik bytecode contained within classes.dex into native machine code using Ahead-Of-Time (AOT) or Just-In-Time (JIT) compilation.
+
+\item Process Sandboxing: When the user taps the app icon, the system forks a secure process via the Zygote base process, assigns its distinct UID, maps its sandboxed storage directories, and initiates execution.
+
+\end{itemize}
+\section{The Role and Importance of AndroidManifest.xml}
+The AndroidManifest.xml file is the most critical metadata component within the APK archive. It serves as an explicit declaration contract between the application and the Android operating system kernel. The system cannot launch any application component or grant any hardware access if it is not formally declared inside this manifest file.\\
+
+However, inside a compiled APK, the manifest file is not saved as human-readable clear text. To reduce package size and optimize on-device parsing speeds, the compilation toolchain processes the text-based XML file into a compressed binary format known as Binary XML (AXML). This binary format substitutes strings with global string pool offsets and organizes structural nodes into tokens.
+
+The manifest file defines the complete configuration boundary of an application by specifying:\begin{itemize}
+
+
+ \item Package Identity: The unique Java-style package namespace identifier used by the operating system to track the app.
+
+ \item Application Components: The declaration of the four fundamental building blocks of Android:\begin{itemize}
+ 
+
+ \item Activities: The visible user interface screens.
+
+ \item Services: The long-running background operations that lack a user interface.
+
+ \item Broadcast Receivers: Event listeners that allow the app to receive system-wide broadcast intents (e.g., detecting if the charger is connected or if the device finished booting).
+
+ \item Content Providers: Interfaces for sharing structured relational data between sandboxed applications.
+ \end{itemize}
+
+ \item Intent Filters: Declarations that specify what hardware or software events an app component can respond to.
+
+ \item Permission Declarations: The security boundaries of the app. It declares Requested Permissions (<uses\-permission>), which specify the sensitive resources the app needs to access (e.g., READ\_SMS, CAMERA, ACCESS\_FINE\_LOCATION), and Defined Permissions, which restrict access to the app's own components.
+
+\end{itemize}
+
+\section{Manifest-Driven Analysis in VigiDroid}
+Within our proposed framework, VigiDroid, the AndroidManifest.xml serves as the primary, high-velocity defensive gating layer during on-device scanning.
+
+\section{Why We Check AndroidManifest.xml}
+Malicious applications routinely reveal their behavioral intents and structural anomalies within their manifest metadata prior to running any bytecode. For instance, a benign calculator application has no operational justification to request the SEND_SMS, RECEIVE\_BOOT\_COMPLETED, and READ\_CONTACTS permissions simultaneously. Similarly, malware strains often register static broadcast receivers for sensitive system events to force themselves to execute immediately upon system boot or to silently intercept incoming authentication messages.\\
+
+Because extracting and parsing the full compiled bytecode (classes.dex) or disassembling structural call graphs is heavily limited by the CPU, battery, and memory constraints of a mobile device, VigiDroid leverages the manifest file as a lightweight, first-line statistical filter. Reading the binary manifest requires minimal file decompression and I/O overhead compared to processing the entire APK, making it ideal for immediate, on-device triaging.
+
+\section{ VigiDroid Does With It}
+When a scan is initiated on an uninstalled or target APK file, VigiDroid performs the following sequential actions:
+\begin{itemize}
+ 
+
+ \item Targeted Streaming Access: Instead of unzipping the complete APK into a temporary folder, VigiDroid opens an optimized stream to isolate and extract only the binary AndroidManifest.xml file directly from the compressed ZIP archive.
+
+ \item Binary XML Decoding: Our Java-backed processing pipeline parses the compressed binary AXML layout into an internal structural representation without needing external third-party decompilation utilities.
+
+ \item Feature Extraction and Tokenization: The parsing engine extracts three explicit feature dimensions:\begin{itemize}
+
+
+ \item Permissions: The full string array of requested permissions.
+
+ \item Intent Filters: The implicit actions and structural categories declared.
+
+ \item Broadcast Receivers: Statically registered event receivers.
+ \end{itemize}
+
+ \item Vocabulary Normalization: These text strings are checked against an internal token vocabulary dictionary pre-compiled within the app assets, transforming varied string values into an optimized, fixed-width binary vector representation (1 for present, 0 for absent).
+
+ \item Multi-Tier Execution: This vectorized manifest representation is fed directly into our initial scanning tiers (Tier~1 and Tier~2) using optimized machine learning classifiers running via ONNX Runtime. If these lightweight tiers return a high-confidence prediction, VigiDroid completes the scan immediately, saving valuable battery and CPU cycles by skipping deep structural bytecode analysis entirely.
+ \end{itemize}
+
+\section{Problem Statement and Research Objectives}
+Despite substantial progress in Android malware research, three practical barriers continue to block deployment on ordinary smartphones. First, many high-accuracy detectors depend on cloud offloading or dynamic instrumentation, which conflicts with privacy expectations and offline usage. Second, models published in the literature are rarely accompanied by reproducible mobile runtimes; accuracy figures from desktop experiments do not automatically transfer to constrained on-device execution. Third, no single feature domain dominates every malware family: permission-only models are fast but miss structural obfuscation, while byte-level deep models are expressive but expensive.
+
+This thesis addresses these barriers through a unified research programme with four objectives:
+\begin{enumerate}
+ \item Re-implement and adapt published static-analysis models---from permission baselines to MSFDroid-inspired structural fusion---under a common temporal evaluation protocol.
+ \item Train each detector offline, export it to ONNX, and verify PyTorch--ONNX parity before any Android integration.
+ \item Design VigiDroid, an offline scanning application that replicates Python feature extraction in Java and orchestrates models through a calibrated four-tier cascade.
+ \item Measure not only classification quality but also per-stage CPU time, memory, and battery impact on physical hardware, producing an accuracy--resource frontier grounded in real device telemetry.
+\end{enumerate}
+
+\section{Thesis Contributions and Outline}
+The primary contributions of this research are threefold:
+\begin{itemize}
+
+\item The architecture and end-to-end implementation of VigiDroid, a native-backed, on-device Android scanning engine optimized via ONNX Runtime.
+
+\item A rigorous empirical evaluation of multiple feature-model pairings (ranging from permission vectors to raw byte sequences) across temporal data splits to isolate the optimal accuracy-resource frontier.
+
+\item The design of an intelligent four-tier cascading scan orchestration system that minimizes hardware overhead by bypassing heavy bytecode inspection whenever lightweight manifest tokens provide high-confidence triage.
+
+\item A reproducible metrics pipeline that converts on-device \texttt{all\_scan\_metrics.jsonl} logs into analysis-ready tables, enabling direct comparison between offline test scores and live hardware measurements.
+\end{itemize}
+The remainder of this thesis book is organized as follows:
+\begin{itemize}
+
+\item Chapter 2: Background and Related Work provides a formal introduction to the Android compilation ecosystem and surveys previous static, dynamic, and hybrid machine learning approaches, highlighting their resource trade-offs.
+
+\item Chapter 3: Methodology and System Design details VigiDroid’s underlying architecture, from targeted archive parsing and feature tokenization to the multi-tier cascading policy engine.
+
+\item Chapter 4: Experiments describes the dataset, feature engineering, ONNX deployment, evaluation APK protocol, metrics conversion pipeline, and comparative results analysis.
+
+\item Chapter 5: Professional Practices, Team Dynamics, and Lifelong Learning reflects on research ethics, project management, and economic trade-offs of on-device security.
+
+\item Chapter 6: Conclusion and Future Work summarizes the core insights, research impact, limitations, and future optimization paths for on-device mobile security frameworks.
+\end{itemize}
+
+
+
+\endinput

@@ -1,0 +1,438 @@
+\chapter{Proposed Methodology}\label{Proposed Methodology}
+
+This chapter describes the end-to-end methodology of our thesis: how published Android malware detectors are re-implemented in a shared offline pipeline, converted to ONNX, staged into the VigiDroid application, and orchestrated through a calibrated four-tier cascade on physical hardware. The narrative follows the actual repository layout---from \texttt{Dex\_header\_paper\_implementation/} and sibling model folders through \texttt{Shared\_pipeline\_Files/} and \texttt{vigidroid/}---so that each design decision can be traced to concrete source artifacts.
+
+\section{End-to-End System Overview}
+At the highest level, the thesis work comprises three coupled subsystems:
+\begin{enumerate}
+ \item \textbf{Offline model factory:} Nine independent Python subtrees, each executing phases P0--P8 on the shared 13,528-APK corpus with temporal splits.
+ \item \textbf{Export and staging bridge:} ONNX bundles with parity samples, copied by \texttt{Android\_Works/stage\_*.sh} into application assets.
+ \item \textbf{VigiDroid runtime:} A Java scanning service that replicates Python feature extraction, runs ONNX Runtime inference, applies cascade policy, and logs hardware metrics.
+\end{enumerate}
+Figure~\ref{fig:offline-workflow} and Figure~\ref{fig:vigidroid-app-flow} depict the offline and on-device halves respectively; Figure~\ref{fig:cascade-detail} refines the cascade logic introduced in Section~\ref{sec:cascade-policy}.
+
+\section{Model Development}
+ 
+The offline half of our pipeline follows a consistent eight-phase structure (P0--P8) applied independently to each detector: environment setup and configuration, APK corpus indexing, feature extraction, dataset loader construction, model definition, training, held-out test evaluation, ONNX export, and finally a parity check confirming that the exported model reproduces PyTorch probabilities within $10^{-4}$ on a set of representative samples. Enforcing this parity gate before any Android integration ensures that accuracy figures reported from the PC are meaningful on-device.
+ 
+Our training corpus comprises roughly 500\,GB of APKs drawn from AndroZoo and related sources, organized by year and label. We adopt a temporal split throughout: models are trained on 2020--2021 samples and evaluated on 2022--2023 samples, which mirrors the realistic scenario where a deployed detector faces APKs newer than those it was trained on. Validation folds are always drawn from the training years to prevent future leakage.
+ 
+We implement nine model families spanning a range of feature domains and computational costs, grouped into three inference tiers. At the \textbf{LIGHT} tier, four fast models handle manifest-level and raw-byte signals: \textbf{ByteCNN}~\cite{byteCNN} applies a 1-D convolutional network to the last 1024 bytes of the APK; \textbf{Linregdroid}~\cite{linregdroid} feeds a normalized manifest permission vector into a linear classifier; \textbf{MLDP-pruned}~\cite{mldp} uses a compact MLP over a permission subset selected by the MLDP framework; and a \textbf{Broadcast+MLDP hybrid}~\cite{broadcast,mldp} combines static receiver-action features with MLDP permissions through a small fusion network. At the \textbf{MID} tier, we add structural DEX signals: \textbf{MLP(H)} (BM1), a 104-dimensional normalized DEX header classifier inspired by MSFDroid; \textbf{Pattern~A}, which performs early fusion of the DEX header with a manifest bag-of-words over a roughly 4,380-entry lexicon; \textbf{Pattern~B}, a dual-branch variant that fuses the same two signals via late fusion; and two \textbf{MLDP+DEX header cascade} configurations (modes~A and~B) that route samples through a permission gate before invoking the header branch. Finally, at the \textbf{HEAVY} tier, a pre-integrated \textbf{XGBoost} model aggregates manifest tokens across all \texttt{classes*.dex} files into a 2,500-dimensional OR vector for gradient-boosted inference.
+ 
+Where an original paper's architecture was not directly portable to ONNX or mobile inference, we adopted lightweight substitutes---replacing SVM/tree classifiers with small MLPs or linear heads---while preserving the published feature semantics. Each model is exported as a self-contained bundle containing \texttt{model.onnx}, an \texttt{export\_manifest.json} describing input shapes and domains, threshold files, feature vocabulary or normalization assets, and a small set of parity samples. These bundles are copied directly into VigiDroid's asset directory, making the PC-to-phone handoff a straightforward file transfer.
+ 
+\subsection{On-Device System: VigiDroid}
+ 
+VigiDroid is an offline-first Android application that runs all inference locally using ONNX Runtime, without sending any APK data to a remote server. When a user initiates a scan, they first choose a scan depth---\textbf{Quick}, \textbf{Balanced}, or \textbf{Full}---which controls which model tiers are active. Quick mode runs only the LIGHT tier for a fast initial screen; Balanced adds the MID tier for better accuracy at moderate cost; Full enables all three tiers including the HEAVY XGBoost model.
+ 
+For each APK found in the device's \texttt{Download/} folder, \texttt{ScanService} opens a metered session and runs the enabled models in sequence. Java feature extractors inside the app replicate the Python extraction logic from P2 exactly, using the vocabulary and normalization assets shipped in the export bundle---this replication is a strict requirement, since any drift between Python and Java feature semantics would silently invalidate on-device accuracy. After each model produces a score, \texttt{EnsemblePolicy} fuses the available outputs into a final verdict of \texttt{benign}, \texttt{malware}, or \texttt{uncertain}. Three fusion policies are supported: a legacy mode using only XGBoost and ByteCNN for backward compatibility; a default weighted-average mode that combines all models that ran, with weights derived from offline validation accuracy; and a tiered cascade mode that escalates from LIGHT to MID or HEAVY only when the lighter models are inconclusive.
+ 
+Throughout each scan, VigiDroid records a detailed operational trace. Per-stage measurements include wall-clock time, whole-process CPU consumption, per-thread CPU time for the scan worker, native and Java heap deltas, proportional set size (PSS) changes, and battery percentage change over the session. These metrics are appended to a structured JSON log (\texttt{all\_scan\_metrics.json}) that accumulates across sessions and can be pulled from the device for post-hoc analysis.
+% A companion script, \texttt{analyze\_device\_scans.py}, groups the records by scan level and ensemble policy to compute mean resource figures alongside detection quality metrics inferred from labeled eval APK filenames.
+ 
+
+\begin{figure}[H]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  % Node styles
+  phase/.style={
+    rectangle, rounded corners=4pt,
+    draw=black!70, fill=black!8,
+    text width=2.1cm, align=center,
+    minimum height=0.75cm, inner sep=4pt
+  },
+  model/.style={
+    rectangle, rounded corners=3pt,
+    draw=black!60, fill=white,
+    text width=2.0cm, align=center,
+    minimum height=0.65cm, inner sep=3pt,
+    font=\footnotesize
+  },
+  tier/.style={
+    rectangle, rounded corners=3pt,
+    draw=black!50, fill=black!5,
+    text width=2.2cm, align=center,
+    minimum height=0.65cm, inner sep=3pt,
+    font=\footnotesize\bfseries
+  },
+  decision/.style={
+    diamond, aspect=2.2,
+    draw=black!70, fill=black!10,
+    text width=1.6cm, align=center,
+    inner sep=2pt, font=\footnotesize
+  },
+  verdict/.style={
+    rectangle, rounded corners=4pt,
+    draw=black!80, fill=black!15,
+    text width=1.8cm, align=center,
+    minimum height=0.7cm, inner sep=4pt,
+    font=\footnotesize\bfseries
+  },
+  output/.style={
+    rectangle, rounded corners=3pt,
+    draw=black!60, fill=black!5,
+    text width=2.2cm, align=center,
+    minimum height=0.65cm, inner sep=4pt,
+    font=\footnotesize
+  },
+  arr/.style={->, thick, black!70},
+  sarr/.style={->, semithick, black!50},
+  label/.style={font=\tiny\itshape, black!60},
+  groupbox/.style={
+    draw=black!40, dashed, rounded corners=5pt,
+    inner sep=6pt, fill=black!2
+  }
+]
+ 
+%% ─── COLUMN 1: PC OFFLINE PIPELINE ───────────────────────────────────────
+\node[phase] (p0) at (0,0)     {\textbf{P0}\\Config \& Env};
+\node[phase, below=0.45cm of p0] (p1) {\textbf{P1}\\APK Indexing};
+\node[phase, below=0.45cm of p1] (p2) {\textbf{P2}\\Feature Extraction};
+\node[phase, below=0.45cm of p2] (p3) {\textbf{P3}\\DataLoaders};
+\node[phase, below=0.45cm of p3] (p4) {\textbf{P4}\\Model Definition};
+\node[phase, below=0.45cm of p4] (p5) {\textbf{P5}\\Training};
+\node[phase, below=0.45cm of p5] (p6) {\textbf{P6}\\Evaluation};
+\node[phase, below=0.45cm of p6] (p7) {\textbf{P7}\\ONNX Export};
+\node[phase, below=0.45cm of p7] (p8) {\textbf{P8}\\Parity Check};
+ 
+\draw[arr] (p0)--(p1); \draw[arr] (p1)--(p2); \draw[arr] (p2)--(p3);
+\draw[arr] (p3)--(p4); \draw[arr] (p4)--(p5); \draw[arr] (p5)--(p6);
+\draw[arr] (p6)--(p7); \draw[arr] (p7)--(p8);
+ 
+% Corpus note
+\node[output, left=0.5cm of p1, text width=1.8cm] (corpus)
+      {APK Corpus\\(\textasciitilde500\,GB)\\2020--2023};
+\draw[sarr] (corpus) -- (p1);
+ 
+% Temporal split note
+\node[output, left=0.5cm of p2, text width=1.8cm] (split)
+      {Train: 2020--2021\\Test: 2022--2023};
+\draw[sarr] (split) -- (p2);
+ 
+% Background box for PC pipeline
+%\begin{scope}[on background layer]
+ % \node[groupbox, fit=(p0)(p1)(p2)(p3)(p4)(p5)(p6)(p7)(p8),
+  %      label=above:{\normalsize\bfseries PC Offline Pipeline}] (pcbox) {};
+%\end{scope}
+ 
+%% ─── COLUMN 2: EXPORT BUNDLE ──────────────────────────────────────────────
+\node[output, right=2cm of p3, text width=2.4cm] (bundle) {
+  \textbf{Export Bundle}\\[2pt]
+  \texttt{model.onnx}\\
+  \texttt{export\_manifest.json}\\
+  thresholds\\
+  vocab / norm stats\\
+  parity samples
+};
+\draw[arr] (p7.east) .. controls +(0.4,0) and +(0,-0.4) .. (bundle.south) node[ midway,left, label]{copy} (bundle);
+\draw[arr] (p8.east) .. controls +(0.6,0) and +(0,-0.6) .. (bundle.south)
+      node[midway, right, label]{$\Delta p \leq 10^{-4}$};
+ 
+%% ─── COLUMN 3: MODEL FAMILIES ─────────────────────────────────────────────
+\node[tier, right=1.8cm of bundle, yshift=2.4cm] (light)
+      {LIGHT Tier};
+\node[model, below=0.25cm of light] (m1) {ByteCNN\\(1-D CNN)};
+\node[model, below=0.25cm of m1]   (m2) {LinRegDroid};
+\node[model, below=0.25cm of m2]   (m3) {MLDP-pruned};
+\node[model, below=0.25cm of m3]   (m4) {Broadcast+MLDP};
+ 
+\node[tier, below=0.5cm of m4] (mid) {MID Tier};
+\node[model, below=0.25cm of mid]  (m5) {MLP(H) / BM1};
+\node[model, below=0.25cm of m5]   (m6) {Pattern A};
+\node[model, below=0.25cm of m6]   (m7) {Pattern B};
+\node[model, below=0.25cm of m7]   (m8) {MLDP+DEX\\Cascade A/B};
+ 
+\node[tier, below=0.5cm of m8] (heavy) {HEAVY Tier};
+\node[model, below=0.25cm of heavy] (m9) {XGBoost\\(2500-d manifest)};
+ 
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m1.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m2.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m3.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m4.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m5.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m6.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m7.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m8.west);
+\draw[sarr] (bundle.east) -- ++(0.3,0) |- (m9.west);
+ 
+
+\end{tikzpicture}
+}
+
+
+\caption{Offline VigiDroid model-development pipeline. The PC-side workflow indexes APKs, extracts features, trains and exports ONNX bundles, and organizes the exported detectors into LIGHT, MID, and HEAVY inference tiers.}
+\label{fig:offline-workflow}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\resizebox{0.6\columnwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  phase/.style={
+    rectangle, rounded corners=4pt,
+    draw=black!70, fill=black!8,
+    text width=2.1cm, align=center,
+    minimum height=0.75cm, inner sep=4pt
+  },
+  decision/.style={
+    diamond, aspect=2.2,
+    draw=black!70, fill=black!10,
+    text width=1.6cm, align=center,
+    inner sep=2pt, font=\footnotesize
+  },
+  verdict/.style={
+    rectangle, rounded corners=4pt,
+    draw=black!80, fill=black!15,
+    text width=1.8cm, align=center,
+    minimum height=0.7cm, inner sep=4pt,
+    font=\footnotesize\bfseries
+  },
+  output/.style={
+    rectangle, rounded corners=3pt,
+    draw=black!60, fill=black!5,
+    text width=2.2cm, align=center,
+    minimum height=0.65cm, inner sep=4pt,
+    font=\footnotesize
+  },
+  arr/.style={->, thick, black!70},
+  sarr/.style={->, semithick, black!50},
+  label/.style={font=\tiny\itshape, black!60},
+  groupbox/.style={
+    draw=black!40, dashed, rounded corners=5pt,
+    inner sep=6pt, fill=black!2
+  }
+]
+
+%% ─── VIGIDROID ON-DEVICE FLOW ────────────────────────────────────────────
+\node[phase] (ui) at (0,0) {User selects\\scan depth};
+\node[decision, below=0.5cm of ui] (depth) {Scan\\Depth?};
+ 
+\node[output, below left=0.7cm and 0.7cm of depth, text width=1.5cm] (dq)
+      {Quick\\LIGHT only};
+\node[output, below=0.7cm of depth, text width=1.5cm] (db)
+      {Balanced\\LIGHT+MID};
+\node[output, below right=0.7cm and 0.7cm of depth, text width=1.5cm] (df)
+      {Full\\L+M+HEAVY};
+ 
+\draw[arr] (ui) -- (depth);
+\draw[arr] (depth) -- node[left, label]{Quick} (dq);
+\draw[arr] (depth) -- node[right, label]{Balanced} (db);
+\draw[arr] (depth) -- node[right, label]{Full} (df);
+ 
+\node[phase, below=1.4cm of db] (scan) {ScanService\\per APK};
+\draw[arr] (dq.south) |- (scan.west);
+\draw[arr] (db) -- (scan);
+\draw[arr] (df.south) |- (scan.east);
+ 
+\node[output, left=0.5cm of scan, text width=1.8cm] (java)
+      {Java Feature\\Extractors\\(parity with P2)};
+\draw[sarr] (java) -- (scan);
+ 
+\node[phase, below=0.5cm of scan] (onnx) {ONNX Runtime\\Inference};
+\draw[arr] (scan) -- (onnx);
+ 
+\node[output, right=0.5cm of onnx, text width=2.0cm] (res)
+      {Resource Capture\\wall time, CPU,\\memory, battery};
+\draw[sarr] (onnx) -- (res);
+ 
+\node[phase, below=0.5cm of onnx] (ens) {EnsemblePolicy\\score fusion};
+\draw[arr] (onnx) -- (ens);
+ 
+\node[output, right=0.5cm of ens, text width=2.0cm] (pol)
+      {Policies:\\weighted avg\\cascade tiered\\legacy XGB+CNN};
+\draw[sarr] (ens) -- (pol);
+ 
+\node[verdict, below=0.5cm of ens] (verd) {Verdict:\\benign / malware\\/ uncertain};
+\draw[arr] (ens) -- (verd);
+ 
+\node[output, below=0.5cm of verd, text width=2.4cm] (json)
+      %{\texttt{all\_scan\_metrics.json}\\
+      {Export to json\\(per-stage: time, CPU,\\mem, PSS, battery)};
+\draw[arr] (verd) -- (json);
+ 
+\node[phase, below=0.5cm of json] (analyze)
+      {%\texttt{analyze\_device\_scans.py}
+      post-pull analysis};
+\draw[arr] (json) -- (analyze);
+ 
+
+ 
+\end{tikzpicture}%
+}
+
+\caption{ VigiDroid on-device application flow. The app selects a scan depth, runs the corresponding model tiers through local feature extraction and ONNX Runtime inference, fuses model scores, reports a verdict, and writes resource metrics for post-device analysis.}
+\label{fig:vigidroid-app-flow}
+\end{figure}
+
+\subsection{Repository Organisation and Paper-to-Model Mapping}
+The thesis codebase is organised as a monorepo in which each detector family owns an independent training subtree, while shared infrastructure---temporal splits, calibration utilities, plotting scripts, and Android staging scripts---lives under \texttt{Shared\_pipeline\_Files/} and \texttt{Android\_Works/}. Table~\ref{tab:paper-mapping} summarises how published works map to our implemented models. Where a paper's original classifier (SVM, decision tree, AdaSV ensemble) was not ONNX-portable, we preserved the published \emph{feature semantics} and substituted a tiny MLP or linear head, documenting the change explicitly.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{2.8cm}p{3.2cm}p{2.4cm}p{4.2cm}@{}}
+\toprule
+\textbf{Model ID} & \textbf{Primary paper(s)} & \textbf{Feature domain} & \textbf{Thesis modification} \\
+\midrule
+\texttt{linregdroid\_permission} & LinRegDroid~\cite{linregdroid} & 173-d permission flags & Faithful MLR; ONNX linear export \\
+\texttt{mldp\_pruned\_permission} & MLDP~\cite{mldp} & $\leq$40 MLDP perms & SVM $\rightarrow$ tiny MLP \\
+\texttt{broadcast\_mldp\_hybrid} & MLDP + broadcast~\cite{mldp,broadcast} & 22 perms + 70 actions & Late concat + MLP \\
+\texttt{mlp\_header} (BM1) & MSFDroid~\cite{msfdroid} & 104-d DEX header & Faithful MLP(H) \\
+\texttt{early\_fusion\_dex\_manifest} & MSFDroid Pattern~A & header + BoW & Single ASCNN tower \\
+\texttt{dual\_branch\_dex\_manifest} & MSFDroid Pattern~B & header $\|$ BoW branches & Late fusion (not fully trained) \\
+\texttt{mldp\_dexheader\_cascade} & MLDP + MSFDroid & perms + header & Mode~A fuse; Mode~B two-stage \\
+\texttt{dexheader\_broadcast\_fusion} & MSFDroid + broadcast & header + receivers & Late fusion MLP \\
+\texttt{bytecnn} & ByteCNN~\cite{byteCNN} & last 1024 APK bytes & Faithful 1-D CNN \\
+\texttt{manifest\_xgb} & Drebin-style~\cite{drebin} & 2500-d OR manifest & Legacy XGBoost baseline \\
+\bottomrule
+\end{tabular}
+\caption{Mapping from source papers to implemented VigiDroid model families.}
+\label{tab:paper-mapping}
+\end{table}
+
+\subsection{The P0--P8 Offline Pipeline}
+Every model subtree executes the same eight phases, orchestrated either individually or through \texttt{ultimate\_runner.sh}:
+\begin{enumerate}
+ \item \textbf{P0 (Configuration):} Verify Python environment, set \texttt{APK\_ROOT} to the corpus mount, load \texttt{config/default.yaml}.
+ \item \textbf{P1 (Indexing):} Walk the year-labelled corpus and emit \texttt{apk\_index.csv} with SHA-256, label, year, and path metadata for all 13,528 APKs.
+ \item \textbf{P2 (Feature extraction):} Parse manifests, DEX headers, receiver actions, or raw bytes. Vocabularies, MLDP sets, and normalization statistics are computed on the training split only and frozen thereafter.
+ \item \textbf{P3 (DataLoader verification):} Confirm tensor shapes, label balance, and shard integrity before any GPU time is spent.
+ \item \textbf{P4 (Model smoke test):} Instantiate the architecture, run a forward pass on a synthetic batch, and verify output dimensionality.
+ \item \textbf{P5 (Training):} Optimize with split-appropriate hyperparameters (e.g., BM1: SGD, 50 epochs; Pattern~A: 80 epochs).
+ \item \textbf{P6 (Test evaluation):} Score the held-out temporal test set; write \texttt{test\_results.json} with accuracy, F1, ROC-AUC, and confusion counts.
+ \item \textbf{P7 (ONNX export):} Trace the trained graph at opset~14, bundle thresholds, vocabs, normalization JSON, and $\sim$10 parity samples into \texttt{artifacts/export/\{model\_id\}/}.
+ \item \textbf{P8 (Parity check):} Assert $\max_j |p_j^{\mathrm{PyTorch}} - p_j^{\mathrm{ONNX}}| \leq 10^{-4}$ on every parity sample (Algorithm~\ref{alg:parity}).
+\end{enumerate}
+Only after P8 passes does \texttt{Android\_Works/stage\_*.sh} copy the bundle into \texttt{vigidroid/app/src/main/assets/models/}.
+
+\subsection{Representative Model Architectures}
+\subsubsection{BM1 --- MLP(H) on DEX Headers}
+Following MSFDroid Base Model~1, we extract bytes~8--111 from every \texttt{classes*.dex} entry, apply train-only min--max normalization, and sum-pool across multidex APKs (Algorithm~\ref{alg:dexheader}). A three-layer MLP ($104 \rightarrow 128 \rightarrow 128 \rightarrow 1$) with sigmoid output is trained with binary cross-entropy. This model achieves 96.6\% accuracy and F1~0.944 on the full 1,528-sample temporal test set while requiring less than one millisecond of on-device CPU time.
+
+\subsubsection{MLDP-Pruned Permission Classifier}
+The MLDP selection pipeline (Algorithm~\ref{alg:mldp}) reduces the permission space to a frozen set~$S$ of at most 40 permissions. Each APK is encoded as $\mathbf{x}_S \in \{0,1\}^{|S|}$. A tiny MLP ($|S| \rightarrow 64 \rightarrow 1$) replaces the paper's SVM for ONNX compatibility.
+
+\subsubsection{Broadcast+MLDP Hybrid}
+Receiver actions mined from manifest \texttt{<receiver>} elements form a 70-dimensional binary vector $\mathbf{x}_R$, concatenated with the 22-dimensional MLDP permission block: $\mathbf{x} = [\mathbf{x}_S \| \mathbf{x}_R]$. A shared tiny MLP produces the malware probability. This hybrid captures orthogonal signals: permissions express \emph{what} an app may access, while receiver actions express \emph{when} it wakes up.
+
+\subsubsection{MLDP+DEX Header Cascade (Modes A and B)}
+Mode~A early-fuses $\mathbf{x}_S$ and $\mathbf{H}$ into a 126-dimensional vector for a single MLP. Mode~B implements a two-stage cascade deployed in VigiDroid Tier~2:
+\begin{enumerate}
+ \item Compute stage-one score $s_1 = f_1(\mathbf{x}_S)$ from the MLDP permission MLP.
+ \item If $s_1 \leq t_{\mathrm{low}}$ or $s_1 \geq t_{\mathrm{high}}$, return $s_1$ and \emph{skip} DEX header extraction.
+ \item Otherwise extract $\mathbf{H}$, compute $s_2 = f_2(\mathbf{H})$, and return $s_2$.
+\end{enumerate}
+Mode~B end-to-end F1 reaches 0.938 on $n{=}1{,}528$ while avoiding dex reads for confident stage-one decisions---a direct accuracy--cost trade-off visible in on-device timing logs.
+
+\subsubsection{ByteCNN Tail-Byte Classifier}
+Following Hasegawa and Iyatomi~\cite{byteCNN}, the last 1,024 bytes of the raw APK (zero-padded on the left if shorter) are embedded, passed through four Conv1d--MaxPool blocks, globally averaged, and classified by a two-logit softmax head. Tail bytes capture ZIP directory structures and appended payloads that header-only models miss.
+
+\subsubsection{XGBoost Manifest Baseline}
+A Drebin-inspired~\cite{drebin} 2,500-dimensional OR vector aggregates manifest permissions, intents, and API tokens extracted from all \texttt{classes*.dex} files. Although it achieves the highest ROC-AUC (0.991) in our suite, its $\sim$100\,ms inference latency places it in the HEAVY tier, invoked only when lighter tiers are inconclusive.
+
+\subsection{ONNX Export and Android Staging}
+Export scripts (e.g., \texttt{only\_base1\_model/scripts/export\_onnx.py}) perform four steps: load the best checkpoint; trace the forward pass with a dummy tensor matching the training input shape; write \texttt{model.onnx} at opset~14; and assemble the deployment bundle:
+\begin{itemize}
+ \item \texttt{export\_manifest.json} --- model ID, input shape, domain, checkpoint path, export timestamp.
+ \item \texttt{thresholds.json} --- validation-tuned $t_{\mathrm{low}}$, $t_{\mathrm{high}}$, and malware probability cutoffs.
+ \item \texttt{features/} --- vocabularies, MLDP permission lists, header normalization bounds.
+ \item \texttt{parity\_samples/} --- fixed input tensors and \texttt{expected\_prob.json} for A4 instrumented tests.
+\end{itemize}
+Staging scripts copy this bundle unchanged into the app's asset tree, ensuring the exact graph evaluated on the PC is the graph executed on the phone.
+
+\subsection{VigiDroid Application Architecture}
+\label{sec:cascade-policy}
+\subsubsection{Scan Entry Points and Modes}
+\texttt{MainActivity} launches \texttt{ScanService}, which enumerates APK files under \texttt{/sdcard/Download/} and \texttt{/sdcard/Download/Scanable/}. Three operational modes exist:
+\begin{itemize}
+ \item \textbf{Cascade (default):} \texttt{ScanOrchestrator} reads \texttt{cascade\_policy.json} and executes up to four tiers with early exit.
+ \item \textbf{Legacy ablation:} \texttt{LegacyScanRunner} runs all eleven model stages sequentially plus an XGBoost--ByteCNN weighted ensemble, used for regression testing.
+ \item \textbf{Scan depth (UI):} \textbf{Quick} enables Tier~1 only; \textbf{Balanced} enables Tiers~1--2; \textbf{Full} enables all tiers including XGBoost and ByteCNN fusion.
+\end{itemize}
+
+\subsubsection{Four-Tier Cascade Policy}
+Table~\ref{tab:cascade-tiers} defines the production cascade calibrated on 764 validation APKs with target false-omission and false-alarm rates of 2\%.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}clp{7.5cm}@{}}
+\toprule
+\textbf{Tier} & \textbf{Models} & \textbf{Rationale} \\
+\midrule
+1 & MLDP-pruned, Broadcast+MLDP & Fastest manifest-only screen; conservative malware OR; $\sim$40\% early exit \\
+2 & MLDP+DEX cascade Mode~B & Permission gate before optional dex read; MLP(H) fallback \\
+3 & Early-fusion ASCNN, XGBoost & Heavy structural fusion for ambiguous cases \\
+4 & ByteCNN & Raw-byte backstop; fused with Tier~3 scores via validation-accuracy weights \\
+\bottomrule
+\end{tabular}
+\caption{VigiDroid four-tier cascade composition and design rationale.}
+\label{tab:cascade-tiers}
+\end{table}
+
+Per-tier decisions follow Algorithm~\ref{alg:cascade}. Tier~1 uses weighted averaging with \texttt{conservative\_malware\_or=true}: if \emph{either} lightweight model exceeds its malware threshold, the scan exits as malware immediately. This design prioritises user safety over aggregate score smoothing.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.92\columnwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  tierbox/.style={rectangle, rounded corners, draw=black!70, fill=black!6,
+    minimum width=3.2cm, minimum height=0.9cm, align=center},
+  decision/.style={diamond, aspect=2, draw=black!70, fill=black!12,
+    text width=1.5cm, align=center, inner sep=1pt, font=\footnotesize},
+  exit/.style={rectangle, rounded corners, draw=black!80, fill=black!18,
+    minimum width=2.2cm, minimum height=0.7cm, align=center, font=\footnotesize\bfseries},
+  arr/.style={->, thick, black!70},
+  skip/.style={->, dashed, black!50}
+]
+\node[tierbox] (t1) {Tier 1\\MLDP + Broadcast};
+\node[decision, below=0.6cm of t1] (d1) {Confident?};
+\node[exit, left=1.2cm of d1] (e1) {Exit};
+\node[tierbox, below=0.8cm of d1] (t2) {Tier 2\\MLDP+DEX Mode B};
+\node[decision, below=0.6cm of t2] (d2) {Confident?};
+\node[exit, left=1.2cm of d2] (e2) {Exit};
+\node[tierbox, below=0.8cm of d2] (t3) {Tier 3\\Fusion + XGB};
+\node[decision, below=0.6cm of t3] (d3) {Confident?};
+\node[exit, left=1.2cm of d3] (e3) {Exit};
+\node[tierbox, below=0.8cm of d3] (t4) {Tier 4\\ByteCNN fusion};
+\node[exit, below=0.6cm of t4] (final) {Final verdict};
+
+\draw[arr] (t1)--(d1);
+\draw[arr] (d1)--node[above,font=\tiny]{yes} (e1);
+\draw[arr] (d1)--node[right,font=\tiny]{no} (t2);
+\draw[arr] (t2)--(d2);
+\draw[arr] (d2)--node[above,font=\tiny]{yes} (e2);
+\draw[arr] (d2)--node[right,font=\tiny]{no} (t3);
+\draw[arr] (t3)--(d3);
+\draw[arr] (d3)--node[above,font=\tiny]{yes} (e3);
+\draw[arr] (d3)--node[right,font=\tiny]{no} (t4);
+\draw[arr] (t4)--(final);
+\draw[skip] (t2.west) to[bend right=40] node[left,font=\tiny]{skip dex} (d2.west);
+\end{tikzpicture}%
+}
+\caption{Four-tier cascade with early exit and Mode~B dex-skip path (dashed).}
+\label{fig:cascade-detail}
+\end{figure}
+
+\subsubsection{Feature Extraction Parity (A1--A4)}
+Android integration follows a four-gate verification ladder:
+\begin{itemize}
+ \item \textbf{A1:} JVM/instrumented tests compare Java extraction output against Python reference dumps.
+ \item \textbf{A2:} ONNX input tensors match Python vectorization bit-for-bit.
+ \item \textbf{A3:} Full APK scans produce structured metrics in \texttt{all\_scan\_metrics.jsonl}.
+ \item \textbf{A4:} End-to-end malware probabilities agree within $10^{-4}$ on bundled parity APKs.
+\end{itemize}
+This ladder ensures that any accuracy regression on device is traceable to a specific layer---parsing, vectorization, or inference---rather than appearing as an unexplained drift.
+
+\FloatBarrier
+
+\endinput

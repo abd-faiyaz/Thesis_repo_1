@@ -1,0 +1,10 @@
+% Do not change these lines
+\renewcommand{\abstractname}{\textbf{{\Large ABSTRACT}}}
+\addcontentsline{toc}{chapter}{\textbf{\normalsize{\emph{ABSTRACT}}}}
+
+% You need to change the text for abstract
+\begin{abstract}\thispagestyle{plain}
+Android malware detection has advanced through static, dynamic, and hybrid machine learning approaches, yet few systems operate fully offline on resource-constrained smartphones. This thesis presents \textbf{VigiDroid}, an on-device static analysis framework that trains nine model families from published research---covering permission baselines, MLDP-pruned features, broadcast receiver mining, DEX header structure, manifest fusion, and raw tail-byte convolution---under a unified temporal evaluation protocol (train 2020--2021, test 2022--2023). Each detector is exported to ONNX, parity-verified against its PyTorch source, and deployed through a calibrated four-tier cascade that exits early on confident predictions. Beyond accuracy and F1-score, we measure per-stage parse, vectorization, and inference latency together with CPU, memory, and battery impact on physical hardware. Our results show that Dex+Broadcast fusion achieves 97.0\% accuracy and F1 of 0.950 at under one millisecond of CPU time, while the cascade avoids heavy models for more than 80\% of evaluation APKs---demonstrating that lightweight static features can deliver practical on-device malware triage without cloud offloading. 
+\end{abstract}
+
+\endinput

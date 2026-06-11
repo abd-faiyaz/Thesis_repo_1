@@ -1,0 +1,26 @@
+% Code settings
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\footnotesize,
+  stepnumber=1,
+  numbersep=2.0mm,
+  breaklines=true}
+
+\chapter{Codes}\label{ch:codes}
+
+\section{Device Metrics JSONL Consolidation}
+Listing~\ref{lst:jsonl} shows the core merge logic from \texttt{Shared\_pipeline\_Files/tools/jsonl\_to\_json.py}, which folds the append-only on-device log into the legacy \texttt{all\_scan\_metrics.json} format consumed by plotting scripts.
+
+\lstinputlisting[caption={JSONL-to-JSON metrics consolidation (excerpt)},label={lst:jsonl}]{codes/jsonl_to_json_snippet.py}
+
+\section{Composite Feasibility Score}
+The plotting pipeline ranks models using a weighted composite of normalized quality, cascade tier priority, and hardware cost:
+\begin{lstlisting}[caption={Feasibility composite (from device\_metrics\_lib.py)},label={lst:composite}]
+composite = 0.45 * quality_norm + 0.30 * tier_weight + 0.25 * (1 - cost_norm)
+cost_score = stage_total_ms + 10 * mem_mb
+quality = mean(accuracy, f1, roc_auc)
+\end{lstlisting}
+
+\endinput

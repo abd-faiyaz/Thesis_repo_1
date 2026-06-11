@@ -1,0 +1,55 @@
+\contentsline {chapter}{\textbf {\normalsize {\emph {CANDIDATES' DECLARATION}}}}{i}{DTLrowi.2.1}%
+\contentsline {chapter}{\textbf {\normalsize {\emph {ACKNOWLEDGEMENT}}}}{ii}{DTLrowi.4.3}%
+\contentsline {chapter}{List of Figures}{v}{section*.1}%
+\contentsline {chapter}{List of Tables}{vi}{section*.2}%
+\contentsline {chapter}{List of Algorithms}{vii}{section*.2}%
+\contentsline {chapter}{\textbf {\normalsize {\emph {ABSTRACT}}}}{viii}{chapter*.3}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1} Android Operating System and Ecosystem}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2} The Architecture of an Android Package (APK)}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3} The Lifecycle and Execution of an APK}{2}{section.1.3}%
+\contentsline {section}{\numberline {1.4}The Role and Importance of AndroidManifest.xml}{3}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Why We Check AndroidManifest.xml}{4}{section.1.5}%
+\contentsline {section}{\numberline {1.6} VigiDroid Does With It}{4}{section.1.6}%
+\contentsline {section}{\numberline {1.7}Thesis Contributions and Outline}{5}{section.1.7}%
+\contentsline {chapter}{\numberline {2}Background and Related Works}{7}{chapter.2}%
+\contentsline {section}{\numberline {2.1}LinRegDroid: Permission-Based Detection via Multiple Linear Regressionv}{7}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Detecting Android Malware by Mining Statically Registered Broadcast Receivers}{8}{section.2.2}%
+\contentsline {section}{\numberline {2.3}One-Dimensional Convolutional Neural Networks For Android Malware Detection}{9}{section.2.3}%
+\contentsline {section}{\numberline {2.4}SeqMobile: An Efficient Sequence-Based Malware Detection System Using RNN on Mobile Devices}{9}{section.2.4}%
+\contentsline {section}{\numberline {2.5}A Lightweight Multi-Source Fast Android Malware Detection Model }{10}{section.2.5}%
+\contentsline {section}{\numberline {2.6} SAMADroid: A Novel 3-Level Hybrid Malware Detection Model}{11}{section.2.6}%
+\contentsline {section}{\numberline {2.7} DL-Droid: Deep Learning Based Android Malware Detection Using Real Devices}{12}{section.2.7}%
+\contentsline {chapter}{\numberline {3}Proposed Methodology}{13}{chapter.3}%
+\contentsline {section}{\numberline {3.1} Model Development }{13}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}On-Device System: VigiDroid}{14}{subsection.3.1.1}%
+\contentsline {chapter}{\numberline {4}Experiments}{17}{chapter.4}%
+\contentsline {section}{\numberline {4.1} Dataset Provenance and Characterization}{17}{section.4.1}%
+\contentsline {section}{\numberline {4.2} Feature Engineering, Extraction, and Normalization}{18}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Manifest Permissions and Intents}{18}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2} Statically Registered Broadcast Receivers}{18}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3} Header Metadata}{19}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4} Raw Tail Byte Sequences}{19}{subsection.4.2.4}%
+\contentsline {section}{\numberline {4.3}Model Optimization, Compilation, and ONNX Export}{19}{section.4.3}%
+\contentsline {section}{\numberline {4.4}On-Device Hardware Profiling Infrastructure}{20}{section.4.4}%
+\contentsline {chapter}{\numberline {5} Professional Practices, Team Dynamics, and Lifelong Learning}{23}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Considerations of Professional Ethics, Responsibilities, and Norms of Engineering Practice}{23}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1} Research and Data Ethics}{23}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2} Practices and Conventional Norms}{24}{subsection.5.1.2}%
+\contentsline {section}{\numberline {5.2} Reflection on Project Management, Team Dynamics, and Economic Decision Making}{24}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1} Project Management and Milestones}{24}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2} Team Dynamics and Collaboration}{25}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Economic and Financial Decision-Making}{25}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}Reflection on Self-directed and Lifelong Learning to Navigate Technological Change}{26}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1} Self-Directed Learning Mechanics}{26}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Framework for Lifelong Learning}{27}{subsection.5.3.2}%
+\contentsline {chapter}{\numberline {6}Conclusion}{28}{chapter.6}%
+\contentsline {section}{\numberline {6.1} Thesis Summary and Key Findings}{28}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Research Limitations}{29}{section.6.2}%
+\contentsline {section}{\numberline {6.3} Future Work Directions}{29}{section.6.3}%
+\contentsline {chapter}{References}{31}{section.6.3}%
+\contentsline {chapter}{\numberline {7}Algorithms}{32}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Sample Algorithm}{32}{section.7.1}%
+\contentsline {chapter}{\numberline {8}Codes}{33}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Sample Code}{33}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Another Sample Code}{34}{section.8.2}%

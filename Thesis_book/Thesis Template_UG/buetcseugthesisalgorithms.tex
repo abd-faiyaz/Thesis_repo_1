@@ -1,0 +1,60 @@
+\chapter{Algorithms}\label{ch:algorithms}
+
+This appendix collects the principal algorithms that underpin VigiDroid's offline training pipeline, on-device cascade orchestration, and metrics post-processing. Each procedure is stated at the level of abstraction used in our implementation, omitting language-specific details while preserving the semantics required for PC--device parity.
+
+\section{MLDP Permission Selection}
+Algorithm~\ref{alg:mldp} implements the train-only permission subset selection described by Wang et al.~\cite{mldp}. The procedure combines PRNR ranking, support filtering, and association-rule mining on malware-only transactions before vectorizing each APK as a binary flag vector over the frozen set~$S$.
+
+\begin{algorithm}
+  \caption{MLDP permission subset selection (train split only)}
+  \label{alg:mldp}
+  \begin{algorithmic}
+    \input{algorithms/mldp_selection.alg}
+  \end{algorithmic}
+\end{algorithm}
+
+\section{DEX Header Feature Extraction}
+Algorithm~\ref{alg:dexheader} defines the multidex sum-pooled header representation shared by BM1, Pattern~A, the MLDP+DEX cascade, and Dex+Broadcast fusion. Bytes~8--111 of each \texttt{classes*.dex} entry are min--max normalized using statistics computed exclusively on the training split.
+
+\begin{algorithm}
+  \caption{Multidex DEX header feature extraction}
+  \label{alg:dexheader}
+  \begin{algorithmic}
+    \input{algorithms/dex_header.alg}
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Cascade Tier Decision}
+Algorithm~\ref{alg:cascade} formalizes the per-tier gating logic used by \texttt{ScanOrchestrator}. Tier~1 additionally enables a \emph{conservative malware OR} rule: if either lightweight model exceeds its malware threshold, the scan exits immediately as malware even when the weighted average remains below~$t_{\mathrm{high}}$.
+
+\begin{algorithm}
+  \caption{Cascade tier exit decision}
+  \label{alg:cascade}
+  \begin{algorithmic}
+    \input{algorithms/cascade_tier.alg}
+  \end{algorithmic}
+\end{algorithm}
+
+\section{ONNX Parity Verification}
+Phase~P8 of every model pipeline requires that exported ONNX graphs reproduce PyTorch probabilities within $10^{-4}$ on a fixed parity sample set shipped inside each export bundle.
+
+\begin{algorithm}
+  \caption{PyTorch--ONNX parity gate (P8)}
+  \label{alg:parity}
+  \begin{algorithmic}
+    \input{algorithms/onnx_parity.alg}
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Device Metrics Conversion}
+On-device scans are logged append-only to \texttt{all\_scan\_metrics.jsonl}. Algorithm~\ref{alg:jsonl} folds this stream into the legacy \texttt{all\_scan\_metrics.json} structure consumed by plotting and aggregation scripts.
+
+\begin{algorithm}
+  \caption{JSONL-to-JSON metrics consolidation}
+  \label{alg:jsonl}
+  \begin{algorithmic}
+    \input{algorithms/metrics_jsonl.alg}
+  \end{algorithmic}
+\end{algorithm}
+
+\endinput

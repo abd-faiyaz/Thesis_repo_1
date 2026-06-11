@@ -1,0 +1,24 @@
+\begin{thebibliography}{1}
+
+\bibitem{linregdroid}
+D.~�. Şahın, S.~Akleylek, and E.~Kiliç, ``Linregdroid: Detection of android malware using multiple linear regression models-based classifiers,'' {\em IEEE Access}, vol.~10, pp.~14246--14259, 2022.
+
+\bibitem{broadcast}
+F.~Mohsen, H.~Bisgin, Z.~Scott, and K.~Strait, ``Detecting android malwares by mining statically registered broadcast receivers,'' in {\em 2017 IEEE 3rd International Conference on Collaboration and Internet Computing (CIC)}, pp.~67--76, 2017.
+
+\bibitem{byteCNN}
+C.~Hasegawa and H.~Iyatomi, ``One-dimensional convolutional neural networks for android malware detection,'' in {\em 2018 IEEE 14th International Colloquium on Signal Processing & Its Applications (CSPA)}, pp.~99--102, 2018.
+
+\bibitem{seqmobile}
+R.~Feng, J.~Q. Lim, S.~Chen, S.-W. Lin, and Y.~Liu, ``Seqmobile: An efficient sequence-based malware detection system using rnn on mobile devices,'' in {\em 2020 25th International Conference on Engineering of Complex Computer Systems (ICECCS)}, pp.~63--72, 2020.
+
+\bibitem{msfdroid}
+J.~L. J. H. Z. Z. R.~H. Tao~Peng, Bochao~Hu and X.~Hu, ``A lightweight multi-source fast android malware detection model,'' {\em Appl. Sci.}, 2022.
+
+\bibitem{samadroid}
+S.~Arshad, M.~A. Shah, A.~Wahid, A.~Mehmood, H.~Song, and H.~Yu, ``Samadroid: A novel 3-level hybrid malware detection model for android operating system,'' {\em IEEE Access}, vol.~6, pp.~4321--4339, 2018.
+
+\bibitem{dldroid}
+M.~Alzaylaee, S.~Yerima, and S.~Sezer, ``Dl-droid: Deep learning based android malware detection using real devices,'' 11 2019.
+
+\end{thebibliography}
